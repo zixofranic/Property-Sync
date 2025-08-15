@@ -1,0 +1,97 @@
+'use client';
+
+import { useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { useMissionControlStore } from '@/stores/missionControlStore';
+
+const icons = {
+  success: CheckCircle,
+  error: AlertCircle,
+  warning: AlertTriangle,
+  info: Info,
+};
+
+const colors = {
+  success: 'from-green-500 to-emerald-600 border-green-500/20',
+  error: 'from-red-500 to-rose-600 border-red-500/20',
+  warning: 'from-yellow-500 to-amber-600 border-yellow-500/20',
+  info: 'from-blue-500 to-cyan-600 border-blue-500/20',
+};
+
+export function Notifications() {
+  const { notifications, removeNotification } = useMissionControlStore();
+
+  useEffect(() => {
+    const timers = (notifications || []).map(notification => {
+      if (!notification.read) {
+        return setTimeout(() => {
+          removeNotification(notification.id);
+        }, 5000);
+      }
+      return null;
+    });
+
+    return () => {
+      timers.forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, [notifications, removeNotification]);
+
+  return (
+    <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
+      <AnimatePresence>
+        {(notifications || []).slice(0, 5).map((notification) => {
+          const Icon = icons[notification.type];
+          const colorClass = colors[notification.type];
+
+          return (
+            <motion.div
+              key={notification.id}
+              initial={{ opacity: 0, x: 300, scale: 0.3 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 300, scale: 0.5, transition: { duration: 0.2 } }}
+              className={`
+                relative overflow-hidden rounded-xl border backdrop-blur-sm shadow-2xl
+                bg-gradient-to-r ${colorClass}
+                max-w-sm w-full pointer-events-auto
+              `}
+            >
+              <div className="p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="ml-3 w-0 flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {notification.title}
+                    </p>
+                    <p className="mt-1 text-sm text-white/80">
+                      {notification.message}
+                    </p>
+                  </div>
+                  <div className="ml-4 flex-shrink-0 flex">
+                    <button
+                      className="inline-flex text-white hover:text-white/80 focus:outline-none"
+                      onClick={() => removeNotification(notification.id)}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <motion.div
+                className="absolute bottom-0 left-0 h-1 bg-white/30"
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: 5, ease: 'linear' }}
+              />
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </div>
+  );
+}

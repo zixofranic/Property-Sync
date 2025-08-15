@@ -1,0 +1,303 @@
+// Property Sync - Complete Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  FREE
+  PRO
+  PREMIUM
+  ENTERPRISE
+}
+
+enum FeedbackType {
+  love     
+  like     
+  dislike  
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PENDING
+  TRIAL
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  isActive    Boolean  @default(true)
+  
+  // Email verification system
+  emailVerified Boolean @default(false)
+  verificationToken String? @unique
+  verificationExpiry DateTime?
+  
+  // Password reset system (for future)
+  resetToken String? @unique
+  resetExpiry DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  profile     Profile?
+  clients     Client[]
+  timelines   Timeline[]
+  
+  @@map("users")
+}
+
+model Profile {
+  id           String  @id @default(cuid())
+  firstName    String
+  lastName     String
+  company      String? // Brokerage
+  phone        String?
+  website      String?
+  licenseNumber String? // Real estate license
+  
+  // Branding (Pro+ feature)
+  logo         String? // URL to logo image
+  brandColor   String? @default("#0ea5e9") // Hex color code
+  
+  // Subscription management
+  plan         Plan    @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  clientLimit  Int     @default(5) // Based on plan
+  propertyLimit Int    @default(25) // Properties per month
+  
+  // Stripe integration
+  stripeCustomerId   String?
+  subscriptionId     String?
+  subscriptionItemId String?
+  billingCycleStart  DateTime?
+  billingCycleEnd    DateTime?
+  
+  // Usage tracking
+  currentMonthProperties Int @default(0)
+  lastUsageReset DateTime @default(now())
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("profiles")
+}
+
+model Client {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  spouseEmail String?  // 🆕 ADD THIS FIELD
+  phone       String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  
+  // Engagement analytics
+  totalViews       Int @default(0)
+  avgResponseTime  Int @default(0) // in hours
+  feedbackRate     Float @default(0.0) // percentage
+  lastActivity     DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  agentId     String
+  agent       User       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  timelines   Timeline[]
+  feedback    Feedback[] // 🆕 ADD THIS RELATION
+  
+  @@map("clients")
+}
+
+model Timeline {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  shareToken  String   @unique @default(cuid()) // For shareable links
+  isActive    Boolean  @default(true)
+  
+  // View tracking & analytics
+  totalViews  Int      @default(0)
+  lastViewed  DateTime?
+  viewHistory Json?    // Track view timestamps
+  
+  // Agent access token
+  agentToken  String?  @unique
+  tokenExpiry DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  agentId     String
+  agent       User       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  properties  Property[]
+  clientAuth  ClientAuth[]
+  analytics   ClientAnalytics[]
+  
+  @@map("timelines")
+}
+
+model Property {
+  id              String   @id @default(cuid())
+  mlsId           String?  // MLS listing ID
+  address         String
+  city            String?
+  state           String?
+  zipCode         String?
+  price           Int      // Store in cents
+  bedrooms        Int?
+  bathrooms       Float?
+  squareFootage   Int?
+  propertyType    String?  // House, Condo, Townhome
+  description     String?  // Property description
+  imageUrls       String[] // Array of image URLs
+  listingUrl      String?  // MLS link
+  
+  // Agent management
+  agentNotes      String?
+  isHighlighted   Boolean  @default(false)
+  
+  // Timeline positioning & status
+  position        Int      @default(0) // Order in timeline
+  isViewed        Boolean  @default(false) // Client viewed
+  viewedAt        DateTime?
+  
+  // Bulk operations
+  isQueued        Boolean  @default(false)
+  queuedForEmail  Boolean  @default(false)
+  emailSent       Boolean  @default(false)
+  emailSentAt     DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  timelineId      String
+  timeline        Timeline   @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  feedback        Feedback[]
+  
+  @@map("properties")
+}
+
+model Feedback {
+  id          String       @id @default(cuid())
+  feedback    FeedbackType 
+  notes       String?
+  clientName  String       
+  clientEmail String       
+  
+  // ADD clientId for our TimelinesService upsert logic
+  clientId    String       // Links to Client table
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  // Enhanced engagement tracking
+  viewedAt    DateTime     @default(now())
+  respondedAt DateTime?
+  responseTime Int?        
+  ipAddress   String?      
+  userAgent   String?      
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  // Relations
+  propertyId  String
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  // UPDATE unique constraint for our upsert logic
+  @@unique([propertyId, clientId], name: "propertyId_clientId")
+  @@map("feedback")
+}
+
+
+// Usage tracking for analytics
+model UsageLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // 'property_created', 'client_created', 'email_sent'
+  metadata  Json?    // Additional data
+  createdAt DateTime @default(now())
+  
+  @@map("usage_logs")
+}
+ 
+ // TrackEvent table for analytics
+model TrackEvent {
+  id        String   @id @default(cuid())
+  clientId  String
+  eventType String   // 'property_feedback', 'timeline_email_sent', etc.
+  metadata  Json?    // Flexible storage for event data
+  timestamp DateTime @default(now())
+  
+  @@index([clientId, eventType])
+  @@index([timestamp])
+  @@map("track_events")
+}
+
+// Email templates for different plans
+model EmailTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  subject     String
+  htmlContent String
+  textContent String?
+  isDefault   Boolean @default(false)
+  planAccess  Plan[]  // Which plans can use this template
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("email_templates")
+}
+
+model ClientAuth {
+  id            String   @id @default(cuid())
+  clientName    String   // firstName from client login  
+  phoneLastFour String   // last 4 digits for simple auth
+  timelineId    String   // connects to existing Timeline
+  sessionToken  String   @unique @default(cuid())
+  lastAccess    DateTime @default(now())
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  
+  // Relation to your existing Timeline model
+  timeline      Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionToken])
+  @@index([timelineId])
+  @@map("client_auth")
+}
+
+model ClientAnalytics {
+  id         String   @id @default(cuid())
+  timelineId String   // connects to existing Timeline
+  eventType  String   // 'timeline_view', 'property_view', 'feedback_submit', 'email_open'
+  propertyId String?  // optional, for property-specific events
+  metadata   Json?    // flexible data storage (IP, user agent, etc.)
+  timestamp  DateTime @default(now())
+  
+  // Relation to your existing Timeline model  
+  timeline   Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  @@index([timelineId, eventType])
+  @@index([timestamp])
+  @@map("client_analytics")
+}
