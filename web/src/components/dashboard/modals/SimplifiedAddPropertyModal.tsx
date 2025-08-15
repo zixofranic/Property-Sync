@@ -162,79 +162,121 @@ export function SimplifiedAddPropertyModal({ isOpen, onClose }: SimplifiedAddPro
   }
 };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ✅ FIX: Replace the handleSubmit function with this:
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!selectedClient) {
+    addNotification({
+      type: 'error',
+      title: 'No Client Selected',
+      message: 'Please select a client first.'
+    });
+    return;
+  }
+
+  // Final duplicate check
+  if (formData.mlsLink && checkMLSDuplicate(selectedClient.id, formData.mlsLink)) {
+    addNotification({
+      type: 'error',
+      title: 'Duplicate Property Blocked',
+      message: 'This MLS property has already been shared with this client.'
+    });
+    return;
+  }
+
+  if (!formData.address || !formData.price || !formData.description) {
+    addNotification({
+      type: 'error',
+      title: 'Missing Information',
+      message: 'Please fill in all required fields.'
+    });
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    // ✅ FIX: Ensure valid URLs for backend validation
+    let validImageUrl = formData.imageUrl;
     
-    if (!selectedClient) {
-      addNotification({
-        type: 'error',
-        title: 'No Client Selected',
-        message: 'Please select a client first.'
-      });
-      return;
-    }
-
-    // Final duplicate check
-    if (formData.mlsLink && checkMLSDuplicate(selectedClient.id, formData.mlsLink)) {
-      addNotification({
-        type: 'error',
-        title: 'Duplicate Property Blocked',
-        message: 'This MLS property has already been shared with this client.'
-      });
-      return;
-    }
-
-    if (!formData.address || !formData.price || !formData.description) {
-      addNotification({
-        type: 'error',
-        title: 'Missing Information',
-        message: 'Please fill in all required fields.'
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      addProperty(selectedClient.id, {
-  ...formData,
-        imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x300?text=Property+Image'
-       });
-
-      const modeText = bulkMode ? 'Added to bulk queue!' : 'Email sent to client!';
+    // Convert blob URLs or invalid URLs to a default
+    if (!validImageUrl || 
+        validImageUrl.startsWith('blob:') || 
+        !validImageUrl.match(/^https?:\/\/.+/)) {
+      validImageUrl = 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&h=600&fit=crop';
       
       addNotification({
-        type: 'success',
-        title: 'Property Added',
-        message: `${formData.address} - ${modeText}`
+        type: 'info',
+        title: 'Image URL Fixed',
+        message: 'Using default image since uploaded file cannot be persisted.',
+        read: false,
       });
+    }
 
-      // Reset form
-      setFormData({
-        address: '',
-        price: 0,
-        description: '',
-        imageUrl: '',
-        mlsLink: ''
-      });
-      setImagePreview(null);
-      setMlsDuplicateWarning(false);
+    // ✅ FIX: Clean MLS link
+    let validMlsLink = formData.mlsLink?.trim();
+    if (validMlsLink && !validMlsLink.match(/^https?:\/\/.+/)) {
+      validMlsLink = undefined; // Remove invalid MLS links
+    }
 
-      if (!bulkMode) {
-        onClose();
-      }
-    } catch (error) {
+    // ✅ FIX: Ensure price is proper number
+    const cleanPrice = parseInt(formData.price.toString()) || 0;
+    if (cleanPrice <= 0) {
       addNotification({
         type: 'error',
-        title: 'Failed to Add Property',
-        message: 'Something went wrong. Please try again.'
+        title: 'Invalid Price',
+        message: 'Please enter a valid price greater than 0'
       });
-    } finally {
       setIsLoading(false);
+      return;
     }
-  };
+
+    const propertyData = {
+      address: formData.address.trim(),
+      price: cleanPrice,
+      description: formData.description.trim(),
+      imageUrl: validImageUrl,
+      mlsLink: validMlsLink,
+    };
+
+    console.log('🔍 Sending property data:', propertyData);
+
+    await addProperty(selectedClient.id, propertyData);
+
+    const modeText = bulkMode ? 'Added to bulk queue!' : 'Email sent to client!';
+    
+    addNotification({
+      type: 'success',
+      title: 'Property Added',
+      message: `${formData.address} - ${modeText}`
+    });
+
+    // Reset form
+    setFormData({
+      address: '',
+      price: 0,
+      description: '',
+      imageUrl: '',
+      mlsLink: ''
+    });
+    setImagePreview(null);
+    setMlsDuplicateWarning(false);
+
+    if (!bulkMode) {
+      onClose();
+    }
+  } catch (error) {
+    console.error('Property creation error:', error);
+    addNotification({
+      type: 'error',
+      title: 'Failed to Add Property',
+      message: 'Something went wrong. Please try again.'
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <AnimatePresence>

@@ -1,9 +1,8 @@
-// apps/web/src/app/layout.tsx
+// apps/web/src/app/layout.tsx - FIXED: Restore AuthProvider wrapper
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/providers/AuthProvider';
-import { Notifications } from '@/components/ui/Notifications';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,14 +16,13 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  console.log('🔵 LAYOUT: Loading with AuthProvider');
+
   return (
     <html lang="en">
-      <body className={inter.className}
-      suppressHydrationWarning={true} 
-      >
+      <body className={inter.className} suppressHydrationWarning={true}>
         <AuthProvider>
           {children}
-          <Notifications />
         </AuthProvider>
       </body>
     </html>

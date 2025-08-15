@@ -1,4 +1,4 @@
-// apps/web/src/lib/api-client.ts - ENHANCED API CLIENT WITH JWT MANAGEMENT
+// apps/web/src/lib/api-client.ts - FIXED: Simplified session management, removed duplicate monitoring
 import { Client, Property, Timeline } from '@/stores/missionControlStore';
 
 // 🔧 API Response Types
@@ -79,7 +79,7 @@ export interface AnalyticsDashboard {
   activeTimelines: number;
 }
 
-// 🔒 Token Management Types
+// 🔑 Token Management Types
 interface TokenData {
   accessToken: string;
   refreshToken: string;
@@ -105,14 +105,56 @@ class ApiClient {
   private onAuthExpired: (() => void) | null = null;
   private onAuthRefreshed: ((user: LoginResponse['user']) => void) | null = null;
 
+  // 🆕 SIMPLIFIED: Basic activity tracking (no intervals)
+  private lastActivityTime: number = Date.now();
+
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    
-    // Initialize with stored tokens
-    if (typeof window !== 'undefined') {
-      this.loadStoredTokens();
-    }
+  this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  
+  // Initialize with stored tokens
+  if (typeof window !== 'undefined') {
+    this.loadStoredTokens();
+    console.log('🔧 API Client: Initialized without automatic session monitoring');
   }
+}
+
+  // 🆕 SIMPLIFIED: Basic activity tracking without intervals
+  private trackUserActivity(): void {
+    if (typeof window === 'undefined') return;
+
+    const updateActivity = () => {
+      this.lastActivityTime = Date.now();
+    };
+
+    // Track various user activities
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+      document.addEventListener(event, updateActivity, { passive: true });
+    });
+
+    // Track tab visibility changes
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        this.lastActivityTime = Date.now();
+      }
+    });
+  }
+
+  // 🆕 SIMPLIFIED: Manual session validation (called by store/AuthProvider)
+public async checkSession(): Promise<boolean> {
+  if (!this.tokenData) {
+    console.log('🔍 API Client: No token data available');
+    return false;
+  }
+
+  // Check if token is expired
+  if (this.isTokenExpired()) {
+    console.log('🔍 API Client: Token expired, attempting refresh...');
+    return await this.refreshTokens();
+  }
+
+  console.log('✅ API Client: Session is valid');
+  return true;
+}
 
   // 🔧 Token Management Methods
   private loadStoredTokens(): void {
@@ -127,6 +169,14 @@ class ApiClient {
           refreshToken,
           expiresAt: parseInt(expiresAt, 10),
         };
+
+        // Validate loaded tokens
+        if (this.isTokenExpired()) {
+          console.log('🔑 Stored token is expired');
+          this.clearTokens();
+        } else {
+          console.log('🔑 Loaded valid stored tokens');
+        }
       }
     } catch (error) {
       console.warn('Failed to load stored tokens:', error);
@@ -150,6 +200,11 @@ class ApiClient {
       localStorage.setItem('refreshToken', loginResponse.refreshToken);
       localStorage.setItem('tokenExpiresAt', expiresAt.toString());
       localStorage.setItem('user', JSON.stringify(loginResponse.user));
+
+      // Reset activity tracking
+      this.lastActivityTime = Date.now();
+      
+      console.log('🔐 Tokens stored successfully, expires at:', new Date(expiresAt).toLocaleString());
     } catch (error) {
       console.error('Failed to store tokens:', error);
     }
@@ -162,6 +217,8 @@ class ApiClient {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('tokenExpiresAt');
       localStorage.removeItem('user');
+      
+      console.log('🔑 Tokens cleared');
     } catch (error) {
       console.warn('Failed to clear tokens:', error);
     }
@@ -184,13 +241,20 @@ class ApiClient {
   private isTokenExpired(): boolean {
     if (!this.tokenData) return true;
     
-    // Consider token expired if it expires within the next 30 seconds
-    const buffer = 30 * 1000; // 30 seconds
-    return Date.now() >= (this.tokenData.expiresAt - buffer);
+    // Consider token expired if it expires within the next 2 minutes (buffer)
+    const buffer = 2 * 60 * 1000; // 2 minutes
+    const isExpired = Date.now() >= (this.tokenData.expiresAt - buffer);
+    
+    if (isExpired) {
+      console.log('🔑 Token is expired or expiring soon');
+    }
+    
+    return isExpired;
   }
 
   private async refreshTokens(): Promise<boolean> {
     if (!this.tokenData?.refreshToken) {
+      console.log('🔑 No refresh token available');
       this.handleAuthExpired();
       return false;
     }
@@ -210,6 +274,7 @@ class ApiClient {
     }
 
     this.isRefreshing = true;
+    console.log('🔄 Attempting token refresh...');
 
     try {
       const response = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
@@ -221,11 +286,13 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        throw new Error(`Refresh failed: ${response.status}`);
+        throw new Error(`Refresh failed: ${response.status} ${response.statusText}`);
       }
 
       const data: LoginResponse = await response.json();
       this.storeTokens(data);
+      
+      console.log('✅ Token refresh successful');
       
       // Notify about successful refresh
       if (this.onAuthRefreshed) {
@@ -237,7 +304,7 @@ class ApiClient {
       
       return true;
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      console.error('❌ Token refresh failed:', error);
       this.handleAuthExpired();
       return false;
     } finally {
@@ -246,6 +313,8 @@ class ApiClient {
   }
 
   private handleAuthExpired(): void {
+    console.log('🔐 Handling authentication expiry');
+    
     this.clearTokens();
     this.rejectQueuedRequests();
     
@@ -258,6 +327,8 @@ class ApiClient {
     const queue = [...this.requestQueue];
     this.requestQueue = [];
 
+    console.log(`🔄 Processing ${queue.length} queued requests`);
+
     queue.forEach(({ url, options, resolve, reject }) => {
       this.executeRequest(url, options)
         .then(resolve)
@@ -269,108 +340,130 @@ class ApiClient {
     const queue = [...this.requestQueue];
     this.requestQueue = [];
 
+    console.log(`❌ Rejecting ${queue.length} queued requests`);
+
     queue.forEach(({ reject }) => {
       reject(new Error('Authentication expired'));
     });
   }
 
-  private async queueRequest(url: string, options: RequestInit): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.requestQueue.push({ url, options, resolve, reject });
+  // ✅ ADD THIS METHOD to your API client class
+private async executeRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  try {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    // Add auth header if we have a valid token
+    if (this.tokenData?.accessToken) {
+      headers.Authorization = `Bearer ${this.tokenData.accessToken}`;
+    }
+
+    console.log(`📡 API Client: ${options.method || 'GET'} ${endpoint}`);
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
     });
+
+    // Handle different response types
+    if (response.status === 204) {
+      return { data: {} as T };
+    }
+
+    const contentType = response.headers.get('content-type');
+    let data: any;
+
+    if (contentType?.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = { message: await response.text() };
+    }
+
+    if (!response.ok) {
+      console.log(`❌ API Client: Request failed - ${response.status}: ${data.message || data.error}`);
+      return { 
+        error: data.message || data.error || `HTTP ${response.status}` 
+      };
+    }
+
+    console.log(`✅ API Client: Request successful`);
+    return { data };
+  } catch (error) {
+    console.error('❌ API Client: Network error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
+    return { error: errorMessage };
   }
+}
+
+
+ // ✅ ADD THIS METHOD to your API client class
+private async queueRequest(url: string, options: RequestInit): Promise<any> {
+  console.log('⏳ Queueing request:', url);
+  return new Promise((resolve, reject) => {
+    this.requestQueue.push({ url, options, resolve, reject });
+  });
+}
 
   // 🔧 Enhanced HTTP Request Method
-  private async executeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    try {
-      const url = `${this.baseUrl}${endpoint}`;
-      
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      };
-
-      // Add auth header if we have a valid token
-      if (this.tokenData?.accessToken) {
-        headers.Authorization = `Bearer ${this.tokenData.accessToken}`;
-      }
-
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      // Handle different response types
-      if (response.status === 204) {
-        return { data: {} as T };
-      }
-
-      const contentType = response.headers.get('content-type');
-      let data: any;
-
-      if (contentType?.includes('application/json')) {
-        data = await response.json();
-      } else {
-        data = { message: await response.text() };
-      }
-
-      if (!response.ok) {
-        return { 
-          error: data.message || data.error || `HTTP ${response.status}` 
-        };
-      }
-
-      return { data };
-    } catch (error) {
-      console.error('API request failed:', error);
-      return { 
-        error: error instanceof Error ? error.message : 'Network error' 
-      };
-    }
-  }
-
   public async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    skipAuth: boolean = false
-  ): Promise<ApiResponse<T>> {
-    // Skip auth for public endpoints
-    if (skipAuth) {
-      return this.executeRequest<T>(endpoint, options);
-    }
-
-    // Check if we need to refresh token
-    if (this.isTokenExpired()) {
-      if (this.isRefreshing) {
-        // Queue this request
-        return this.queueRequest(endpoint, options);
-      }
-
-      const refreshSuccess = await this.refreshTokens();
-      if (!refreshSuccess) {
-        return { error: 'Authentication expired. Please login again.' };
-      }
-    }
-
-    const response = await this.executeRequest<T>(endpoint, options);
-
-    // Handle 401 responses (token might be invalid)
-    if (response.error?.includes('401') || response.error?.includes('Unauthorized')) {
-      // Try to refresh token once
-      const refreshSuccess = await this.refreshTokens();
-      if (refreshSuccess) {
-        // Retry the original request
-        return this.executeRequest<T>(endpoint, options);
-      } else {
-        return { error: 'Authentication expired. Please login again.' };
-      }
-    }
-
-    return response;
+  endpoint: string,
+  options: RequestInit = {},
+  skipAuth: boolean = false
+): Promise<ApiResponse<T>> {
+  // Skip auth for public endpoints
+  if (skipAuth) {
+    console.log('🌐 API Client: Making public request to:', endpoint);
+    return this.executeRequest<T>(endpoint, options);
   }
+
+  // For authenticated requests, check if we have a token
+  if (!this.tokenData?.accessToken) {
+    console.log('❌ API Client: No auth token available');
+    return { error: 'No authentication token available' };
+  }
+
+  // Check if we need to refresh token (simple check)
+  if (this.isTokenExpired()) {
+    console.log('🔄 API Client: Token expired, refreshing...');
+    
+    if (this.isRefreshing) {
+      // Queue this request
+      return this.queueRequest(endpoint, options);
+    }
+
+    const refreshSuccess = await this.refreshTokens();
+    if (!refreshSuccess) {
+      return { error: 'Authentication expired. Please login again.' };
+    }
+  }
+
+  console.log('📡 API Client: Making authenticated request to:', endpoint);
+  const response = await this.executeRequest<T>(endpoint, options);
+
+  // Handle 401 responses with single retry
+  if (response.error?.includes('401') || response.error?.includes('Unauthorized')) {
+    console.log('🔄 API Client: Got 401, attempting single token refresh...');
+    
+    // Try to refresh token once
+    const refreshSuccess = await this.refreshTokens();
+    if (refreshSuccess) {
+      console.log('🔄 API Client: Retry after refresh...');
+      return this.executeRequest<T>(endpoint, options);
+    } else {
+      console.log('❌ API Client: Refresh failed, auth expired');
+      return { error: 'Authentication expired. Please login again.' };
+    }
+  }
+
+  return response;
+}
 
   // 🔧 Event Handlers
   public onAuthenticationExpired(callback: () => void): void {
@@ -383,8 +476,20 @@ class ApiClient {
 
   // 🔧 Auth Status Methods
   public isAuthenticated(): boolean {
-    return !!this.tokenData?.accessToken && !this.isTokenExpired();
+  if (!this.tokenData?.accessToken) {
+    console.log('❌ API Client: No access token');
+    return false;
   }
+  
+  // Simple token expiry check
+  if (this.isTokenExpired()) {
+    console.log('❌ API Client: Token expired');
+    return false;
+  }
+  
+  console.log('✅ API Client: Authenticated');
+  return true;
+}
 
   public getStoredUser(): LoginResponse['user'] | null {
     try {
@@ -397,6 +502,8 @@ class ApiClient {
 
   // 🔐 Authentication Methods
   async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
+    console.log('🔐 Attempting login...');
+    
     const response = await this.request<LoginResponse>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -404,6 +511,9 @@ class ApiClient {
 
     if (response.data) {
       this.storeTokens(response.data);
+      console.log('✅ Login successful');
+    } else {
+      console.log('❌ Login failed:', response.error);
     }
 
     return response;
@@ -427,6 +537,8 @@ class ApiClient {
   }
 
   async logout(): Promise<void> {
+    console.log('🔐 Logging out...');
+    
     try {
       // Call logout endpoint if available
       await this.request('/api/v1/auth/logout', {

@@ -19,7 +19,7 @@ export function ClientsModal({ isOpen, onClose }: ClientsModalProps) {
   const { 
     clients, 
     selectedClient, 
-    setSelectedClient, 
+    selectClient, 
     deleteClient, 
     shareTimeline,
     addNotification 
@@ -37,14 +37,14 @@ export function ClientsModal({ isOpen, onClose }: ClientsModalProps) {
   };
 
   const handleSelectClient = (client: any) => {
-    setSelectedClient(client);
-    addNotification({
-      type: 'info',
-      title: 'Client Selected',
-      message: `Switched to ${client.name}'s timeline.`
-    });
-    onClose();
-  };
+  selectClient(client);  // ✅ This should call selectClient, not selectedClient
+  addNotification({
+    type: 'info',
+    title: 'Client Selected',
+    message: `Switched to ${client.name}'s timeline.`
+  });
+  onClose();
+};
 
   const handleShareTimeline = (client: any) => {
     const shareToken = shareTimeline(client.id);
@@ -117,140 +117,139 @@ export function ClientsModal({ isOpen, onClose }: ClientsModalProps) {
                 </button>
               </div>
             </div>
+{/* Clients List */}
+<div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+ {clients.filter(client => client && client.id).length > 0 ? (
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+     {clients.filter(client => client && client.id).map((client, index) => (
+       <motion.div
+         key={`client-${client.id}-${index}`}
+         initial={{ opacity: 0, y: 20 }}
+         animate={{ opacity: 1, y: 0 }}
+         className={`p-6 rounded-2xl border transition-all duration-300 hover:scale-[1.02] cursor-pointer ${
+           selectedClient?.id === client.id
+             ? 'bg-blue-500/10 border-blue-500/30'
+             : 'bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50'
+         }`}
+         onClick={() => handleSelectClient(client)}
+       >
+         {/* Client Header */}
+         <div className="flex items-start justify-between mb-4">
+           <div className="flex-1">
+             <h3 className="text-lg font-semibold text-white mb-1">
+               {client.name}
+             </h3>
+             <div className="flex items-center space-x-4 text-sm text-slate-400">
+               <div className="flex items-center space-x-1">
+                 <Mail className="w-3 h-3" />
+                 <span>{client.email}</span>
+               </div>
+               {client.phone && (
+                 <div className="flex items-center space-x-1">
+                   <Phone className="w-3 h-3" />
+                   <span>{client.phone}</span>
+                 </div>
+               )}
+             </div>
+           </div>
+           
+           <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
+             {client.status}
+           </div>
+         </div>
 
-            {/* Clients List */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {clients.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {clients.map((client) => (
-                    <motion.div
-                      key={client.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`p-6 rounded-2xl border transition-all duration-300 hover:scale-[1.02] cursor-pointer ${
-                        selectedClient?.id === client.id
-                          ? 'bg-blue-500/10 border-blue-500/30'
-                          : 'bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50'
-                      }`}
-                      onClick={() => handleSelectClient(client)}
-                    >
-                      {/* Client Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-white mb-1">
-                            {client.name}
-                          </h3>
-                          <div className="flex items-center space-x-4 text-sm text-slate-400">
-                            <div className="flex items-center space-x-1">
-                              <Mail className="w-3 h-3" />
-                              <span>{client.email}</span>
-                            </div>
-                            {client.phone && (
-                              <div className="flex items-center space-x-1">
-                                <Phone className="w-3 h-3" />
-                                <span>{client.phone}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
-                          {client.status}
-                        </div>
-                      </div>
+         {/* Client Stats */}
+         <div className="flex items-center space-x-6 mb-4 text-sm">
+           <div className="flex items-center space-x-2">
+             <TrendingUp className="w-4 h-4 text-green-400" />
+             <span className="text-slate-300">Properties:</span>
+             <span className="font-semibold text-green-400">{client.propertiesViewed}</span>
+           </div>
+           
+           <div className="flex items-center space-x-2">
+             <Target className="w-4 h-4 text-yellow-400" />
+             <span className="text-slate-300">Engagement:</span>
+             <span className="font-semibold text-yellow-400">{client.engagementScore}%</span>
+           </div>
+         </div>
 
-                      {/* Client Stats */}
-                      <div className="flex items-center space-x-6 mb-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <TrendingUp className="w-4 h-4 text-green-400" />
-                          <span className="text-slate-300">Properties:</span>
-                          <span className="font-semibold text-green-400">{client.propertiesViewed}</span>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Target className="w-4 h-4 text-yellow-400" />
-                          <span className="text-slate-300">Engagement:</span>
-                          <span className="font-semibold text-yellow-400">{client.engagementScore}%</span>
-                        </div>
-                      </div>
+         <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
+           <div className="flex items-center space-x-1">
+             <Clock className="w-3 h-3" />
+             <span>Last active: {client.lastActive}</span>
+           </div>
+           <span>Added {new Date(client.createdAt).toLocaleDateString()}</span>
+         </div>
 
-                      <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
-                          <span>Last active: {client.lastActive}</span>
-                        </div>
-                        <span>Added {new Date(client.createdAt).toLocaleDateString()}</span>
-                      </div>
+         {/* Action Buttons */}
+         <div className="flex items-center space-x-2">
+           <button
+             onClick={(e) => {
+               e.stopPropagation();
+               handleShareTimeline(client);
+             }}
+             className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"
+           >
+             <Share2 className="w-3 h-3" />
+             <span>Share Timeline</span>
+           </button>
+           
+           <button
+             onClick={(e) => {
+               e.stopPropagation();
+               // TODO: Implement edit client
+               addNotification({
+                 type: 'info',
+                 title: 'Coming Soon',
+                 message: 'Edit client feature coming soon!'
+               });
+             }}
+             className="px-3 py-2 bg-slate-600/50 hover:bg-slate-600/70 text-slate-300 rounded-lg transition-colors"
+           >
+             <Edit3 className="w-3 h-3" />
+           </button>
+           
+           <button
+             onClick={(e) => {
+               e.stopPropagation();
+               handleDeleteClient(client);
+             }}
+             className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
+           >
+             <Trash2 className="w-3 h-3" />
+           </button>
+         </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShareTimeline(client);
-                          }}
-                          className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"
-                        >
-                          <Share2 className="w-3 h-3" />
-                          <span>Share Timeline</span>
-                        </button>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // TODO: Implement edit client
-                            addNotification({
-                              type: 'info',
-                              title: 'Coming Soon',
-                              message: 'Edit client feature coming soon!'
-                            });
-                          }}
-                          className="px-3 py-2 bg-slate-600/50 hover:bg-slate-600/70 text-slate-300 rounded-lg transition-colors"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                        </button>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClient(client);
-                          }}
-                          className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      {/* Selected Indicator */}
-                      {selectedClient?.id === client.id && (
-                        <div className="mt-3 flex items-center justify-center space-x-2 text-blue-400 text-sm font-medium">
-                          <Target className="w-4 h-4" />
-                          <span>Currently Active</span>
-                        </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                /* Empty State */
-                <div className="text-center py-20">
-                  <Users className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No Clients Yet</h3>
-                  <p className="text-slate-400 mb-6 max-w-md mx-auto">
-                    Add your first client to start building property timelines and tracking engagement.
-                  </p>
-                  <button
-                    onClick={() => setShowAddClient(true)}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2 mx-auto"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Add Your First Client</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
+         {/* Selected Indicator */}
+         {selectedClient?.id === client.id && (
+           <div className="mt-3 flex items-center justify-center space-x-2 text-blue-400 text-sm font-medium">
+             <Target className="w-4 h-4" />
+             <span>Currently Active</span>
+           </div>
+         )}
+       </motion.div>
+     ))}
+   </div>
+ ) : (
+   /* Empty State */
+   <div className="text-center py-20">
+     <Users className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+     <h3 className="text-xl font-semibold text-white mb-2">No Clients Yet</h3>
+     <p className="text-slate-400 mb-6 max-w-md mx-auto">
+       Add your first client to start building property timelines and tracking engagement.
+     </p>
+     <button
+       onClick={() => setShowAddClient(true)}
+       className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2 mx-auto"
+     >
+       <UserPlus className="w-4 h-4" />
+       <span>Add Your First Client</span>
+     </button>
+   </div>
+ )}
+</div>
+</motion.div>
+  </motion.div>
       )}
       
       {/* Add Client Modal */}

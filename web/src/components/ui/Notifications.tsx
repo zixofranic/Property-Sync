@@ -27,7 +27,7 @@ export function Notifications() {
       if (!notification.read) {
         return setTimeout(() => {
           removeNotification(notification.id);
-        }, 5000);
+        }, 4000); // ✅ CHANGED: 5000ms → 4000ms (4 seconds)
       }
       return null;
     });
@@ -55,8 +55,9 @@ export function Notifications() {
               className={`
                 relative overflow-hidden rounded-xl border backdrop-blur-sm shadow-2xl
                 bg-gradient-to-r ${colorClass}
-                max-w-sm w-full pointer-events-auto
+                max-w-md w-96 pointer-events-auto
               `}
+              // ✅ CHANGED: max-w-sm w-full → max-w-md w-96 (wider notifications)
             >
               <div className="p-4">
                 <div className="flex items-start">
@@ -86,7 +87,8 @@ export function Notifications() {
                 className="absolute bottom-0 left-0 h-1 bg-white/30"
                 initial={{ width: '100%' }}
                 animate={{ width: '0%' }}
-                transition={{ duration: 5, ease: 'linear' }}
+                transition={{ duration: 4, ease: 'linear' }}
+                // ✅ CHANGED: duration: 5 → duration: 4 (matches the 4s auto-dismiss)
               />
             </motion.div>
           );

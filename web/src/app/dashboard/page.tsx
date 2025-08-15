@@ -4,6 +4,7 @@ import { withAuth } from '@/providers/AuthProvider';
 import { MissionControl } from '@/components/dashboard/MissionControl';
 
 function DashboardPage() {
+console.log('🟢 DASHBOARD: Loading');
   return <MissionControl />;
 }
 

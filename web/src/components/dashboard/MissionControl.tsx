@@ -1,7 +1,7 @@
-// apps/web/src/components/dashboard/MissionControl.tsx - COMPLETE WITH NULL SAFETY FIXES
+// apps/web/src/components/dashboard/MissionControl.tsx - ADDED: Loading animations for data retrieval
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -17,7 +17,11 @@ import {
   Clock,
   TrendingUp,
   Send,
-  Calendar
+  Calendar,
+  Wifi,
+  WifiOff,
+  Shield,
+  Loader2  // ✅ ADDED: Loading icon
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { SimplifiedAddPropertyModal } from './modals/SimplifiedAddPropertyModal';
@@ -25,6 +29,7 @@ import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
 import { Notifications } from '../ui/Notifications';
 import { ClientsModal } from './modals/ClientsModal';
+import { apiClient } from '@/lib/api-client';
 
 export function MissionControl() {
   const { 
@@ -41,6 +46,13 @@ export function MissionControl() {
     getPropertyById,
     bulkMode,
     sendBulkProperties,
+    isAuthenticated,
+    user,
+    logout,
+    // ✅ ADDED: Loading states from store
+    clientsLoading,
+    timelineLoading,
+    analyticsLoading,
   } = useMissionControlStore();
   
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -49,6 +61,28 @@ export function MissionControl() {
     url: '',
     address: ''
   });
+
+  // ✅ SIMPLIFIED: Basic online/offline detection only
+  const [isOnline, setIsOnline] = useState(true);
+
+  // ✅ SIMPLIFIED: Basic online/offline monitoring (no session management)
+  useEffect(() => {
+    // Only handle online/offline detection
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Check initial online status
+    setIsOnline(navigator.onLine);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []); // ✅ FIXED: Empty dependency array, no auth dependencies
 
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
@@ -176,10 +210,109 @@ export function MissionControl() {
     return name.includes(searchTerm) || email.includes(searchTerm);
   });
 
+  // ✅ ADDED: Shimmer loading component for client list
+  const ClientShimmer = () => (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="p-4 border-b border-slate-700/50">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="h-4 bg-gradient-to-r from-slate-600 via-slate-500 to-slate-600 rounded animate-pulse mb-2"></div>
+              <div className="h-3 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded animate-pulse w-3/4 mb-1"></div>
+              <div className="h-2 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded animate-pulse w-1/2"></div>
+            </div>
+            <div className="text-right ml-4">
+              <div className="h-6 w-16 bg-gradient-to-r from-slate-600 via-slate-500 to-slate-600 rounded-full animate-pulse mb-1"></div>
+              <div className="h-2 w-12 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ✅ ADDED: Loading overlay component
+  const LoadingOverlay = ({ message = "Loading..." }: { message?: string }) => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center"
+    >
+      <div className="bg-slate-800/90 rounded-2xl p-8 border border-slate-700/50 shadow-2xl">
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            <div className="absolute inset-0 w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"
+                 style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}>
+            </div>
+          </div>
+          <div>
+            <p className="text-white font-semibold">{message}</p>
+            <p className="text-slate-400 text-sm">Please wait...</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  // ✅ ADDED: Timeline loading skeleton
+  const TimelineLoadingSkeleton = () => (
+    <div className="space-y-12">
+      {[1, 2].map((i) => (
+        <div key={i} className="space-y-8">
+          {/* Date header skeleton */}
+          <div className="flex items-center justify-center">
+            <div className="h-16 w-64 bg-gradient-to-r from-slate-600 via-slate-500 to-slate-600 rounded-2xl animate-pulse"></div>
+          </div>
+          
+          {/* Property cards skeleton */}
+          {[1, 2].map((j) => (
+            <div key={j} className={`flex ${j % 2 === 0 ? 'lg:flex-row-reverse' : ''} items-center space-x-8 lg:space-x-16`}>
+              <div className="flex-1 max-w-2xl">
+                <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                  <div className="space-y-4">
+                    <div className="h-6 bg-gradient-to-r from-slate-600 via-slate-500 to-slate-600 rounded animate-pulse"></div>
+                    <div className="h-32 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded-lg animate-pulse"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded animate-pulse"></div>
+                      <div className="h-4 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded animate-pulse w-3/4"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* ✅ ADDED: Show loading overlay for initial data loading */}
+      <AnimatePresence>
+        {clientsLoading && clients.length === 0 && (
+          <LoadingOverlay message="Loading your clients..." />
+        )}
+      </AnimatePresence>
+
+      {/* ✅ SIMPLIFIED: Basic offline status bar only */}
+      {!isOnline && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm font-medium bg-red-600 text-white"
+        >
+          <div className="flex items-center justify-center space-x-2">
+            <WifiOff className="w-4 h-4" />
+            <span>You are offline. Some features may not work properly.</span>
+          </div>
+        </motion.div>
+      )}
+
       {/* Mission Control HUD */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50">
+      <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
         <div className="flex items-center justify-between p-4">
           {/* Enhanced Client Selector */}
           <div className="relative">
@@ -223,9 +356,11 @@ export function MissionControl() {
                     </div>
                   </div>
 
-                  {/* Client List */}
+                  {/* ✅ ADDED: Client List with loading state */}
                   <div className="max-h-80 overflow-y-auto">
-                    {filteredClients.length > 0 ? (
+                    {clientsLoading ? (
+                      <ClientShimmer />
+                    ) : filteredClients.length > 0 ? (
                       filteredClients.map((client) => (
                         <motion.button
                           key={client.id}
@@ -283,7 +418,7 @@ export function MissionControl() {
             </AnimatePresence>
           </div>
 
-          {/* Enhanced Client Stats HUD */}
+          {/* Enhanced Client Stats HUD with Basic Connection Status */}
           <div className="flex items-center space-x-6">
             {selectedClient && (
               <motion.div
@@ -312,6 +447,14 @@ export function MissionControl() {
             )}
 
             <div className="flex items-center space-x-2">
+              {/* ✅ ADDED: Loading indicator for data operations */}
+              {(clientsLoading || timelineLoading || analyticsLoading) && (
+                <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+              )}
+              
+              {/* Basic Connection Status Indicator */}
+              <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`} />
+              
               <Bell className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
               <Search className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
             </div>
@@ -324,7 +467,7 @@ export function MissionControl() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed top-24 right-6 z-40 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-xl shadow-lg border border-purple-500/30"
+          className={`fixed ${!isOnline ? 'top-32' : 'top-24'} right-6 z-30 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-xl shadow-lg border border-purple-500/30`}
         >
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
@@ -342,7 +485,7 @@ export function MissionControl() {
       )}
 
       {/* Main Timeline Canvas */}
-      <div className="pt-28 px-6 pb-24">
+      <div className={`${!isOnline ? 'pt-40' : 'pt-28'} px-6 pb-24`}>
         <div className="max-w-6xl mx-auto">
           {selectedClient ? (
             <>
@@ -356,10 +499,23 @@ export function MissionControl() {
                   <h1 className="text-4xl font-bold text-white mb-4">
                     {selectedClient.name || 'Client'}'s Property Journey
                   </h1>
+                  
+                  {/* ✅ SIMPLIFIED: Basic user and connection info */}
+                  <div className="flex items-center justify-center space-x-4 text-sm text-slate-400">
+                    <span>Welcome back, {user?.firstName || 'Agent'}</span>
+                    <span>•</span>
+                    <span className={`flex items-center space-x-1 ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
+                      {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                      <span>{isOnline ? 'Online' : 'Offline'}</span>
+                    </span>
+                  </div>
                 </motion.div>
               </div>
 
-              {properties.length > 0 ? (
+              {/* ✅ ADDED: Conditional rendering with loading states */}
+              {timelineLoading ? (
+                <TimelineLoadingSkeleton />
+              ) : properties.length > 0 ? (
                 /* ✅ ENHANCED: Timeline with Date Grouping */
                 <div className="relative">
                   {/* Center Timeline Line for Large Screens */}
@@ -496,14 +652,14 @@ export function MissionControl() {
       <div className="fixed bottom-32 right-20">
         <motion.button
           onClick={() => !selectedClient ? null : setActiveModal('add-property')}
-          disabled={!selectedClient}
+          disabled={!selectedClient || !isOnline}
           className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
-            selectedClient 
+            selectedClient && isOnline
               ? 'hover:scale-110 cursor-pointer' 
               : 'opacity-50 cursor-not-allowed'
           }`}
-          whileHover={{ scale: selectedClient ? 1.1 : 1 }}
-          whileTap={{ scale: selectedClient ? 0.95 : 1 }}
+          whileHover={{ scale: selectedClient && isOnline ? 1.1 : 1 }}
+          whileTap={{ scale: selectedClient && isOnline ? 0.95 : 1 }}
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -551,13 +707,13 @@ export function MissionControl() {
           ].map(({ icon: Icon, label, action, color, disabled }) => (
             <motion.button
               key={action}
-              onClick={() => !disabled && setActiveModal(action)}
-              disabled={disabled}
+              onClick={() => !disabled && isOnline && setActiveModal(action)}
+              disabled={disabled || !isOnline}
               className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
-                disabled ? 'opacity-50 cursor-not-allowed' : ''
+                disabled || !isOnline ? 'opacity-50 cursor-not-allowed' : ''
               }`}
-              whileHover={{ scale: disabled ? 1 : 1.1 }}
-              whileTap={{ scale: disabled ? 1 : 0.95 }}
+              whileHover={{ scale: disabled || !isOnline ? 1 : 1.1 }}
+              whileTap={{ scale: disabled || !isOnline ? 1 : 0.95 }}
             >
               <Icon className="w-5 h-5 text-white" />
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -595,7 +751,7 @@ export function MissionControl() {
       {/* Click outside to close dropdown */}
       {isClientDropdownOpen && (
         <div 
-          className="fixed inset-0 z-40" 
+          className="fixed inset-0 z-30" 
           onClick={() => {
             setIsClientDropdownOpen(false);
             setClientSearch('');

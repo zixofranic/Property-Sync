@@ -8,6 +8,7 @@ import { useMissionControlStore } from '@/stores/missionControlStore';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  console.log('🔴 LOGIN: Loading');
   const router = useRouter();
   const { login, isLoading, isAuthenticated, addNotification } = useMissionControlStore();
   
@@ -19,11 +20,14 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard');
-    }
-  }, [isAuthenticated, router]);
+useEffect(() => {
+  console.log('🟡 LOGIN: Auth check - isAuth:', isAuthenticated, 'loading:', isLoading);
+  
+  if (isAuthenticated && !isLoading) {
+    console.log('🟡 LOGIN: Redirecting to dashboard');
+    router.push('/dashboard');
+  }
+}, [isAuthenticated, isLoading, router]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};

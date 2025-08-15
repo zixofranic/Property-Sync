@@ -1,4 +1,4 @@
-// apps/web/src/stores/missionControlStore.ts - COMPLETE WITH ALL MISSING FUNCTIONS
+// apps/web/src/stores/missionControlStore.ts - FIXED: Resilient auth validation and data loading
 
 import { create } from 'zustand';
 import { devtools, persist, subscribeWithSelector } from 'zustand/middleware';
@@ -104,6 +104,14 @@ interface MissionControlState {
   activeModal: string | null;
   editingProperty: Property | null;
   bulkMode: boolean;
+
+  // ⏰ Polling State
+  pollingInterval: NodeJS.Timeout | null;
+  
+  // 🆕 NEW: Retry and error recovery state
+  retryCount: number;
+  lastDataLoadAttempt: number;
+  isRetrying: boolean;
 }
 
 // 🔧 Store Actions Interface
@@ -113,6 +121,8 @@ interface MissionControlActions {
   logout: () => void;
   setUser: (user: User) => void;
   checkAuthStatus: () => void;
+  refreshAuth: () => Promise<boolean>;
+  loadProfile: () => Promise<void>;
 
   // 👥 Client Actions
   loadClients: () => Promise<void>;
@@ -131,12 +141,17 @@ interface MissionControlActions {
 
   // 📊 Analytics Actions
   loadAnalytics: () => Promise<void>;
+  loadDashboardAnalytics: () => Promise<void>;
 
   // 🔔 Notification Actions
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
+
+  // ⏰ Polling Actions
+  startPolling: () => void;
+  stopPolling: () => void;
 
   // 🔧 UI Actions
   setSidebarOpen: (open: boolean) => void;
@@ -145,6 +160,10 @@ interface MissionControlActions {
   setEditingProperty: (property: Property | null) => void;
   clearErrors: () => void;
 
+  // 🆕 NEW: Retry and recovery actions
+  retryFailedOperations: () => Promise<void>;
+  resetRetryState: () => void;
+
   // 🔧 Helper Actions
   getClientTimeline: (clientId: string) => Timeline | null;
   getPropertyById: (propertyId: string) => Property | undefined;
@@ -152,7 +171,7 @@ interface MissionControlActions {
   sendBulkProperties: (clientId: string) => void;
 }
 
-// 🏪 Zustand Store Creation
+// 🪄 Zustand Store Creation
 export const useMissionControlStore = create<MissionControlState & MissionControlActions>()(
   devtools(
     persist(
@@ -189,67 +208,93 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         editingProperty: null,
         bulkMode: false,
 
+        // ⏰ Initial Polling State
+        pollingInterval: null,
+
+        // 🆕 NEW: Initial retry state
+        retryCount: 0,
+        lastDataLoadAttempt: 0,
+        isRetrying: false,
+
         // 🔐 Authentication Actions
-        login: async (email: string, password: string): Promise<boolean> => {
-          set({ isLoading: true, authError: null });
+login: async (email: string, password: string): Promise<boolean> => {
+  set({ isLoading: true, authError: null });
 
-          try {
-            const response = await apiClient.login(email, password);
-            
-            if (response.error) {
-              set({ authError: response.error, isLoading: false });
-              
-              // Add error notification
-              get().addNotification({
-                type: 'error',
-                title: 'Login Failed',
-                message: response.error,
-                read: false,
-              });
-              
-              return false;
-            }
+  try {
+    console.log('🔐 Store: Attempting login...');
+    const response = await apiClient.login(email, password);
+    
+    if (response.error) {
+      console.log('❌ Store: Login failed:', response.error);
+      set({ authError: response.error, isLoading: false });
+      
+      get().addNotification({
+        type: 'error',
+        title: 'Login Failed',
+        message: response.error,
+        read: false,
+      });
+      
+      return false;
+    }
 
-            if (response.data) {
-              set({
-                user: response.data.user,
-                isAuthenticated: true,
-                isLoading: false,
-                authError: null,
-              });
+    if (response.data) {
+      console.log('✅ Store: Login successful, setting user state');
+      set({
+        user: response.data.user,
+        isAuthenticated: true,
+        isLoading: false,
+        authError: null,
+        retryCount: 0,
+      });
 
-              // Add success notification
-              get().addNotification({
-                type: 'success',
-                title: 'Welcome Back!',
-                message: `Logged in as ${response.data.user.firstName} ${response.data.user.lastName}`,
-                read: false,
-              });
+      get().addNotification({
+        type: 'success',
+        title: 'Welcome Back!',
+        message: `Logged in as ${response.data.user.firstName} ${response.data.user.lastName}`,
+        read: false,
+      });
 
-              // Load initial data after successful login
-              get().loadClients();
-              get().loadAnalytics();
+      // ✅ FIXED: Load data immediately after successful login
+      console.log('📊 Store: Loading data after successful login...');
+      setTimeout(async () => {
+        try {
+          await Promise.allSettled([
+            get().loadClients(),
+            get().loadDashboardAnalytics()
+          ]);
+          console.log('✅ Store: Post-login data loading complete');
+        } catch (error) {
+          console.warn('⚠️ Store: Some data failed to load after login:', error);
+        }
+      }, 100); // Small delay to ensure state is set
 
-              return true;
-            }
+      return true;
+    }
 
-            return false;
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Login failed';
-            set({ authError: errorMessage, isLoading: false });
-            
-            get().addNotification({
-              type: 'error',
-              title: 'Login Error',
-              message: errorMessage,
-              read: false,
-            });
-            
-            return false;
-          }
-        },
+    return false;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Login failed';
+    console.error('❌ Store: Login error:', errorMessage);
+    set({ authError: errorMessage, isLoading: false });
+    
+    get().addNotification({
+      type: 'error',
+      title: 'Login Error',
+      message: errorMessage,
+      read: false,
+    });
+    
+    return false;
+  }
+},
 
         logout: () => {
+          console.log('🔐 Store: Logging out...');
+          
+          // Stop polling
+          get().stopPolling();
+
           // Clear API client tokens
           apiClient.logout();
 
@@ -262,91 +307,258 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             selectedClient: null,
             activeTimeline: null,
             analytics: null,
-            notifications: [], // Clear notifications on logout
+            notifications: [],
             selectedView: 'clients',
             activeModal: null,
             editingProperty: null,
             bulkMode: false,
-          });
-        },
-
-        setUser: (user: User) => {
-          set({ user, isAuthenticated: true });
-        },
-
-        checkAuthStatus: () => {
-          const isAuth = apiClient.isAuthenticated();
-          const storedUser = apiClient.getStoredUser();
-          
-          set({
-            isAuthenticated: isAuth,
-            user: storedUser,
+            pollingInterval: null,
+            retryCount: 0,
+            lastDataLoadAttempt: 0,
+            isRetrying: false,
           });
 
-          // If not authenticated, redirect to login
-          if (!isAuth && typeof window !== 'undefined') {
+          // Redirect to login
+          if (typeof window !== 'undefined') {
             window.location.href = '/login';
           }
         },
 
-        // 👥 Client Actions
-        loadClients: async () => {
-          set({ clientsLoading: true, clientsError: null });
+        setUser: (user: User) => {
+          console.log('🔐 Store: Setting user:', user.email);
+          set({ user, isAuthenticated: true });
+        },
 
+        checkAuthStatus: () => {
+  console.log('🔍 Store: Checking auth status...');
+  const isAuth = apiClient.isAuthenticated();
+  const storedUser = apiClient.getStoredUser();
+  
+  if (isAuth && storedUser) {
+    console.log('✅ Store: Auth status valid, user found');
+    set({
+      isAuthenticated: true,
+      user: storedUser,
+    });
+  } else {
+    console.log('❌ Store: Auth status invalid');
+    set({
+      isAuthenticated: false,
+      user: null,
+    });
+  }
+},
+
+        // 🆕 FIXED: More resilient refresh auth
+        refreshAuth: async (): Promise<boolean> => {
+  const state = get();
+  
+  if (state.isLoading) {
+    console.log('⏳ Store: Auth refresh already in progress');
+    return state.isAuthenticated;
+  }
+
+  try {
+    console.log('🔄 Store: Refreshing authentication...');
+    set({ isLoading: true });
+
+    const response = await apiClient.getProfile();
+    
+    if (response.error) {
+      console.log('❌ Store: Profile fetch failed:', response.error);
+      
+      const isAuthError = response.error.includes('401') || 
+                        response.error.includes('Unauthorized') ||
+                        response.error.includes('Invalid token') ||
+                        response.error.includes('Token expired');
+      
+      if (isAuthError) {
+        console.log('🔐 Store: Auth error detected, clearing auth state');
+        set({ 
+          isAuthenticated: false,
+          user: null,
+          isLoading: false 
+        });
+        return false;
+      } else {
+        console.log('⚠️ Store: Network error, keeping auth state');
+        set({ isLoading: false });
+        return state.isAuthenticated;
+      }
+    }
+
+    if (response.data) {
+      console.log('✅ Store: Auth refresh successful');
+      set({
+        user: response.data,
+        isAuthenticated: true,
+        authError: null,
+        isLoading: false,
+        retryCount: 0,
+      });
+      return true;
+    }
+
+    console.log('❌ Store: No data in profile response');
+    set({ isLoading: false });
+    return false;
+  } catch (error) {
+    console.error('❌ Store: Auth refresh error:', error);
+    set({ isLoading: false });
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      console.log('🔐 Store: Network error indicates auth issue');
+      set({ 
+        isAuthenticated: false,
+        user: null 
+      });
+      return false;
+    } else {
+      console.log('⚠️ Store: Network error, keeping auth state');
+      return get().isAuthenticated;
+    }
+  }
+},
+
+        // 🆕 FIXED: More resilient profile loading
+        loadProfile: async () => {
           try {
-            const response = await apiClient.getClients();
+            console.log('👤 Store: Loading profile...');
+            const response = await apiClient.getProfile();
             
             if (response.error) {
-              set({ clientsError: response.error, clientsLoading: false });
+              console.error('❌ Store: Profile loading failed:', response.error);
               
+              // Don't logout on profile loading errors
               get().addNotification({
-                type: 'error',
-                title: 'Failed to Load Clients',
-                message: response.error,
+                type: 'warning',
+                title: 'Profile Loading Issue',
+                message: 'Unable to load profile information.',
                 read: false,
               });
-              
               return;
             }
 
             if (response.data) {
-              const transformedClients: Client[] = response.data.map((client: ClientResponse) => ({
-                id: client.id,
-                name: client.name,
-                email: client.email,
-                phone: client.phone,
-                avatar: client.avatar,
-                propertiesViewed: client.propertiesViewed,
-                lastActive: client.lastActive,
-                engagementScore: client.engagementScore,
-                status: client.status,
-                createdAt: client.createdAt,
-                timeline: client.timeline,
-              }));
-
-              set({
-                clients: transformedClients,
-                clientsLoading: false,
-                clientsError: null,
-              });
+              console.log('✅ Store: Profile loaded successfully');
+              set({ user: response.data });
             }
           } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to load clients';
-            set({ clientsError: errorMessage, clientsLoading: false });
-            
-            get().addNotification({
-              type: 'error',
-              title: 'Network Error',
-              message: errorMessage,
-              read: false,
-            });
+            console.error('❌ Store: Profile loading error:', error);
+            // Don't logout on network errors during profile loading
           }
         },
+
+        // 🆕 FIXED: More resilient polling
+        startPolling: () => {
+          console.log('⏰ Store: Starting polling...');
+          
+          // Stop existing polling first
+          get().stopPolling();
+
+          // Start new polling interval (every 2 minutes for less aggressive polling)
+          const interval = setInterval(() => {
+            const state = get();
+            if (state.isAuthenticated && !state.isRetrying) {
+              console.log('🔄 Store: Polling refresh...');
+              
+              // Only refresh analytics on polling (lightweight operation)
+              state.loadAnalytics().catch((error) => {
+                console.warn('⚠️ Store: Polling analytics refresh failed:', error);
+                // Don't show notifications for polling failures
+              });
+            } else if (!state.isAuthenticated) {
+              console.log('🛑 Store: Not authenticated, stopping polling');
+              state.stopPolling();
+            }
+          }, 120000); // 2 minutes
+
+          set({ pollingInterval: interval });
+        },
+
+        stopPolling: () => {
+          console.log('🛑 Store: Stopping polling...');
+          const { pollingInterval } = get();
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            set({ pollingInterval: null });
+          }
+        },
+
+
+
+    // 🆕 FIXED: More resilient client loading
+     loadClients: async () => {
+  const state = get();
+  
+  if (state.clientsLoading) {
+    console.log('⏳ Store: Clients already loading');
+    return;
+  }
+
+  set({ clientsLoading: true, clientsError: null });
+  console.log('👥 Store: Loading clients...');
+
+  try {
+    const response = await apiClient.getClients();
+    
+    if (response.error) {
+      console.error('❌ Store: Clients loading failed:', response.error);
+      set({ clientsError: response.error, clientsLoading: false });
+      
+      if (!response.error.toLowerCase().includes('network')) {
+        get().addNotification({
+          type: 'warning',
+          title: 'Clients Loading Issue',
+          message: 'Unable to load clients. Click retry or refresh the page.',
+          read: false,
+        });
+      }
+      return;
+    }
+
+    if (response.data) {
+      console.log('✅ Store: Clients loaded successfully, count:', response.data.length);
+      
+      const transformedClients: Client[] = response.data.map((client: ClientResponse) => ({
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        avatar: client.avatar,
+        propertiesViewed: client.propertiesViewed,
+        lastActive: client.lastActive,
+        engagementScore: client.engagementScore,
+        status: client.status,
+        createdAt: client.createdAt,
+        timeline: client.timeline,
+      }));
+
+      set({
+        clients: transformedClients,
+        clientsLoading: false,
+        clientsError: null,
+      });
+
+      if (!state.selectedClient && transformedClients.length > 0) {
+        console.log('👥 Store: Auto-selecting first client');
+        get().selectClient(transformedClients[0]);
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to load clients';
+    console.error('❌ Store: Clients loading error:', errorMessage);
+    set({ clientsError: errorMessage, clientsLoading: false });
+  }
+},
 
         createClient: async (clientData: Partial<Client>): Promise<Client | null> => {
           set({ clientsLoading: true, clientsError: null });
 
           try {
+            console.log('👥 Store: Creating client...');
             const response = await apiClient.createClient(clientData);
             
             if (response.error) {
@@ -363,6 +575,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
 
             if (response.data) {
+              console.log('✅ Store: Client created successfully');
+              
               const newClient: Client = {
                 id: response.data.id,
                 name: response.data.name,
@@ -411,6 +625,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         updateClient: async (clientId: string, updates: Partial<Client>) => {
           try {
+            console.log('👥 Store: Updating client:', clientId);
             const response = await apiClient.updateClient(clientId, updates);
             
             if (response.error) {
@@ -427,6 +642,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
 
             if (response.data) {
+              console.log('✅ Store: Client updated successfully');
+              
               set((state) => ({
                 clients: state.clients.map((client) =>
                   client.id === clientId
@@ -465,6 +682,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         deleteClient: async (clientId: string) => {
           try {
             const clientName = get().clients.find(c => c.id === clientId)?.name || 'Client';
+            console.log('👥 Store: Deleting client:', clientName);
+            
             const response = await apiClient.deleteClient(clientId);
             
             if (response.error) {
@@ -480,6 +699,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               return;
             }
 
+            console.log('✅ Store: Client deleted successfully');
+            
             set((state) => ({
               clients: state.clients.filter((client) => client.id !== clientId),
               selectedClient: state.selectedClient?.id === clientId ? null : state.selectedClient,
@@ -506,30 +727,36 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        selectClient: (client: Client | null) => {
-          set({ selectedClient: client });
-          
-          // Auto-load timeline when client is selected
-          if (client) {
-            get().loadTimeline(client.id);
-          } else {
-            set({ activeTimeline: null });
-          }
-        },
+       selectClient: (client: Client | null) => {
+  console.log('👥 Store: Selecting client:', client?.name || 'none');
+  set({ selectedClient: client });
+  
+  // Auto-load timeline when client is selected
+  if (client) {
+    console.log('📈 Store: Auto-loading timeline for client:', client.id);
+    get().loadTimeline(client.id);
+  } else {
+    set({ activeTimeline: null });
+  }
+},
 
         // 📈 Timeline Actions
         loadTimeline: async (clientId: string) => {
           set({ timelineLoading: true, timelineError: null });
+          console.log('📈 Store: Loading timeline for client:', clientId);
 
           try {
             const response = await apiClient.getTimeline(clientId);
             
             if (response.error) {
+              console.error('❌ Store: Timeline loading failed:', response.error);
               set({ timelineError: response.error, timelineLoading: false });
               return;
             }
 
             if (response.data) {
+              console.log('✅ Store: Timeline loaded successfully');
+              
               const transformedTimeline: Timeline = {
                 id: response.data.id,
                 clientId: response.data.clientId,
@@ -548,70 +775,147 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load timeline';
+            console.error('❌ Store: Timeline loading error:', errorMessage);
             set({ timelineError: errorMessage, timelineLoading: false });
           }
         },
 
-        addProperty: async (propertyData: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => {
-          const { activeTimeline } = get();
-          if (!activeTimeline?.id) return;
+        // ✅ ADD: setBulkMode method
+setBulkMode: (enabled: boolean) => set({ bulkMode: enabled }),
 
-          set({ timelineLoading: true, timelineError: null });
+// ✅ ADD: shareTimeline method
+shareTimeline: (clientId: string): string => {
+  const client = get().clients.find(c => c.id === clientId);
+  if (!client?.timeline?.shareToken) {
+    get().addNotification({
+      type: 'error',
+      title: 'Share Error',
+      message: 'Timeline not found for this client',
+      read: false,
+    });
+    return '';
+  }
+  return client.timeline.shareToken;
+},
 
-          try {
-            const response = await apiClient.addProperty(activeTimeline.id, {
-              address: propertyData.address,
-              price: propertyData.price,
-              description: propertyData.description,
-              imageUrl: propertyData.imageUrl,
-              mlsLink: propertyData.mlsLink,
-            });
-            
-            if (response.error) {
-              set({ timelineError: response.error, timelineLoading: false });
-              
-              get().addNotification({
-                type: 'error',
-                title: 'Property Add Failed',
-                message: response.error,
-                read: false,
-              });
-              
-              return;
-            }
+// ✅ ADD: checkMLSDuplicate method
+checkMLSDuplicate: (clientId: string, mlsLink: string): boolean => {
+  const timeline = get().getClientTimeline(clientId);
+  if (!timeline?.properties) return false;
+  
+  return timeline.properties.some(property => 
+    property.mlsLink && property.mlsLink === mlsLink
+  );
+},
 
-            if (response.data) {
-              set((state) => ({
-                activeTimeline: state.activeTimeline ? {
-                  ...state.activeTimeline,
-                  properties: [...state.activeTimeline.properties, response.data!],
-                } : null,
-                timelineLoading: false,
-                timelineError: null,
-              }));
+// ✅ ADD: addClient method (alias for createClient)
+addClient: async (clientData: any) => {
+  console.log('👥 Store: addClient called with:', clientData);
+  return get().createClient(clientData);
+},
 
-              get().addNotification({
-                type: 'success',
-                title: 'Property Added',
-                message: `${propertyData.address} has been added to the timeline`,
-                read: false,
-              });
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to add property';
-            set({ timelineError: errorMessage, timelineLoading: false });
-            
-            get().addNotification({
-              type: 'error',
-              title: 'Network Error',
-              message: errorMessage,
-              read: false,
-            });
-          }
-        },
+        addProperty: async (clientIdOrData: string | Omit<Property, 'id' | 'clientId' | 'addedAt'>, propertyData?: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => {
+  let clientId: string;
+  let data: Omit<Property, 'id' | 'clientId' | 'addedAt'>;
+  
+  // Handle both signatures: addProperty(clientId, propertyData) OR addProperty(propertyData)
+  if (typeof clientIdOrData === 'string') {
+    clientId = clientIdOrData;
+    data = propertyData!;
+  } else {
+    // Legacy signature - use selected client
+    const selectedClient = get().selectedClient;
+    if (!selectedClient) {
+      get().addNotification({
+        type: 'error',
+        title: 'No Client Selected',
+        message: 'Please select a client first',
+        read: false,
+      });
+      return;
+    }
+    clientId = selectedClient.id;
+    data = clientIdOrData;
+  }
+
+  // Ensure timeline exists for this client
+  let timeline = get().getClientTimeline(clientId);
+  if (!timeline) {
+    console.log('📈 Store: No timeline found, loading for client:', clientId);
+    await get().loadTimeline(clientId);
+    timeline = get().getClientTimeline(clientId);
+  }
+
+  if (!timeline?.id) {
+    get().addNotification({
+      type: 'error',
+      title: 'Timeline Error',
+      message: 'Could not load timeline for this client',
+      read: false,
+    });
+    return;
+  }
+
+  set({ timelineLoading: true, timelineError: null });
+  console.log('📈 Store: Adding property to timeline:', timeline.id);
+
+  try {
+    const response = await apiClient.addProperty(timeline.id, {
+      address: data.address,
+      price: data.price,
+      description: data.description,
+      imageUrl: data.imageUrl,
+      mlsLink: data.mlsLink,
+    });
+    
+    if (response.error) {
+      set({ timelineError: response.error, timelineLoading: false });
+      
+      get().addNotification({
+        type: 'error',
+        title: 'Property Add Failed',
+        message: response.error,
+        read: false,
+      });
+      
+      return;
+    }
+
+    if (response.data) {
+      console.log('✅ Store: Property added successfully');
+      
+      set((state) => ({
+        activeTimeline: state.activeTimeline ? {
+          ...state.activeTimeline,
+          properties: [...state.activeTimeline.properties, response.data!],
+        } : null,
+        timelineLoading: false,
+        timelineError: null,
+      }));
+
+      get().addNotification({
+        type: 'success',
+        title: 'Property Added',
+        message: `${data.address} has been added to the timeline`,
+        read: false,
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add property';
+    set({ timelineError: errorMessage, timelineLoading: false });
+    
+    get().addNotification({
+      type: 'error',
+      title: 'Network Error',
+      message: errorMessage,
+      read: false,
+    });
+  }
+},
 
         updateProperty: async (propertyId: string, updates: Partial<Property>) => {
           try {
+            console.log('📈 Store: Updating property:', propertyId);
             const response = await apiClient.updateProperty(propertyId, updates);
             
             if (response.error) {
@@ -628,6 +932,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
 
             if (response.data) {
+              console.log('✅ Store: Property updated successfully');
+              
               set((state) => ({
                 activeTimeline: state.activeTimeline ? {
                   ...state.activeTimeline,
@@ -661,6 +967,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         deleteProperty: async (propertyId: string) => {
           try {
             const property = get().activeTimeline?.properties.find(p => p.id === propertyId);
+            console.log('📈 Store: Deleting property:', property?.address);
+            
             const response = await apiClient.deleteProperty(propertyId);
             
             if (response.error) {
@@ -676,6 +984,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               return;
             }
 
+            console.log('✅ Store: Property deleted successfully');
+            
             set((state) => ({
               activeTimeline: state.activeTimeline ? {
                 ...state.activeTimeline,
@@ -706,6 +1016,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         sendTimelineEmail: async (timelineId: string) => {
           try {
+            console.log('📧 Store: Sending timeline email for:', timelineId);
             const response = await apiClient.sendTimelineEmail(timelineId);
             
             if (response.error) {
@@ -722,6 +1033,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
 
             if (response.data) {
+              console.log('✅ Store: Timeline email sent successfully');
               get().addNotification({
                 type: 'success',
                 title: 'Timeline Sent!',
@@ -744,6 +1056,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         revokeTimelineAccess: async (timelineId: string) => {
           try {
+            console.log('🔒 Store: Revoking timeline access for:', timelineId);
             const response = await apiClient.revokeTimelineAccess(timelineId);
             
             if (response.error) {
@@ -761,6 +1074,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
             // Update timeline with new share token
             if (response.data?.newShareToken) {
+              console.log('✅ Store: Timeline access revoked, new token generated');
               set((state) => ({
                 activeTimeline: state.activeTimeline ? {
                   ...state.activeTimeline,
@@ -788,19 +1102,40 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        // 📊 Analytics Actions
+        // 📊 Analytics Actions - FIXED: More resilient analytics loading
         loadAnalytics: async () => {
+          const state = get();
+          
+          // Prevent multiple concurrent loads
+          if (state.analyticsLoading) {
+            console.log('⏳ Store: Analytics already loading');
+            return;
+          }
+
           set({ analyticsLoading: true, analyticsError: null });
+          console.log('📊 Store: Loading analytics...');
 
           try {
             const response = await apiClient.getDashboardAnalytics();
             
             if (response.error) {
+              console.error('❌ Store: Analytics loading failed:', response.error);
               set({ analyticsError: response.error, analyticsLoading: false });
+              
+              // 🆕 FIXED: Less aggressive error notifications for analytics
+              if (!response.error.includes('Network')) {
+                get().addNotification({
+                  type: 'warning',
+                  title: 'Analytics Loading Issue',
+                  message: 'Unable to load analytics data.',
+                  read: false,
+                });
+              }
               return;
             }
 
             if (response.data) {
+              console.log('✅ Store: Analytics loaded successfully');
               set({
                 analytics: response.data,
                 analyticsLoading: false,
@@ -809,8 +1144,24 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load analytics';
+            console.error('❌ Store: Analytics loading error:', errorMessage);
             set({ analyticsError: errorMessage, analyticsLoading: false });
+            
+            // Only show notification for non-network errors
+            if (!errorMessage.includes('Network')) {
+              get().addNotification({
+                type: 'warning',
+                title: 'Analytics Error',
+                message: 'Unable to load analytics due to connection issues.',
+                read: false,
+              });
+            }
           }
+        },
+
+        // 🆕 NEW: Alias for loadAnalytics (for AuthProvider compatibility)
+        loadDashboardAnalytics: async () => {
+          return get().loadAnalytics();
         },
 
         // 🔔 Notification Actions
@@ -842,6 +1193,64 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         clearAllNotifications: () => {
           set({ notifications: [] });
+        },
+
+        // 🆕 NEW: Retry failed operations
+        retryFailedOperations: async () => {
+          const state = get();
+          
+          if (state.isRetrying) {
+            console.log('⏳ Store: Retry already in progress');
+            return;
+          }
+
+          console.log('🔄 Store: Retrying failed operations...');
+          set({ isRetrying: true, retryCount: state.retryCount + 1 });
+
+          try {
+            // Retry failed data loads
+            const retryPromises = [];
+
+            if (state.clientsError) {
+              console.log('🔄 Store: Retrying clients load...');
+              retryPromises.push(get().loadClients());
+            }
+
+            if (state.analyticsError) {
+              console.log('🔄 Store: Retrying analytics load...');
+              retryPromises.push(get().loadAnalytics());
+            }
+
+            if (state.timelineError && state.selectedClient) {
+              console.log('🔄 Store: Retrying timeline load...');
+              retryPromises.push(get().loadTimeline(state.selectedClient.id));
+            }
+
+            await Promise.allSettled(retryPromises);
+            
+            get().addNotification({
+              type: 'info',
+              title: 'Retry Complete',
+              message: 'Attempted to reload failed data.',
+              read: false,
+            });
+
+          } catch (error) {
+            console.error('❌ Store: Retry failed:', error);
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Retry Failed',
+              message: 'Unable to reload data. Please refresh the page.',
+              read: false,
+            });
+          } finally {
+            set({ isRetrying: false, lastDataLoadAttempt: Date.now() });
+          }
+        },
+
+        resetRetryState: () => {
+          set({ retryCount: 0, lastDataLoadAttempt: 0, isRetrying: false });
         },
 
         // 🔧 UI Actions
@@ -908,17 +1317,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 export const initializeApiClientIntegration = () => {
   // Set up API client callbacks
   apiClient.onAuthenticationExpired(() => {
-    console.log('🔐 Authentication expired - logging out');
+    console.log('🔐 API Client: Authentication expired - logging out');
     useMissionControlStore.getState().logout();
-    
-    // Redirect to login page
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
   });
 
   apiClient.onAuthenticationRefreshed((user) => {
-    console.log('🔄 Token refreshed - updating user');
+    console.log('🔄 API Client: Token refreshed - updating user');
     useMissionControlStore.getState().setUser(user);
   });
 
