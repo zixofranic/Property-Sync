@@ -21,7 +21,9 @@ import {
   Wifi,
   WifiOff,
   Shield,
-  Loader2  // ✅ ADDED: Loading icon
+  Loader2,
+  User,
+  Share2
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { SimplifiedAddPropertyModal } from './modals/SimplifiedAddPropertyModal';
@@ -30,6 +32,10 @@ import { PropertyCard } from '../timeline/PropertyCard';
 import { Notifications } from '../ui/Notifications';
 import { ClientsModal } from './modals/ClientsModal';
 import { apiClient } from '@/lib/api-client';
+import { ProfileModal } from '@/components/profile/ProfileModal';
+import { SettingsModal } from '@/components/modals/settings/SettingsModal';
+import { ShareTimelineModal } from '@/components/modals/email/ShareTimelineModal';
+
 
 export function MissionControl() {
   const { 
@@ -49,10 +55,13 @@ export function MissionControl() {
     isAuthenticated,
     user,
     logout,
-    // ✅ ADDED: Loading states from store
     clientsLoading,
     timelineLoading,
     analyticsLoading,
+    userPreferences,
+    updateEmailTemplate,
+    updateUserPreferences,
+    sendTimelineEmail,
   } = useMissionControlStore();
   
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -61,6 +70,11 @@ export function MissionControl() {
     url: '',
     address: ''
   });
+
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // ✅ SIMPLIFIED: Basic online/offline detection only
   const [isOnline, setIsOnline] = useState(true);
@@ -209,6 +223,25 @@ export function MissionControl() {
     
     return name.includes(searchTerm) || email.includes(searchTerm);
   });
+  // Add this after your existing useState declarations
+const testProfileAPI = async () => {
+  try {
+    const response = await apiClient.getProfile();
+    console.log('Profile response:', response);
+    addNotification({
+      type: 'success',
+      title: 'Profile API Test',
+      message: 'Check browser console for profile data'
+    });
+  } catch (error) {
+    console.error('Profile API error:', error);
+    addNotification({
+      type: 'error', 
+      title: 'Profile API Error',
+      message: 'Check browser console for details'
+    });
+  }
+};
 
   // ✅ ADDED: Shimmer loading component for client list
   const ClientShimmer = () => (
@@ -312,7 +345,7 @@ export function MissionControl() {
       )}
 
       {/* Mission Control HUD */}
-      <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
+      <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
         <div className="flex items-center justify-between p-4">
           {/* Enhanced Client Selector */}
           <div className="relative">
@@ -340,7 +373,7 @@ export function MissionControl() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden"
+                  className="absolute top-full left-0 mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[60]"
                 >
                   {/* Search Bar */}
                   <div className="p-4 border-b border-slate-700">
@@ -358,9 +391,9 @@ export function MissionControl() {
 
                   {/* ✅ ADDED: Client List with loading state */}
                   <div className="max-h-80 overflow-y-auto">
-                    {clientsLoading ? (
+                    {clientsLoading && clients.length === 0 ? (
                       <ClientShimmer />
-                    ) : filteredClients.length > 0 ? (
+                           ) : filteredClients.length > 0 ? (
                       filteredClients.map((client) => (
                         <motion.button
                           key={client.id}
@@ -392,7 +425,7 @@ export function MissionControl() {
                         </motion.button>
                       ))
                     ) : (
-                      <div className="p-8 text-center text-slate-400">
+                    <div className="p-8 text-center text-slate-400">
                         <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No clients found</p>
                       </div>
@@ -460,6 +493,41 @@ export function MissionControl() {
             </div>
           </div>
         </div>
+        {/* Settings Modal */}
+<SettingsModal
+  isOpen={showSettingsModal}
+  onClose={() => setShowSettingsModal(false)}
+  user={user || { id: '', email: '', firstName: '', lastName: '', plan: 'FREE' }}
+  preferences={userPreferences || {
+    emailTemplateStyle: 'modern',
+    notifications: { email: true, desktop: true, feedback: true, newProperties: true },
+    theme: 'dark',
+    soundEnabled: true
+  }}
+  onSavePreferences={updateUserPreferences}
+/>
+
+{/* Share Timeline Modal */}
+{selectedClient && (
+  <ShareTimelineModal
+    isOpen={showShareModal}
+    onClose={() => setShowShareModal(false)}
+    client={{
+      id: selectedClient.id,
+      name: selectedClient.name,
+      email: selectedClient.email,
+      phone: selectedClient.phone,
+    }}
+    timeline={{
+      id: currentTimeline?.id || '',
+      shareToken: currentTimeline?.shareToken || '',
+      shareUrl: `${window.location.origin}/timeline/${currentTimeline?.shareToken}`,
+      propertyCount: properties.length,
+    }}
+    agentName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
+    onSendEmail={() => sendTimelineEmail(currentTimeline?.id || '')}
+  />
+)}
       </div>
 
       {/* Enhanced Bulk Send Notification Bar */}
@@ -668,61 +736,67 @@ export function MissionControl() {
         </motion.button>
       </div>
 
-      {/* Enhanced Floating Action Bar */}
-      <div className="fixed bottom-6 right-6">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center space-x-3 bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-3 shadow-2xl"
-        >
-          {[
-            { 
-              icon: Users, 
-              label: 'Clients', 
-              action: 'clients', 
-              color: 'from-blue-500 to-cyan-600',
-              disabled: false 
-            },
-            { 
-              icon: BarChart3, 
-              label: 'Analytics', 
-              action: 'analytics', 
-              color: 'from-purple-500 to-violet-600',
-              disabled: false 
-            },
-            { 
-              icon: Settings, 
-              label: 'Settings', 
-              action: 'settings', 
-              color: 'from-gray-500 to-slate-600',
-              disabled: false 
-            },
-            { 
-              icon: CreditCard, 
-              label: 'Billing', 
-              action: 'billing', 
-              color: 'from-yellow-500 to-orange-600',
-              disabled: false 
-            }
-          ].map(({ icon: Icon, label, action, color, disabled }) => (
-            <motion.button
-              key={action}
-              onClick={() => !disabled && isOnline && setActiveModal(action)}
-              disabled={disabled || !isOnline}
-              className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
-                disabled || !isOnline ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              whileHover={{ scale: disabled || !isOnline ? 1 : 1.1 }}
-              whileTap={{ scale: disabled || !isOnline ? 1 : 0.95 }}
-            >
-              <Icon className="w-5 h-5 text-white" />
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                {label}
-              </div>
-            </motion.button>
-          ))}
-        </motion.div>
-      </div>
+     <div className="fixed bottom-6 right-6">
+  <motion.div
+    initial={{ opacity: 0, y: 50 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex items-center space-x-3 bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-3 shadow-2xl"
+  >
+    {[
+      { 
+        icon: Users, 
+        label: 'Clients', 
+        action: () => setActiveModal('clients'), 
+        color: 'from-blue-500 to-cyan-600',
+        disabled: false 
+      },
+      { 
+        icon: BarChart3, 
+        label: 'Analytics', 
+        action: () => setActiveModal('analytics'), 
+        color: 'from-purple-500 to-violet-600',
+        disabled: false 
+      },
+      { 
+        icon: User, 
+        label: 'Profile', 
+        action: () => setShowProfileModal(true), 
+        color: 'from-green-500 to-emerald-600',
+        disabled: false 
+      },
+      { 
+        icon: Settings, 
+        label: 'Settings', 
+        action: () => setShowSettingsModal(true), // Changed this line
+        color: 'from-gray-500 to-slate-600',
+        disabled: false 
+      },
+      { 
+        icon: Share2, // Add this import to your lucide-react imports
+        label: 'Share Timeline', 
+        action: () => setShowShareModal(true),
+        color: 'from-purple-500 to-pink-600',
+        disabled: !selectedClient 
+      }
+    ].map(({ icon: Icon, label, action, color, disabled }) => (
+      <motion.button
+        key={label}
+        onClick={() => !disabled && action()}
+        disabled={disabled}
+        className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
+          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+        whileHover={{ scale: disabled ? 1 : 1.1 }}
+        whileTap={{ scale: disabled ? 1 : 0.95 }}
+      >
+        <Icon className="w-5 h-5 text-white" />
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          {label}
+        </div>
+      </motion.button>
+    ))}
+  </motion.div>
+</div>
 
       {/* Modals */}
       <SimplifiedAddPropertyModal 
@@ -738,6 +812,25 @@ export function MissionControl() {
         onClose={() => setActiveModal(null)} 
       />
 
+      {/* Settings Modal - Fixed Integration */}
+{showSettingsModal && (
+  <SettingsModal
+    isOpen={showSettingsModal}
+    onClose={() => setShowSettingsModal(false)}
+    user={user || { id: '', email: '', firstName: '', lastName: '', plan: 'FREE' }}
+    preferences={userPreferences || {
+      emailTemplateStyle: 'modern' as const,
+      notifications: { email: true, desktop: true, feedback: true, newProperties: true },
+      theme: 'dark' as const,
+      soundEnabled: true,
+      timezone: 'America/New_York',
+      brandColor: '#3b82f6',
+      logo: ''
+    }}
+    onSavePreferences={updateUserPreferences}
+  />
+)}
+
       <MLSViewModal
         isOpen={mlsModal.isOpen}
         mlsUrl={mlsModal.url}
@@ -751,13 +844,17 @@ export function MissionControl() {
       {/* Click outside to close dropdown */}
       {isClientDropdownOpen && (
         <div 
-          className="fixed inset-0 z-30" 
+          className="fixed inset-0 z-45" 
           onClick={() => {
             setIsClientDropdownOpen(false);
             setClientSearch('');
           }}
         />
       )}
+      <ProfileModal 
+  isOpen={showProfileModal} 
+  onClose={() => setShowProfileModal(false)} 
+/>
     </div>
   );
 }

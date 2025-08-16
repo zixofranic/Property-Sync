@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ResendProvider } from './resend.provider';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 export interface TimelineEmailData {
-  clientEmail: string;
+  to: string;
   clientName: string;
   agentName: string;
   agentCompany: string;
@@ -38,373 +37,174 @@ export interface FeedbackReminderData {
 }
 
 @Injectable()
-export class EmailService {
-  private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+export class ResendProvider {
+  private readonly logger = new Logger(ResendProvider.name);
+  private resend: Resend;
 
-  constructor(
-    private configService: ConfigService,
-    private resendProvider: ResendProvider,
-  ) {
-    this.initializeTransporter();
-  }
-
-  private async initializeTransporter() {
-    if (process.env.NODE_ENV === 'production') {
-      // Production email setup
-      this.transporter = nodemailer.createTransport({
-        host: this.configService.get('SMTP_HOST'),
-        port: 587,
-        secure: false,
-        auth: {
-          user: this.configService.get('SMTP_USER'),
-          pass: this.configService.get('SMTP_PASS'),
-        },
-      });
-    } else {
-      // Development: Use Ethereal Email (fake SMTP for testing)
-      const testAccount = await nodemailer.createTestAccount();
-      
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
+  constructor(private configService: ConfigService) {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!apiKey) {
+      this.logger.warn('RESEND_API_KEY not found. Resend functionality will be limited.');
     }
+    this.resend = new Resend(apiKey);
   }
 
-  // ENHANCED: Timeline Email with Resend Primary + Nodemailer Fallback
-  async sendTimelineEmail(data: TimelineEmailData): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
-    this.logger.log(`Sending timeline email to ${data.clientEmail} via ${data.agentName}`);
+  // ENHANCED: Timeline Email with Modern/Classical Templates
+  async sendTimelineEmail(data: TimelineEmailData) {
+    this.logger.log(`Sending timeline email via Resend to ${data.to}`);
 
-    // Try Resend first
+    const htmlContent = this.generateTimelineEmailHtml(data);
+    const textContent = this.generateTimelineEmailText(data);
+
     try {
-      const resendResult = await this.resendProvider.sendTimelineEmail({
-        to: data.clientEmail,
-        clientName: data.clientName,
-        agentName: data.agentName,
-        agentCompany: data.agentCompany,
-        timelineUrl: data.timelineUrl,
-        propertyCount: data.propertyCount,
-        spouseEmail: data.spouseEmail,
-        agentPhoto: data.agentPhoto,
-        brandColor: data.brandColor || '#3b82f6',
-        templateStyle: data.templateStyle || 'modern',
+      const result = await this.resend.emails.send({
+        from: 'Property Sync <noreply@propertysync.com>',
+        to: data.to,
+        subject: `Your Property Timeline from ${data.agentName}`,
+        html: htmlContent,
+        text: textContent,
+        headers: {
+          'X-Entity-Ref-ID': `timeline-${Date.now()}`,
+        },
       });
 
-      if (resendResult.data?.id) {
-        this.logger.log(`Timeline email sent successfully via Resend: ${resendResult.data.id}`);
-        return {
-          success: true,
-          messageId: resendResult.data.id,
-          provider: 'resend',
-        };
+      // Send to spouse if provided
+      if (data.spouseEmail) {
+        await this.resend.emails.send({
+          from: 'Property Sync <noreply@propertysync.com>',
+          to: data.spouseEmail,
+          subject: `Property Timeline for ${data.clientName} from ${data.agentName}`,
+          html: htmlContent.replace(new RegExp(data.clientName, 'g'), `${data.clientName} and you`),
+          text: textContent.replace(new RegExp(data.clientName, 'g'), `${data.clientName} and you`),
+          headers: {
+            'X-Entity-Ref-ID': `timeline-spouse-${Date.now()}`,
+          },
+        });
       }
-    } catch (error) {
-      this.logger.warn(`Resend failed for timeline email: ${error.message}`);
-      
-      // Check if we should fallback (network, rate limit, auth errors)
-      if (this.shouldFallbackToNodemailer(error)) {
-        this.logger.log('Attempting nodemailer fallback for timeline email...');
-        return await this.sendTimelineEmailViaNodemailer(data);
-      } else {
-        // If it's a non-recoverable error, don't fallback
-        return {
-          success: false,
-          error: `Resend failed: ${error.message}`,
-        };
-      }
-    }
 
-    // If Resend didn't return data but didn't throw, try fallback
-    this.logger.warn('Resend returned no data, attempting nodemailer fallback...');
-    return await this.sendTimelineEmailViaNodemailer(data);
+      return result;
+    } catch (error) {
+      this.logger.error('Resend timeline email failed:', error);
+      throw error;
+    }
   }
 
   // NEW: Property Update Notification
-  async sendPropertyNotification(data: PropertyNotificationData): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    this.logger.log(`Sending property notification to ${data.clientEmail} for ${data.propertyAddress}`);
+  async sendPropertyNotification(data: PropertyNotificationData) {
+    this.logger.log(`Sending property notification via Resend to ${data.clientEmail}`);
+
+    const htmlContent = this.generatePropertyNotificationHtml(data);
+    const textContent = `New Property Added!\n\n${data.agentName} has added a new property to your timeline:\n\n${data.propertyAddress}\nPrice: $${data.propertyPrice.toLocaleString()}\n\n${data.propertyDescription}\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
-      const resendResult = await this.resendProvider.sendPropertyNotification(data);
-      
-      if (resendResult.data?.id) {
-        this.logger.log(`Property notification sent via Resend: ${resendResult.data.id}`);
-        return {
-          success: true,
-          messageId: resendResult.data.id,
-          provider: 'resend',
-        };
-      }
-    } catch (error) {
-      this.logger.warn(`Resend failed for property notification: ${error.message}`);
-      
-      if (this.shouldFallbackToNodemailer(error)) {
-        return await this.sendPropertyNotificationViaNodemailer(data);
-      }
-    }
+      const result = await this.resend.emails.send({
+        from: 'Property Sync <noreply@propertysync.com>',
+        to: data.clientEmail,
+        subject: `New Property Added: ${data.propertyAddress}`,
+        html: htmlContent,
+        text: textContent,
+        headers: {
+          'X-Entity-Ref-ID': `property-notification-${Date.now()}`,
+        },
+      });
 
-    return { success: false };
+      // Send to spouse if provided
+      if (data.spouseEmail) {
+        await this.resend.emails.send({
+          from: 'Property Sync <noreply@propertysync.com>',
+          to: data.spouseEmail,
+          subject: `New Property Added: ${data.propertyAddress}`,
+          html: htmlContent,
+          text: textContent,
+          headers: {
+            'X-Entity-Ref-ID': `property-notification-spouse-${Date.now()}`,
+          },
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error('Resend property notification failed:', error);
+      throw error;
+    }
   }
 
   // NEW: Feedback Reminder Email
-  async sendFeedbackReminder(data: FeedbackReminderData): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    this.logger.log(`Sending feedback reminder to ${data.clientEmail}`);
+  async sendFeedbackReminder(data: FeedbackReminderData) {
+    this.logger.log(`Sending feedback reminder via Resend to ${data.clientEmail}`);
+
+    const htmlContent = this.generateFeedbackReminderHtml(data);
+    const textContent = `Hi ${data.clientName}!\n\nYou have ${data.pendingPropertiesCount} properties waiting for your feedback from ${data.agentName}.\n\nIt's been ${data.daysSinceLastActivity} days since your last activity. Your input helps us find you the perfect home!\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
-      const resendResult = await this.resendProvider.sendFeedbackReminder(data);
-      
-      if (resendResult.data?.id) {
-        this.logger.log(`Feedback reminder sent via Resend: ${resendResult.data.id}`);
-        return {
-          success: true,
-          messageId: resendResult.data.id,
-          provider: 'resend',
-        };
-      }
-    } catch (error) {
-      this.logger.warn(`Resend failed for feedback reminder: ${error.message}`);
-      
-      if (this.shouldFallbackToNodemailer(error)) {
-        return await this.sendFeedbackReminderViaNodemailer(data);
-      }
-    }
-
-    return { success: false };
-  }
-
-  // ENHANCED: Verification Email with Fallback
-  async sendVerificationEmail(email: string, firstName: string, verificationToken: string): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    this.logger.log(`Sending verification email to ${email}`);
-
-    // Try Resend first
-    try {
-      const resendResult = await this.resendProvider.sendVerificationEmail(email, firstName, verificationToken);
-      
-      if (resendResult.data?.id) {
-        this.logger.log(`Verification email sent via Resend: ${resendResult.data.id}`);
-        return {
-          success: true,
-          messageId: resendResult.data.id,
-          provider: 'resend',
-        };
-      }
-    } catch (error) {
-      this.logger.warn(`Resend failed for verification email: ${error.message}`);
-      
-      if (this.shouldFallbackToNodemailer(error)) {
-        return await this.sendVerificationEmailViaNodemailer(email, firstName, verificationToken);
-      }
-    }
-
-    return { success: false };
-  }
-
-  // ENHANCED: Welcome Email with Fallback
-  async sendWelcomeEmail(email: string, firstName: string): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    this.logger.log(`Sending welcome email to ${email}`);
-
-    // Try Resend first
-    try {
-      const resendResult = await this.resendProvider.sendWelcomeEmail(email, firstName);
-      
-      if (resendResult.data?.id) {
-        this.logger.log(`Welcome email sent via Resend: ${resendResult.data.id}`);
-        return {
-          success: true,
-          messageId: resendResult.data.id,
-          provider: 'resend',
-        };
-      }
-    } catch (error) {
-      this.logger.warn(`Resend failed for welcome email: ${error.message}`);
-      
-      if (this.shouldFallbackToNodemailer(error)) {
-        return await this.sendWelcomeEmailViaNodemailer(email, firstName);
-      }
-    }
-
-    return { success: false };
-  }
-
-  // PRIVATE: Fallback Logic
-  private shouldFallbackToNodemailer(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
-    const errorCode = error?.code;
-
-    // Network errors
-    if (errorMessage.includes('network') || 
-        errorMessage.includes('timeout') || 
-        errorMessage.includes('connection') ||
-        errorCode === 'ENOTFOUND' ||
-        errorCode === 'ECONNREFUSED') {
-      return true;
-    }
-
-    // Rate limiting
-    if (errorMessage.includes('rate limit') || 
-        errorMessage.includes('too many requests') ||
-        error?.statusCode === 429) {
-      return true;
-    }
-
-    // Authentication issues
-    if (errorMessage.includes('unauthorized') || 
-        errorMessage.includes('invalid api key') ||
-        errorMessage.includes('authentication') ||
-        error?.statusCode === 401 ||
-        error?.statusCode === 403) {
-      return true;
-    }
-
-    // Service unavailable
-    if (error?.statusCode >= 500) {
-      return true;
-    }
-
-    return false;
-  }
-
-  // PRIVATE: Nodemailer Fallback Methods
-  private async sendTimelineEmailViaNodemailer(data: TimelineEmailData): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
-    try {
-      const mailOptions = {
-        from: '"Property Sync" <noreply@propertysync.com>',
-        to: data.clientEmail,
-        subject: `Your Property Timeline from ${data.agentName}`,
-        html: this.generateTimelineEmailHtmlNodemailer(data),
-        text: this.generateTimelineEmailTextNodemailer(data),
-      };
-
-      const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV !== 'production') {
-        this.logger.log('Nodemailer Preview URL: %s', nodemailer.getTestMessageUrl(info));
-      }
-      
-      return {
-        success: true,
-        messageId: info.messageId,
-        provider: 'nodemailer',
-      };
-    } catch (error) {
-      this.logger.error('Nodemailer fallback failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        provider: 'nodemailer',
-      };
-    }
-  }
-
-  private async sendPropertyNotificationViaNodemailer(data: PropertyNotificationData): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    try {
-      const mailOptions = {
-        from: '"Property Sync" <noreply@propertysync.com>',
-        to: data.clientEmail,
-        subject: `New Property Added: ${data.propertyAddress}`,
-        html: this.generatePropertyNotificationHtml(data),
-        text: `New Property Added!\n\n${data.agentName} has added a new property to your timeline:\n\n${data.propertyAddress}\nPrice: $${data.propertyPrice.toLocaleString()}\n\n${data.propertyDescription}\n\nView your timeline: ${data.timelineUrl}`,
-      };
-
-      const info = await this.transporter.sendMail(mailOptions);
-      return {
-        success: true,
-        messageId: info.messageId,
-        provider: 'nodemailer',
-      };
-    } catch (error) {
-      this.logger.error('Property notification nodemailer fallback failed:', error);
-      return { success: false };
-    }
-  }
-
-  private async sendFeedbackReminderViaNodemailer(data: FeedbackReminderData): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    try {
-      const mailOptions = {
-        from: '"Property Sync" <noreply@propertysync.com>',
+      return await this.resend.emails.send({
+        from: 'Property Sync <noreply@propertysync.com>',
         to: data.clientEmail,
         subject: `Feedback Requested: ${data.pendingPropertiesCount} Properties Await Your Response`,
-        html: this.generateFeedbackReminderHtml(data),
-        text: `Hi ${data.clientName}!\n\nYou have ${data.pendingPropertiesCount} properties waiting for your feedback from ${data.agentName}.\n\nIt's been ${data.daysSinceLastActivity} days since your last activity. Your input helps us find you the perfect home!\n\nView your timeline: ${data.timelineUrl}`,
-      };
-
-      const info = await this.transporter.sendMail(mailOptions);
-      return {
-        success: true,
-        messageId: info.messageId,
-        provider: 'nodemailer',
-      };
+        html: htmlContent,
+        text: textContent,
+        headers: {
+          'X-Entity-Ref-ID': `feedback-reminder-${Date.now()}`,
+        },
+      });
     } catch (error) {
-      this.logger.error('Feedback reminder nodemailer fallback failed:', error);
-      return { success: false };
+      this.logger.error('Resend feedback reminder failed:', error);
+      throw error;
     }
   }
 
-  private async sendVerificationEmailViaNodemailer(email: string, firstName: string, verificationToken: string): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    const verificationUrl = `${this.configService.get('FRONTEND_URL') || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
-    
-    const mailOptions = {
-      from: '"Property Sync" <noreply@propertysync.com>',
-      to: email,
-      subject: 'Welcome to Property Sync - Verify Your Email',
-      html: this.getVerificationEmailTemplate(firstName, verificationUrl),
-      text: `Hi ${firstName},\n\nWelcome to Property Sync! Please verify your email address by clicking the link below:\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nBest regards,\nThe Property Sync Team`,
-    };
+  // NEW: Verification Email via Resend
+  async sendVerificationEmail(email: string, firstName: string, verificationToken: string) {
+    this.logger.log(`Sending verification email via Resend to ${email}`);
+
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    const htmlContent = this.getVerificationEmailTemplate(firstName, verificationUrl);
+    const textContent = `Hi ${firstName},\n\nWelcome to Property Sync! Please verify your email address by clicking the link below:\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nBest regards,\nThe Property Sync Team`;
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV !== 'production') {
-        this.logger.log('Verification Email Preview URL: %s', nodemailer.getTestMessageUrl(info));
-      }
-      
-      return {
-        success: true,
-        messageId: info.messageId,
-        provider: 'nodemailer',
-      };
+      return await this.resend.emails.send({
+        from: 'Property Sync <noreply@propertysync.com>',
+        to: email,
+        subject: 'Welcome to Property Sync - Verify Your Email',
+        html: htmlContent,
+        text: textContent,
+        headers: {
+          'X-Entity-Ref-ID': `verification-${Date.now()}`,
+        },
+      });
     } catch (error) {
-      this.logger.error('Verification email nodemailer fallback failed:', error);
-      return { success: false };
+      this.logger.error('Resend verification email failed:', error);
+      throw error;
     }
   }
 
-  private async sendWelcomeEmailViaNodemailer(email: string, firstName: string): Promise<{ success: boolean; messageId?: string; provider?: string }> {
-    const dashboardUrl = `${this.configService.get('FRONTEND_URL') || 'http://localhost:3000'}/dashboard`;
-    
-    const mailOptions = {
-      from: '"Property Sync" <noreply@propertysync.com>',
-      to: email,
-      subject: '🎉 Welcome to Property Sync - Your Account is Ready!',
-      html: this.getWelcomeEmailTemplate(firstName, dashboardUrl),
-      text: `Hi ${firstName},\n\nYour Property Sync account is now verified and ready to use!\n\nGet started: ${dashboardUrl}\n\nBest regards,\nThe Property Sync Team`,
-    };
+  // NEW: Welcome Email via Resend
+  async sendWelcomeEmail(email: string, firstName: string) {
+    this.logger.log(`Sending welcome email via Resend to ${email}`);
+
+    const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
+    const htmlContent = this.getWelcomeEmailTemplate(firstName, dashboardUrl);
+    const textContent = `Hi ${firstName},\n\nYour Property Sync account is now verified and ready to use!\n\nGet started: ${dashboardUrl}\n\nBest regards,\nThe Property Sync Team`;
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV !== 'production') {
-        this.logger.log('Welcome Email Preview URL: %s', nodemailer.getTestMessageUrl(info));
-      }
-      
-      return {
-        success: true,
-        messageId: info.messageId,
-        provider: 'nodemailer',
-      };
+      return await this.resend.emails.send({
+        from: 'Property Sync <noreply@propertysync.com>',
+        to: email,
+        subject: '🎉 Welcome to Property Sync - Your Account is Ready!',
+        html: htmlContent,
+        text: textContent,
+        headers: {
+          'X-Entity-Ref-ID': `welcome-${Date.now()}`,
+        },
+      });
     } catch (error) {
-      this.logger.error('Welcome email nodemailer fallback failed:', error);
-      return { success: false };
+      this.logger.error('Resend welcome email failed:', error);
+      throw error;
     }
   }
 
-  // PRIVATE: HTML Template Generators (Nodemailer versions)
-  private generateTimelineEmailHtmlNodemailer(data: TimelineEmailData): string {
+  // PRIVATE: Template Generators
+  private generateTimelineEmailHtml(data: TimelineEmailData): string {
     const templateStyle = data.templateStyle || 'modern';
     const brandColor = data.brandColor || '#3b82f6';
     
@@ -415,26 +215,26 @@ export class EmailService {
     }
   }
 
-  private generateTimelineEmailTextNodemailer(data: TimelineEmailData): string {
+  private generateTimelineEmailText(data: TimelineEmailData): string {
     return `
-      Hi ${data.clientName}!
+Hi ${data.clientName}!
 
-      ${data.agentName} from ${data.agentCompany} has created a personalized property timeline just for you.
+${data.agentName} from ${data.agentCompany} has created a personalized property timeline just for you.
 
-      I've carefully selected ${data.propertyCount} properties that match your criteria.
+I've carefully selected ${data.propertyCount} properties that match your criteria.
 
-      View Your Properties: ${data.timelineUrl}
+View Your Properties: ${data.timelineUrl}
 
-      How it works:
-      - Browse each property at your own pace
-      - Leave feedback using the Love, Let's Talk, or Not for Me buttons
-      - Add your personal notes
+How it works:
+- Browse each property at your own pace
+- Leave feedback using the Love, Let's Talk, or Not for Me buttons  
+- Add your personal notes
 
-      Best regards,
-      ${data.agentName}
-      ${data.agentCompany}
+Best regards,
+${data.agentName}
+${data.agentCompany}
 
-      Powered by Property Sync
+Powered by Property Sync
     `.trim();
   }
 
@@ -465,6 +265,10 @@ export class EmailService {
       <a href="${data.timelineUrl}" style="display: inline-block; background: white; color: #3b82f6; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">See All Properties →</a>
     </div>
   </div>
+  
+  <div style="border-top: 2px solid #e2e8f0; padding: 20px; background: #f8fafc; text-align: center;">
+    <p style="margin: 0; color: #64748b; font-size: 12px;">Powered by Property Sync</p>
+  </div>
 </body>
 </html>`;
   }
@@ -493,6 +297,10 @@ export class EmailService {
     <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
       <p style="margin: 0; color: #92400e;"><strong>Quick Reminder:</strong> Use the ❤️ Love, 💬 Let's Talk, or ❌ Not for Me buttons to let me know your thoughts on each property.</p>
     </div>
+  </div>
+  
+  <div style="border-top: 2px solid #e2e8f0; padding: 20px; background: #f8fafc; text-align: center;">
+    <p style="margin: 0; color: #64748b; font-size: 12px;">Powered by Property Sync</p>
   </div>
 </body>
 </html>`;
@@ -592,7 +400,6 @@ export class EmailService {
 </html>`;
   }
 
-  // Existing template methods remain the same
   private getVerificationEmailTemplate(firstName: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
@@ -653,8 +460,7 @@ export class EmailService {
       </head>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; padding: 40px 0; background: linear-gradient(135deg, #10b981, #059669); border-radius: 10px; margin-bottom: 30px;">
-          <h1 style="color: white; margin: 0; font-size: 2.5em;">🎉</h1>
-          <h2 style="color: white; margin: 10px 0; font-size: 1.8em;">You're All Set!</h2>
+          <h1 style="color: white; margin: 0; font-size: 2.5em;">You're All Set!</h1>
         </div>
         
         <div style="padding: 30px; background: #f0fdf4; border-radius: 10px; border-left: 5px solid #10b981;">

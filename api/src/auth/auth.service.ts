@@ -138,6 +138,16 @@ export class AuthService {
     return null;
   }
 
+  async updateProfile(userId: string, updateData: any) {
+    return this.usersService.updateProfile(userId, updateData);
+  }
+
+  async updateUserPreferences(userId: string, preferences: any) {
+    return this.usersService.updateProfile(userId, {
+      emailTemplateStyle: preferences.emailTemplateStyle
+    });
+  }
+
   private async generateTokens(user: any): Promise<AuthResponseDto> {
     const payload = { 
       email: user.email, 

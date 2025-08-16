@@ -11,6 +11,7 @@ import { TimelinesModule } from './timelines/timelines.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ShareModule } from './share/share.module'; // Add this import
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     ClientsModule,
     TimelinesModule,
     AnalyticsModule,
-    ShareModule, // Add this line
+    ShareModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [

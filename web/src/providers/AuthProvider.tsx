@@ -1,166 +1,76 @@
-// apps/web/src/providers/AuthProvider.tsx - FIXED: Simplified initialization without race conditions
+// apps/web/src/providers/AuthProvider.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { useMissionControlStore, initializeApiClientIntegration } from '@/stores/missionControlStore';
-import { useRouter } from 'next/navigation';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useMissionControlStore } from '@/stores/missionControlStore';
+import { useProfileStore } from '@/stores/profileStore';
+import { apiClient } from '@/lib/api-client';
 
 interface AuthContextType {
   isInitialized: boolean;
   isLoading: boolean;
-  retryDataLoading: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isInitialized: false,
   isLoading: true,
-  retryDataLoading: () => {}
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  console.log('🟡 AUTH: Provider starting...');
-  
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const initRef = useRef(false);
   
   const { 
     isAuthenticated, 
-    checkAuthStatus,
-    refreshAuth,
     logout,
     loadClients,
-    loadDashboardAnalytics,
-    addNotification,
+    loadAnalytics,
+    checkAuthStatus
   } = useMissionControlStore();
 
-  // 🔄 Retry data loading function
-  const retryDataLoading = async () => {
-    if (!isAuthenticated) return;
-    
-    console.log('🔄 Retrying data loading...');
-    try {
-      await Promise.allSettled([
-        loadClients(),
-        loadDashboardAnalytics()
-      ]);
-      
-      addNotification({
-        type: 'success',
-        title: 'Data Refreshed',
-        message: 'Successfully reloaded your data.',
-        read: false,
-      });
-    } catch (error) {
-      console.error('❌ Retry failed:', error);
-      addNotification({
-        type: 'warning',
-        title: 'Retry Failed',
-        message: 'Unable to reload data. Please refresh the page.',
-        read: false,
-      });
-    }
-  };
+  const { loadProfile } = useProfileStore();
 
-  // 🚀 Single initialization effect
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-
     const initializeAuth = async () => {
       try {
-        console.log('🚀 AUTH: Starting initialization...');
-        
-        // Step 1: Setup API client integration
-        console.log('🔧 AUTH: Setting up API client...');
-        initializeApiClientIntegration();
-
-        // Step 2: Check stored auth status (synchronous)
-        console.log('🔍 AUTH: Checking stored auth...');
+        // Check initial auth status
         checkAuthStatus();
         
-        // Step 3: If we think we're authenticated, verify with server
-        if (useMissionControlStore.getState().isAuthenticated) {
-          console.log('🔄 AUTH: Verifying stored auth...');
-          
-          const isValid = await refreshAuth();
-          
-          if (isValid) {
-            console.log('✅ AUTH: Valid session found');
-            
-            // Load initial data in background (don't await)
-            setTimeout(() => {
-              console.log('📊 AUTH: Loading initial data...');
-              Promise.allSettled([
-                loadClients(),
-                loadDashboardAnalytics()
-              ]).then(() => {
-                console.log('📊 AUTH: Initial data loading complete');
-              }).catch((error) => {
-                console.warn('⚠️ AUTH: Some data failed to load:', error);
-              });
-            }, 100);
-          } else {
-            console.log('❌ AUTH: Session invalid, clearing state');
-            logout();
-          }
-        } else {
-          console.log('ℹ️ AUTH: No stored session found');
+        // If authenticated, load initial data
+        if (isAuthenticated) {
+          await Promise.all([
+            loadClients(),
+            loadAnalytics(),
+            loadProfile()
+          ]);
         }
-
       } catch (error) {
-        console.error('❌ AUTH: Initialization error:', error);
-        
-        // Don't logout on init errors, just notify
-        addNotification({
-          type: 'warning',
-          title: 'Initialization Warning',
-          message: 'Session validation encountered an issue.',
-          read: false,
-        });
+        console.error('Auth initialization failed:', error);
+        logout();
       } finally {
-        console.log('🏁 AUTH: Initialization complete');
         setIsInitialized(true);
         setIsLoading(false);
       }
     };
 
     initializeAuth();
-  }, []); // Empty deps - only run once
+  }, []);
 
-  // 🎨 Loading screen
-  if (isLoading || !isInitialized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="relative mb-8">
-            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-purple-500/20 border-b-purple-500 rounded-full animate-spin mx-auto" 
-                 style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}>
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            <p className="text-white text-lg font-semibold">Loading Mission Control...</p>
-            <p className="text-slate-400 text-sm">Setting up secure session</p>
-          </div>
-          
-          <div className="mt-8 w-64 mx-auto">
-            <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Handle tab focus - refresh data when user returns
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleFocus = () => {
+      loadAnalytics();
+      loadProfile();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated, loadAnalytics, loadProfile]);
 
   return (
-    <AuthContext.Provider value={{ 
-      isInitialized, 
-      isLoading, 
-      retryDataLoading 
-    }}>
+    <AuthContext.Provider value={{ isInitialized, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -174,33 +84,28 @@ export const useAuth = () => {
   return context;
 };
 
-// 🛡️ Simplified route protection
+// HOC for protecting routes
 export function withAuth<P extends object>(Component: React.ComponentType<P>) {
   return function AuthenticatedComponent(props: P) {
-    const router = useRouter();
-    const { isAuthenticated, isLoading } = useMissionControlStore();
-    
-    useEffect(() => {
-      if (!isLoading && !isAuthenticated) {
-        console.log('🛡️ AUTH: Not authenticated, redirecting to login');
-        router.push('/login');
-      }
-    }, [isAuthenticated, isLoading, router]);
+    const { isInitialized, isLoading } = useAuth();
+    const { isAuthenticated } = useMissionControlStore();
 
-    // Show loading while checking auth
-    if (isLoading) {
+    if (isLoading || !isInitialized) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-white">Checking authentication...</p>
+            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white text-lg">Loading Mission Control...</p>
           </div>
         </div>
       );
     }
 
-    // Don't render if not authenticated (will redirect)
     if (!isAuthenticated) {
+      // Redirect to login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       return null;
     }
 

@@ -65,6 +65,18 @@ model Profile {
   website      String?
   licenseNumber String? // Real estate license
   
+    // ADD THESE NEW FIELDS
+  avatar       String?    // Profile photo URL
+  bio          String?    // Professional description
+  timezone     String?    // User timezone
+  specialties  String[]   // Real estate specialties
+  yearsExperience Int?    // Years in real estate
+  notifications Json?     // Email/SMS preferences
+  onboardingComplete Boolean @default(false)
+
+  //Email design
+  emailTemplateStyle String? @default("modern") // "modern" | "classical"
+  
   // Branding (Pro+ feature)
   logo         String? // URL to logo image
   brandColor   String? @default("#0ea5e9") // Hex color code
@@ -226,7 +238,6 @@ model Feedback {
   @@unique([propertyId, clientId], name: "propertyId_clientId")
   @@map("feedback")
 }
-
 
 // Usage tracking for analytics
 model UsageLog {

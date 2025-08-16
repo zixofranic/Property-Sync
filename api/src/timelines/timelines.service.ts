@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService, TimelineEmailData } from '../email/email.service';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { PropertyFeedbackDto } from './dto/property-feedback.dto';
 
 @Injectable()
 export class TimelinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
-  // 🔄 UPDATED: Frontend-compatible timeline response
+  // 📄 UPDATED: Frontend-compatible timeline response
   async getTimelineByShareToken(shareToken: string, clientCode?: string) {
     const timeline = await this.prisma.timeline.findUnique({
       where: { shareToken },
@@ -163,23 +167,25 @@ export class TimelinesService {
       throw new NotFoundException('Timeline not found');
     }
 
-    // Get next position
-    const lastProperty = await this.prisma.property.findFirst({
-      where: { timelineId },
-      orderBy: { position: 'desc' },
-    });
-
     const newProperty = await this.prisma.property.create({
       data: {
-    address: propertyData.address,
-    price: propertyData.price,
-    description: propertyData.description,
-    imageUrls: [propertyData.imageUrl], // Store as array
-    listingUrl: propertyData.mlsLink || null, // Map mlsLink to listingUrl
-    timelineId,
-    position: (lastProperty?.position || 0) + 1,
-    },
+        address: propertyData.address,
+        price: propertyData.price,
+        description: propertyData.description,
+        imageUrls: [propertyData.imageUrl],
+        listingUrl: propertyData.mlsLink || null,
+        timelineId,
+        position: (await this.getLastPropertyPosition(timelineId)) + 1,
+      },
     });
+
+    // Optional: Send immediate notification (can be made configurable)
+    try {
+      await this.sendPropertyNotification(agentId, newProperty.id);
+    } catch (error) {
+      // Don't fail the property creation if notification fails
+      console.warn('Property notification failed:', error.message);
+    }
 
     // Return in frontend format
     return this.formatPropertyResponse(newProperty, timeline.clientId);
@@ -332,7 +338,7 @@ export class TimelinesService {
     };
   }
 
-  // 🆕 SEND TIMELINE EMAIL
+  // 🆕 ENHANCED: Send Timeline Email with Complete Data Transformation
   async sendTimelineEmail(agentId: string, timelineId: string) {
     const timeline = await this.prisma.timeline.findFirst({
       where: { 
@@ -344,7 +350,9 @@ export class TimelinesService {
         agent: {
           include: { profile: true }
         },
-        properties: true,
+        properties: {
+          where: { isQueued: false }, // Only count sent properties
+        },
       },
     });
 
@@ -352,6 +360,7 @@ export class TimelinesService {
       throw new NotFoundException('Timeline not found');
     }
 
+    // Build client login code for timeline access
     const clientLoginCode = this.generateClientLoginCode(
       timeline.client.firstName,
       timeline.client.phone || undefined
@@ -359,33 +368,200 @@ export class TimelinesService {
 
     const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
 
-    // TODO: Integrate with your email service (Resend, etc.)
-    // For now, return success with email details
-    const emailData = {
-      to: timeline.client.email,
-      spouseTo: timeline.client.spouseEmail, // 🆕 Spouse email support
-      subject: `${timeline.agent.profile?.firstName || 'Your Agent'} sent you ${timeline.properties.length} properties`,
-      shareUrl,
-      clientCode: clientLoginCode,
+    // Transform data for enhanced email service
+    const emailData: TimelineEmailData = {
+      clientEmail: timeline.client.email,
+      clientName: `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+      agentName: timeline.agent.profile ? 
+        `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`.trim() : 
+        'Your Agent',
+      agentCompany: timeline.agent.profile?.company || 'Real Estate Professional',
+      timelineUrl: shareUrl,
       propertyCount: timeline.properties.length,
-      agentName: `${timeline.agent.profile?.firstName || ''} ${timeline.agent.profile?.lastName || ''}`.trim(),
-      companyName: timeline.agent.profile?.company || '',
+      spouseEmail: timeline.client.spouseEmail || undefined,
+      agentPhoto: timeline.agent.profile?.logo || undefined,
+      brandColor: timeline.agent.profile?.brandColor || '#3b82f6',
+      templateStyle: (timeline.agent.profile?.emailTemplateStyle as 'modern' | 'classical') || 'modern',
     };
 
-    // Track email sent
-    await this.trackAnalyticsEvent(timeline.clientId, 'timeline_email_sent', {
-      timelineId,
-      propertyCount: timeline.properties.length,
-      hasSpouseEmail: !!timeline.client.spouseEmail,
+    try {
+      // Use enhanced email service with Resend + fallback
+      const emailResult = await this.emailService.sendTimelineEmail(emailData);
+      
+      if (emailResult.success) {
+        // Track email sent in analytics
+        await this.trackAnalyticsEvent(timeline.clientId, 'timeline_email_sent', {
+          timelineId,
+          propertyCount: timeline.properties.length,
+          hasSpouseEmail: !!timeline.client.spouseEmail,
+          emailProvider: emailResult.provider,
+          messageId: emailResult.messageId,
+        });
+
+        return {
+          message: 'Timeline email sent successfully',
+          sentTo: timeline.client.email,
+          spouseSentTo: timeline.client.spouseEmail,
+          propertyCount: timeline.properties.length,
+          shareUrl,
+          provider: emailResult.provider,
+          messageId: emailResult.messageId,
+        };
+      } else {
+        throw new Error(emailResult.error || 'Email sending failed');
+      }
+    } catch (error) {
+      // Log the error but don't expose internal details
+      console.error('Timeline email failed:', error);
+      throw new Error('Failed to send timeline email. Please try again.');
+    }
+  }
+
+  // NEW: Send Property Update Notification
+  async sendPropertyNotification(agentId: string, propertyId: string) {
+    const property = await this.prisma.property.findFirst({
+      where: { 
+        id: propertyId,
+        timeline: { agentId }
+      },
+      include: {
+        timeline: {
+          include: {
+            client: true,
+            agent: { include: { profile: true } }
+          }
+        }
+      },
     });
 
-    return {
-      message: 'Timeline email sent successfully',
-      sentTo: timeline.client.email,
-      spouseSentTo: timeline.client.spouseEmail,
-      propertyCount: timeline.properties.length,
-      shareUrl,
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    const timeline = property.timeline;
+    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}`;
+
+    const notificationData = {
+      clientEmail: timeline.client.email,
+      clientName: `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+      agentName: timeline.agent.profile ? 
+        `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`.trim() : 
+        'Your Agent',
+      propertyAddress: property.address,
+      propertyPrice: property.price,
+      propertyDescription: property.description || 'New property added to your timeline',
+      propertyImageUrl: property.imageUrls[0] || '/api/placeholder/400/300',
+      timelineUrl: shareUrl,
+      spouseEmail: timeline.client.spouseEmail || undefined,
     };
+
+    try {
+      const emailResult = await this.emailService.sendPropertyNotification(notificationData);
+      
+      if (emailResult.success) {
+        // Track notification sent
+        await this.trackAnalyticsEvent(timeline.clientId, 'property_notification_sent', {
+          propertyId,
+          propertyAddress: property.address,
+          emailProvider: emailResult.provider,
+        });
+
+        return {
+          message: 'Property notification sent successfully',
+          sentTo: timeline.client.email,
+          propertyAddress: property.address,
+          provider: emailResult.provider,
+        };
+      } else {
+        throw new Error('Property notification failed');
+      }
+    } catch (error) {
+      console.error('Property notification failed:', error);
+      throw new Error('Failed to send property notification');
+    }
+  }
+
+  // NEW: Send Feedback Reminder
+  async sendFeedbackReminder(agentId: string, clientId: string) {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, agentId },
+      include: {
+        agent: { include: { profile: true } },
+        timelines: {
+          include: {
+            properties: {
+              include: {
+                feedback: true
+              }
+            }
+          }
+        }
+      },
+    });
+
+    if (!client) {
+      throw new NotFoundException('Client not found');
+    }
+
+    const timeline = client.timelines[0]; // Assuming one timeline per client
+    if (!timeline) {
+      throw new NotFoundException('No timeline found for client');
+    }
+
+    // Count properties without feedback
+    const pendingPropertiesCount = timeline.properties.filter(
+      property => property.feedback.length === 0
+    ).length;
+
+    if (pendingPropertiesCount === 0) {
+      return {
+        message: 'No pending feedback required',
+        pendingCount: 0,
+      };
+    }
+
+    // Calculate days since last activity
+    const daysSinceLastActivity = client.lastActivity 
+      ? Math.floor((Date.now() - new Date(client.lastActivity).getTime()) / (1000 * 60 * 60 * 24))
+      : 30;
+
+    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}`;
+
+    const reminderData = {
+      clientEmail: client.email,
+      clientName: `${client.firstName} ${client.lastName}`.trim(),
+      agentName: client.agent.profile ? 
+        `${client.agent.profile.firstName} ${client.agent.profile.lastName}`.trim() : 
+        'Your Agent',
+      pendingPropertiesCount,
+      timelineUrl: shareUrl,
+      daysSinceLastActivity,
+    };
+
+    try {
+      const emailResult = await this.emailService.sendFeedbackReminder(reminderData);
+      
+      if (emailResult.success) {
+        // Track reminder sent
+        await this.trackAnalyticsEvent(clientId, 'feedback_reminder_sent', {
+          pendingPropertiesCount,
+          daysSinceLastActivity,
+          emailProvider: emailResult.provider,
+        });
+
+        return {
+          message: 'Feedback reminder sent successfully',
+          sentTo: client.email,
+          pendingPropertiesCount,
+          provider: emailResult.provider,
+        };
+      } else {
+        throw new Error('Feedback reminder failed');
+      }
+    } catch (error) {
+      console.error('Feedback reminder failed:', error);
+      throw new Error('Failed to send feedback reminder');
+    }
   }
 
   // 🆕 REVOKE TIMELINE ACCESS
@@ -556,5 +732,14 @@ export class TimelinesService {
   // Helper: Generate new share token
   private generateNewShareToken(): string {
     return require('crypto').randomBytes(16).toString('hex');
+  }
+
+  // Helper: Get last property position
+  private async getLastPropertyPosition(timelineId: string): Promise<number> {
+    const lastProperty = await this.prisma.property.findFirst({
+      where: { timelineId },
+      orderBy: { position: 'desc' },
+    });
+    return lastProperty?.position || 0;
   }
 }

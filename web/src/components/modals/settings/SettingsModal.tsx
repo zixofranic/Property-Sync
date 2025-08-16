@@ -1,0 +1,641 @@
+// apps/web/src/components/modals/settings/SettingsModal.tsx
+'use client';
+
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  X, Settings, User, Mail, Bell, Shield, 
+  CreditCard, HelpCircle, Palette, Save,
+  Monitor, Moon, Sun, Volume2, VolumeX,
+  MapPin, Camera, Eye, EyeOff, Lock,
+  Upload, Check, AlertTriangle
+} from 'lucide-react';
+import { PasswordChangeModal } from '@/components/profile/PasswordChangeModal';
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    plan: string;
+  };
+  preferences: {
+    emailTemplateStyle: 'modern' | 'classical';
+    notifications: {
+      email: boolean;
+      desktop: boolean;
+      feedback: boolean;
+      newProperties: boolean;
+    };
+    theme: 'dark' | 'light' | 'system';
+    soundEnabled: boolean;
+    timezone?: string;
+    brandColor?: string;
+    logo?: string;
+  };
+  onSavePreferences: (preferences: any) => Promise<void>;
+}
+
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' }
+];
+
+export function SettingsModal({ 
+  isOpen, 
+  onClose, 
+  user, 
+  preferences: initialPreferences,
+  onSavePreferences 
+}: SettingsModalProps) {
+  const [activeTab, setActiveTab] = useState('branding');
+  const [preferences, setPreferences] = useState({
+    ...initialPreferences,
+    timezone: initialPreferences.timezone || 'America/New_York',
+    brandColor: initialPreferences.brandColor || '#3b82f6',
+    logo: initialPreferences.logo || ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(preferences.logo || null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  const tabs = [
+    { id: 'branding', label: 'Branding', icon: Palette },
+    { id: 'professional', label: 'Professional Settings', icon: Settings },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'appearance', label: 'Appearance', icon: Monitor },
+    { id: 'account', label: 'Account & Security', icon: Shield },
+    { id: 'help', label: 'Help & Support', icon: HelpCircle },
+  ];
+
+  const updatePreference = (path: string[], value: any) => {
+    setPreferences(prev => {
+      const newPrefs = { ...prev };
+      let current = newPrefs;
+      
+      for (let i = 0; i < path.length - 1; i++) {
+        current = current[path[i]] = { ...current[path[i]] };
+      }
+      current[path[path.length - 1]] = value;
+      
+      return newPrefs;
+    });
+    setHasChanges(true);
+  };
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // File validation
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    
+    if (file.size > maxSize) {
+      alert('Please select an image under 2MB.');
+      return;
+    }
+
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a JPEG, PNG, WebP, or SVG image.');
+      return;
+    }
+
+    // Store file for upload
+    setLogoFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setLogoPreview(result);
+      updatePreference(['logo'], result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSavePreferences(preferences);
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Failed to save preferences:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'branding':
+        return (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-6">Brand Identity</h3>
+              
+              {/* Logo Upload */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Company Logo</label>
+                  <div className="flex items-start space-x-6">
+                    {/* Logo Preview */}
+                    <div className="w-24 h-24 bg-slate-700 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center overflow-hidden">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <Camera className="w-8 h-8 text-slate-400" />
+                      )}
+                    </div>
+                    
+                    {/* Upload Controls */}
+                    <div className="flex-1">
+                      <label className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors">
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Logo</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Recommended: 200x200px or larger, under 2MB
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Supports JPEG, PNG, WebP, and SVG formats
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand Color */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Brand Color</label>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="color"
+                        value={preferences.brandColor}
+                        onChange={(e) => updatePreference(['brandColor'], e.target.value)}
+                        className="w-12 h-10 rounded-lg border border-slate-600 bg-slate-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={preferences.brandColor}
+                        onChange={(e) => updatePreference(['brandColor'], e.target.value)}
+                        className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono text-sm"
+                        placeholder="#3b82f6"
+                      />
+                    </div>
+                    
+                    {/* Color Preview */}
+                    <div className="flex-1">
+                      <div 
+                        className="h-10 rounded-lg border border-slate-600"
+                        style={{ backgroundColor: preferences.brandColor }}
+                      />
+                      <p className="text-xs text-slate-400 mt-1">
+                        This color will appear in your email templates and client timeline
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Template Styles */}
+            <div>
+              <h4 className="text-base font-semibold text-white mb-4">Email Template Style</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { 
+                    id: 'modern', 
+                    label: 'Modern', 
+                    description: 'Clean, minimalist design with bold typography' 
+                  },
+                  { 
+                    id: 'classical', 
+                    label: 'Classical', 
+                    description: 'Traditional layout with professional styling' 
+                  }
+                ].map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => updatePreference(['emailTemplateStyle'], template.id)}
+                    className={`p-4 rounded-lg border transition-all text-left ${
+                      preferences.emailTemplateStyle === template.id
+                        ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <div className="font-medium mb-1">{template.label}</div>
+                    <div className="text-sm opacity-80">{template.description}</div>
+                    {preferences.emailTemplateStyle === template.id && (
+                      <Check className="w-4 h-4 mt-2 text-blue-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Brand Preview */}
+            <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+              <h4 className="font-medium text-white mb-3">Brand Preview</h4>
+              <div className="bg-white rounded-lg p-4">
+                <div className="flex items-center space-x-3 mb-3">
+                  {logoPreview && (
+                    <img src={logoPreview} alt="Logo" className="w-8 h-8 object-contain" />
+                  )}
+                  <div className="text-gray-800">
+                    <div className="font-semibold">{user.firstName} {user.lastName}</div>
+                    <div className="text-sm text-gray-600">Real Estate Professional</div>
+                  </div>
+                </div>
+                <div 
+                  className="h-1 rounded-full mb-3"
+                  style={{ backgroundColor: preferences.brandColor }}
+                />
+                <div className="text-sm text-gray-600">
+                  This is how your branding will appear in client emails and timelines.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'professional':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-6">Professional Settings</h3>
+              
+              {/* Timezone */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    Timezone
+                  </label>
+                  <select
+                    value={preferences.timezone}
+                    onChange={(e) => updatePreference(['timezone'], e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Used for scheduling and timestamp display
+                  </p>
+                </div>
+
+                {/* Password Change */}
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-white flex items-center space-x-2">
+                        <Lock className="w-4 h-4" />
+                        <span>Password & Security</span>
+                      </h4>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Update your password and security settings
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowPasswordModal(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'notifications':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-6">Notification Preferences</h3>
+              
+              {/* Email Notifications */}
+              <div className="space-y-4">
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <h4 className="font-medium text-white mb-4 flex items-center space-x-2">
+                    <Mail className="w-4 h-4 text-blue-400" />
+                    <span>Email Notifications</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {[
+                      { key: 'email', label: 'General email notifications', description: 'System updates and important messages' },
+                      { key: 'newProperties', label: 'New properties added', description: 'When properties are added to timelines' },
+                      { key: 'feedback', label: 'Client feedback received', description: 'When clients provide property feedback' }
+                    ].map(({ key, label, description }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-200">{label}</div>
+                          <div className="text-sm text-slate-400">{description}</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                          <input
+                            type="checkbox"
+                            checked={preferences.notifications[key as keyof typeof preferences.notifications]}
+                            onChange={(e) => updatePreference(['notifications', key], e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Desktop Notifications */}
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <h4 className="font-medium text-white mb-4 flex items-center space-x-2">
+                    <Monitor className="w-4 h-4 text-green-400" />
+                    <span>Desktop & Browser Notifications</span>
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-200">Desktop notifications</div>
+                        <div className="text-sm text-slate-400">Show browser notifications for real-time updates</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <input
+                          type="checkbox"
+                          checked={preferences.notifications.desktop}
+                          onChange={(e) => updatePreference(['notifications', 'desktop'], e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'appearance':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4">Appearance Settings</h3>
+              
+              <div className="space-y-4">
+                {/* Theme Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Theme</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'light', label: 'Light', icon: Sun },
+                      { id: 'dark', label: 'Dark', icon: Moon },
+                      { id: 'system', label: 'System', icon: Monitor }
+                    ].map((theme) => {
+                      const Icon = theme.icon;
+                      return (
+                        <button
+                          key={theme.id}
+                          onClick={() => updatePreference(['theme'], theme.id)}
+                          className={`p-4 rounded-lg border transition-all ${
+                            preferences.theme === theme.id
+                              ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+                              : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                          }`}
+                        >
+                          <Icon className="w-6 h-6 mx-auto mb-2" />
+                          <span className="text-sm font-medium">{theme.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sound */}
+                <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/30">
+                  <div className="flex items-center space-x-3">
+                    {preferences.soundEnabled ? 
+                      <Volume2 className="w-5 h-5 text-blue-400" /> : 
+                      <VolumeX className="w-5 h-5 text-slate-400" />
+                    }
+                    <div>
+                      <h4 className="font-medium text-white">Sound Effects</h4>
+                      <p className="text-sm text-slate-400">Play sounds for notifications and actions</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preferences.soundEnabled}
+                      onChange={(e) => updatePreference(['soundEnabled'], e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'account':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4">Account & Billing</h3>
+              
+              <div className="space-y-4">
+                {/* Account Info */}
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <h4 className="font-medium text-white mb-3">Account Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-400">Name:</span>
+                      <p className="text-white font-medium">{user.firstName} {user.lastName}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Email:</span>
+                      <p className="text-white font-medium">{user.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Current Plan */}
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-white">Current Plan</h4>
+                      <p className="text-sm text-slate-400">Your subscription details</p>
+                    </div>
+                    <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
+                      {user.plan}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Billing Info */}
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                    <p className="text-yellow-400 text-sm">
+                      Billing and subscription management features will be available soon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'help':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4">Help & Support</h3>
+              
+              <div className="space-y-4">
+                {/* Support Options */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <a
+                    href="mailto:support@propertysync.com"
+                    className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/30 hover:bg-slate-700/50 transition-colors"
+                  >
+                    <Mail className="w-6 h-6 text-blue-400 mb-2" />
+                    <h4 className="font-medium text-white">Email Support</h4>
+                    <p className="text-sm text-slate-400">Get help via email</p>
+                  </a>
+                  
+                  <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/30">
+                    <HelpCircle className="w-6 h-6 text-purple-400 mb-2" />
+                    <h4 className="font-medium text-white">Documentation</h4>
+                    <p className="text-sm text-slate-400">Coming soon</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Settings</h2>
+                    <p className="text-sm text-slate-400">Manage your preferences and account</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  {hasChanges && (
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors flex items-center space-x-2"
+                    >
+                      {isSaving ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex h-[calc(95vh-120px)]">
+                {/* Sidebar */}
+                <div className="w-64 border-r border-slate-700 p-4 overflow-y-auto">
+                  <nav className="space-y-2">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
+                            activeTab === tab.id
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="font-medium">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-6 overflow-y-auto">
+                  {renderTabContent()}
+                </div>
+              </div>
+          </motion.div>
+
+          {/* Password Change Modal */}
+          <PasswordChangeModal
+            isOpen={showPasswordModal}
+            onClose={() => setShowPasswordModal(false)}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

@@ -1,0 +1,351 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  X, Share2, Copy, Check, MessageSquare, Mail, 
+  Phone, Link as LinkIcon, ExternalLink, Send,
+  Sparkles, Users
+} from 'lucide-react';
+
+interface ShareTimelineModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  client: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  timeline: {
+    id: string;
+    shareToken: string;
+    shareUrl: string;
+    propertyCount: number;
+  };
+  agentName: string;
+  onSendEmail: () => Promise<void>;
+}
+
+export function ShareTimelineModal({ 
+  isOpen, 
+  onClose, 
+  client, 
+  timeline, 
+  agentName,
+  onSendEmail 
+}: ShareTimelineModalProps) {
+  const [copiedItem, setCopiedItem] = useState<string | null>(null);
+  const [isEmailSending, setIsEmailSending] = useState(false);
+
+  const shareMessages = {
+    email: {
+      subject: `Your Property Timeline from ${agentName}`,
+      body: `Hi ${client.name}!\n\n${agentName} has created a personalized property timeline just for you with ${timeline.propertyCount} carefully selected properties.\n\nView your timeline here: ${timeline.shareUrl}\n\nYou can browse each property at your own pace and leave feedback using the Love It, Let's Talk, or Not for Me buttons.\n\nBest regards,\n${agentName}`
+    },
+    sms: `Hi ${client.name}! ${agentName} here. I've created your property timeline with ${timeline.propertyCount} properties that match your criteria. Check it out: ${timeline.shareUrl}`,
+    whatsapp: `Hi ${client.name}! 🏡\n\nI've created a personalized property timeline just for you with ${timeline.propertyCount} carefully selected properties.\n\n🔗 View your timeline: ${timeline.shareUrl}\n\nBrowse at your own pace and let me know what you think!\n\nBest,\n${agentName}`,
+    simple: timeline.shareUrl
+  };
+
+  const copyToClipboard = async (text: string, itemKey: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedItem(itemKey);
+      setTimeout(() => setCopiedItem(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    setIsEmailSending(true);
+    try {
+      await onSendEmail();
+      setCopiedItem('email-sent');
+      setTimeout(() => setCopiedItem(null), 3000);
+    } catch (error) {
+      console.error('Failed to send email:', error);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  const openEmailClient = () => {
+    const mailtoLink = `mailto:${client.email}?subject=${encodeURIComponent(shareMessages.email.subject)}&body=${encodeURIComponent(shareMessages.email.body)}`;
+    window.open(mailtoLink, '_blank');
+  };
+
+  const openSMSClient = () => {
+    if (client.phone) {
+      const smsLink = `sms:${client.phone}?body=${encodeURIComponent(shareMessages.sms)}`;
+      window.open(smsLink, '_blank');
+    }
+  };
+
+  const openWhatsApp = () => {
+    if (client.phone) {
+      const cleanPhone = client.phone.replace(/[^\d]/g, '');
+      const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(shareMessages.whatsapp)}`;
+      window.open(whatsappLink, '_blank');
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-xl z-[9999] flex items-start justify-center pt-16 px-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                  <Share2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Share Timeline</h2>
+                  <p className="text-sm text-slate-400">Send timeline to {client.name}</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth">
+              {/* Timeline Info */}
+              <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
+                <div className="flex items-center space-x-3 mb-3">
+                  <Users className="w-5 h-5 text-blue-400" />
+                  <h3 className="font-medium text-white">Timeline Details</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-400">Client:</span>
+                    <p className="text-white font-medium">{client.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Properties:</span>
+                    <p className="text-white font-medium">{timeline.propertyCount}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                  <Sparkles className="w-5 h-5 text-yellow-400" />
+                  <span>Quick Share</span>
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Send Email Button */}
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={isEmailSending}
+                    className="flex items-center justify-center space-x-2 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-slate-600 disabled:to-slate-600 text-white rounded-xl transition-all duration-200 disabled:cursor-not-allowed"
+                  >
+                    {isEmailSending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : copiedItem === 'email-sent' ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Email Sent!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Email</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Copy Link Button */}
+                  <button
+                    onClick={() => copyToClipboard(timeline.shareUrl, 'link')}
+                    className="flex items-center justify-center space-x-2 p-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-xl transition-all duration-200"
+                  >
+                    {copiedItem === 'link' ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Manual Sharing Options */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Manual Sharing</h3>
+                
+                {/* Email Template */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-white flex items-center space-x-2">
+                      <Mail className="w-4 h-4 text-blue-400" />
+                      <span>Email Template</span>
+                    </h4>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={openEmailClient}
+                        className="text-xs px-3 py-1 bg-blue-600/20 text-blue-400 rounded-md hover:bg-blue-600/30 transition-colors flex items-center space-x-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Open</span>
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(`Subject: ${shareMessages.email.subject}\n\n${shareMessages.email.body}`, 'email')}
+                        className="text-xs px-3 py-1 bg-slate-600/50 text-slate-300 rounded-md hover:bg-slate-600/70 transition-colors flex items-center space-x-1"
+                      >
+                        {copiedItem === 'email' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedItem === 'email' ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                    <div className="text-xs text-slate-400 mb-2">Subject:</div>
+                    <div className="text-sm text-white mb-3 font-medium">{shareMessages.email.subject}</div>
+                    <div className="text-xs text-slate-400 mb-2">Body:</div>
+                    <div className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">
+                      {shareMessages.email.body}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SMS Template */}
+                {client.phone && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-white flex items-center space-x-2">
+                        <MessageSquare className="w-4 h-4 text-green-400" />
+                        <span>SMS Template</span>
+                      </h4>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={openSMSClient}
+                          className="text-xs px-3 py-1 bg-green-600/20 text-green-400 rounded-md hover:bg-green-600/30 transition-colors flex items-center space-x-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open</span>
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(shareMessages.sms, 'sms')}
+                          className="text-xs px-3 py-1 bg-slate-600/50 text-slate-300 rounded-md hover:bg-slate-600/70 transition-colors flex items-center space-x-1"
+                        >
+                          {copiedItem === 'sms' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedItem === 'sms' ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                      <div className="text-sm text-slate-300">{shareMessages.sms}</div>
+                      <div className="text-xs text-slate-500 mt-2">{shareMessages.sms.length}/160 characters</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* WhatsApp Template */}
+                {client.phone && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-white flex items-center space-x-2">
+                        <Phone className="w-4 h-4 text-green-500" />
+                        <span>WhatsApp Template</span>
+                      </h4>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={openWhatsApp}
+                          className="text-xs px-3 py-1 bg-green-600/20 text-green-400 rounded-md hover:bg-green-600/30 transition-colors flex items-center space-x-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open</span>
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(shareMessages.whatsapp, 'whatsapp')}
+                          className="text-xs px-3 py-1 bg-slate-600/50 text-slate-300 rounded-md hover:bg-slate-600/70 transition-colors flex items-center space-x-1"
+                        >
+                          {copiedItem === 'whatsapp' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedItem === 'whatsapp' ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                      <div className="text-sm text-slate-300 whitespace-pre-line">{shareMessages.whatsapp}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Just the Link */}
+                  <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-white flex items-center space-x-2">
+                      <LinkIcon className="w-4 h-4 text-purple-400" />
+                      <span>Direct Link</span>
+                    </h4>
+                    <button
+                      onClick={() => copyToClipboard(timeline.shareUrl, 'direct-link')}
+                      className="text-xs px-3 py-1 bg-slate-600/50 text-slate-300 rounded-md hover:bg-slate-600/70 transition-colors flex items-center space-x-1"
+                    >
+                      {copiedItem === 'direct-link' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedItem === 'direct-link' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                    <div className="text-sm text-slate-300 font-mono break-all">{timeline.shareUrl}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Usage Instructions */}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                <h4 className="font-medium text-blue-300 mb-2">How it works:</h4>
+                <ul className="text-sm text-blue-200 space-y-1">
+                  <li>• Your client will receive a personalized timeline with {timeline.propertyCount} properties</li>
+                  <li>• They can browse each property and provide feedback using simple buttons</li>
+                  <li>• You'll be notified when they interact with properties</li>
+                  <li>• The link works on any device - no app needed</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-slate-700 bg-slate-800/50">
+              <div className="text-sm text-slate-400">
+                Timeline will remain active until manually revoked
+              </div>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
