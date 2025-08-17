@@ -45,6 +45,7 @@ export class UpdateProfileDto {
   @IsNumber()
   yearsExperience?: number;
 
+
   @IsOptional()
   @IsObject()
   notifications?: {

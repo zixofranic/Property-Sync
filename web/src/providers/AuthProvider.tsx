@@ -28,7 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuthStatus
   } = useMissionControlStore();
 
-  const { loadProfile } = useProfileStore();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -41,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await Promise.all([
             loadClients(),
             loadAnalytics(),
-            loadProfile()
           ]);
         }
       } catch (error) {
@@ -62,12 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const handleFocus = () => {
       loadAnalytics();
-      loadProfile();
     };
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [isAuthenticated, loadAnalytics, loadProfile]);
+  }, [isAuthenticated, loadAnalytics]);
 
   return (
     <AuthContext.Provider value={{ isInitialized, isLoading }}>

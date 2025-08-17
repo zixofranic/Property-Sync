@@ -144,7 +144,7 @@ export class AuthService {
 
   async updateUserPreferences(userId: string, preferences: any) {
     return this.usersService.updateProfile(userId, {
-      emailTemplateStyle: preferences.emailTemplateStyle
+      //emailTemplateStyle: preferences.emailTemplateStyle
     });
   }
 

@@ -65,7 +65,7 @@ model Profile {
   website      String?
   licenseNumber String? // Real estate license
   
-    // ADD THESE NEW FIELDS
+  // Profile enhancements
   avatar       String?    // Profile photo URL
   bio          String?    // Professional description
   timezone     String?    // User timezone
@@ -74,8 +74,14 @@ model Profile {
   notifications Json?     // Email/SMS preferences
   onboardingComplete Boolean @default(false)
 
-  //Email design
+  // Email design and preferences
   emailTemplateStyle String? @default("modern") // "modern" | "classical"
+  notificationEmail Boolean @default(true)
+  notificationDesktop Boolean @default(true) 
+  notificationFeedback Boolean @default(true)
+  notificationNewProperties Boolean @default(true)
+  theme String @default("dark") // "dark" | "light" | "system"
+  soundEnabled Boolean @default(true)
   
   // Branding (Pro+ feature)
   logo         String? // URL to logo image
@@ -113,7 +119,7 @@ model Client {
   firstName   String
   lastName    String
   email       String
-  spouseEmail String?  // 🆕 ADD THIS FIELD
+  spouseEmail String?
   phone       String?
   notes       String?
   isActive    Boolean  @default(true)
@@ -131,7 +137,7 @@ model Client {
   agentId     String
   agent       User       @relation(fields: [agentId], references: [id], onDelete: Cascade)
   timelines   Timeline[]
-  feedback    Feedback[] // 🆕 ADD THIS RELATION
+  feedback    Feedback[]
   
   @@map("clients")
 }
@@ -216,8 +222,8 @@ model Feedback {
   clientName  String       
   clientEmail String       
   
-  // ADD clientId for our TimelinesService upsert logic
-  clientId    String       // Links to Client table
+  // Links to Client table for upsert logic
+  clientId    String
   client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   
   // Enhanced engagement tracking
@@ -234,7 +240,7 @@ model Feedback {
   propertyId  String
   property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   
-  // UPDATE unique constraint for our upsert logic
+  // Unique constraint for upsert logic
   @@unique([propertyId, clientId], name: "propertyId_clientId")
   @@map("feedback")
 }
@@ -250,7 +256,7 @@ model UsageLog {
   @@map("usage_logs")
 }
  
- // TrackEvent table for analytics
+// TrackEvent table for analytics
 model TrackEvent {
   id        String   @id @default(cuid())
   clientId  String
@@ -289,7 +295,7 @@ model ClientAuth {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   
-  // Relation to your existing Timeline model
+  // Relation to existing Timeline model
   timeline      Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
   
   @@index([sessionToken])
@@ -305,7 +311,7 @@ model ClientAnalytics {
   metadata   Json?    // flexible data storage (IP, user agent, etc.)
   timestamp  DateTime @default(now())
   
-  // Relation to your existing Timeline model  
+  // Relation to existing Timeline model  
   timeline   Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
   
   @@index([timelineId, eventType])

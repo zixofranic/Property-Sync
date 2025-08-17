@@ -1,4 +1,3 @@
-// apps/api/src/users/dto/update-preferences.dto.ts
 import { IsOptional, IsString, IsBoolean, IsIn } from 'class-validator';
 
 export class UpdatePreferencesDto {

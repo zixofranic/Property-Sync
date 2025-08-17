@@ -14,6 +14,21 @@ export interface User {
   emailVerified: boolean;
 }
 
+export interface UserPreferences {
+  emailTemplateStyle: 'modern' | 'classical';
+  notifications: {
+    email: boolean;
+    desktop: boolean;
+    feedback: boolean;
+    newProperties: boolean;
+  };
+  theme: 'dark' | 'light' | 'system';
+  soundEnabled: boolean;
+  timezone: string;
+  brandColor: string;
+  logo: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -75,6 +90,7 @@ export interface Notification {
 interface MissionControlState {
   // Authentication State
   user: User | null;
+  userPreferences: UserPreferences;
   isAuthenticated: boolean;
   isLoading: boolean;
   authError: string | null;
@@ -123,6 +139,11 @@ interface MissionControlActions {
   checkAuthStatus: () => void;
   refreshAuth: () => Promise<boolean>;
   loadProfile: () => Promise<void>;
+
+  // User Preferences Actions
+  updateUserPreferences: (preferences: Partial<UserPreferences>) => Promise<void>;
+  loadUserPreferences: () => Promise<void>;
+  resetPreferencesToDefaults: () => void;
 
   // Client Actions
   loadClients: () => Promise<void>;
@@ -175,13 +196,30 @@ interface MissionControlActions {
   addClient: (clientData: any) => Promise<Client | null>;
 }
 
+// Default preferences
+const defaultPreferences: UserPreferences = {
+  emailTemplateStyle: 'modern',
+  notifications: {
+    email: true,
+    desktop: true,
+    feedback: true,
+    newProperties: true,
+  },
+  theme: 'dark',
+  soundEnabled: true,
+  timezone: 'America/New_York',
+  brandColor: '#3b82f6',
+  logo: '',
+};
+
 // Zustand Store Creation
 export const useMissionControlStore = create<MissionControlState & MissionControlActions>()(
   devtools(
     persist(
       subscribeWithSelector((set, get) => ({
-        // Initial Authentication State
+        // Initial State
         user: null,
+        userPreferences: defaultPreferences,
         isAuthenticated: false,
         isLoading: false,
         authError: null,
@@ -265,7 +303,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 try {
                   await Promise.allSettled([
                     get().loadClients(),
-                    get().loadDashboardAnalytics()
+                    get().loadDashboardAnalytics(),
+                    get().loadUserPreferences()
                   ]);
                   console.log('Store: Post-login data loading complete');
                 } catch (error) {
@@ -305,6 +344,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           // Reset all store state
           set({
             user: null,
+            userPreferences: defaultPreferences,
             isAuthenticated: false,
             authError: null,
             clients: [],
@@ -339,26 +379,27 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           const storedUser = apiClient.getStoredUser();
           
           if (isAuth && storedUser) {
-  console.log('Store: Auth status valid, user found');
-  set({
-    isAuthenticated: true,
-    user: storedUser,
-  });
-  
-  // ADDED: Load data after confirming auth on refresh
-  setTimeout(async () => {
-    console.log('Store: Loading data after auth check...');
-    try {
-      await Promise.allSettled([
-        get().loadClients(),
-        get().loadDashboardAnalytics()
-      ]);
-      console.log('Store: Post-auth data loading complete');
-    } catch (error) {
-      console.warn('Store: Some data failed to load after auth check:', error);
-    }
-  }, 100);
-} else {
+            console.log('Store: Auth status valid, user found');
+            set({
+              isAuthenticated: true,
+              user: storedUser,
+            });
+            
+            // Load data after confirming auth on refresh
+            setTimeout(async () => {
+              console.log('Store: Loading data after auth check...');
+              try {
+                await Promise.allSettled([
+                  get().loadClients(),
+                  get().loadDashboardAnalytics(),
+                  get().loadUserPreferences()
+                ]);
+                console.log('Store: Post-auth data loading complete');
+              } catch (error) {
+                console.warn('Store: Some data failed to load after auth check:', error);
+              }
+            }, 100);
+          } else {
             console.log('Store: Auth status invalid');
             set({
               isAuthenticated: false,
@@ -367,7 +408,94 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        // FIXED: Use getAuthProfile for authentication checks
+        // User Preferences Actions
+        updateUserPreferences: async (preferences: Partial<UserPreferences>) => {
+          try {
+            console.log('Store: Updating user preferences...', preferences);
+            
+            // Optimistically update local state
+            set((state) => ({
+              userPreferences: {
+                ...state.userPreferences,
+                ...preferences,
+              },
+            }));
+
+            // Attempt to save to backend
+            const response = await apiClient.updateUserPreferences(preferences);
+            
+            if (response.error) {
+              console.error('Store: Preferences update failed:', response.error);
+              
+              // Revert optimistic update on failure
+              await get().loadUserPreferences();
+              
+              get().addNotification({
+                type: 'error',
+                title: 'Settings Save Failed',
+                message: response.error,
+                read: false,
+              });
+              
+              throw new Error(response.error);
+            }
+
+            console.log('Store: Preferences updated successfully');
+            
+            get().addNotification({
+              type: 'success',
+              title: 'Settings Saved',
+              message: 'Your preferences have been updated successfully',
+              read: false,
+            });
+
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to save preferences';
+            console.error('Store: Preferences update error:', errorMessage);
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Settings Error',
+              message: errorMessage,
+              read: false,
+            });
+            
+            throw error; // Re-throw so UI can handle it
+          }
+        },
+
+        loadUserPreferences: async () => {
+          try {
+            console.log('Store: Loading user preferences...');
+            const response = await apiClient.getUserPreferences();
+            
+            if (response.error) {
+              console.warn('Store: Preferences loading failed, using defaults:', response.error);
+              // Don't throw - just use defaults silently
+              return;
+            }
+
+            if (response.data) {
+              console.log('Store: Preferences loaded successfully');
+              set({
+                userPreferences: {
+                  ...defaultPreferences,
+                  ...response.data,
+                },
+              });
+            }
+          } catch (error) {
+            console.warn('Store: Preferences loading error, using defaults:', error);
+            // Don't throw - gracefully degrade to defaults
+          }
+        },
+
+        resetPreferencesToDefaults: () => {
+          console.log('Store: Resetting preferences to defaults');
+          set({ userPreferences: { ...defaultPreferences } });
+        },
+
+        // Use getAuthProfile for authentication checks
         refreshAuth: async (): Promise<boolean> => {
           const state = get();
           
@@ -380,8 +508,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             console.log('Store: Refreshing authentication...');
             set({ isLoading: true });
 
-            // FIXED: Use getAuthProfile instead of getProfile
-            const response = await apiClient.getAuthProfile();
+            const response = await apiClient.getUserProfile();
             
             if (response.error) {
               console.log('Store: Auth profile fetch failed:', response.error);
@@ -408,7 +535,6 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
             if (response.data) {
               console.log('Store: Auth refresh successful');
-              // Transform auth profile to User format
               const userFromAuth = {
                 id: response.data.id,
                 email: response.data.email,
@@ -451,11 +577,10 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        // FIXED: Use getUserProfile for profile loading
+        // Use getUserProfile for profile loading
         loadProfile: async () => {
           try {
             console.log('Store: Loading profile...');
-            // FIXED: Use getUserProfile for detailed profile data
             const response = await apiClient.getUserProfile();
             
             if (response.error) {
@@ -472,7 +597,6 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
             if (response.data) {
               console.log('Store: Profile loaded successfully');
-              // Transform detailed profile to User format for store
               const userFromProfile = {
                 id: response.data.id,
                 email: response.data.email,
@@ -808,37 +932,6 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             console.error('Store: Timeline loading error:', errorMessage);
             set({ timelineError: errorMessage, timelineLoading: false });
           }
-        },
-
-        // Helper methods for backwards compatibility
-        setBulkMode: (enabled: boolean) => set({ bulkMode: enabled }),
-
-        shareTimeline: (clientId: string): string => {
-          const client = get().clients.find(c => c.id === clientId);
-          if (!client?.timeline?.shareToken) {
-            get().addNotification({
-              type: 'error',
-              title: 'Share Error',
-              message: 'Timeline not found for this client',
-              read: false,
-            });
-            return '';
-          }
-          return client.timeline.shareToken;
-        },
-
-        checkMLSDuplicate: (clientId: string, mlsLink: string): boolean => {
-          const timeline = get().getClientTimeline(clientId);
-          if (!timeline?.properties) return false;
-          
-          return timeline.properties.some(property => 
-            property.mlsLink && property.mlsLink === mlsLink
-          );
-        },
-
-        addClient: async (clientData: any) => {
-          console.log('Store: addClient called with:', clientData);
-          return get().createClient(clientData);
         },
 
         addProperty: async (clientIdOrData: string | Omit<Property, 'id' | 'clientId' | 'addedAt'>, propertyData?: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => {
@@ -1312,6 +1405,36 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           });
         },
 
+        setBulkMode: (enabled: boolean) => set({ bulkMode: enabled }),
+
+        shareTimeline: (clientId: string): string => {
+          const client = get().clients.find(c => c.id === clientId);
+          if (!client?.timeline?.shareToken) {
+            get().addNotification({
+              type: 'error',
+              title: 'Share Error',
+              message: 'Timeline not found for this client',
+              read: false,
+            });
+            return '';
+          }
+          return client.timeline.shareToken;
+        },
+
+        checkMLSDuplicate: (clientId: string, mlsLink: string): boolean => {
+          const timeline = get().getClientTimeline(clientId);
+          if (!timeline?.properties) return false;
+          
+          return timeline.properties.some(property => 
+            property.mlsLink && property.mlsLink === mlsLink
+          );
+        },
+
+        addClient: async (clientData: any) => {
+          console.log('Store: addClient called with:', clientData);
+          return get().createClient(clientData);
+        },
+
         clearErrors: () => set({ 
           authError: null, 
           clientsError: null, 
@@ -1324,6 +1447,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         partialize: (state) => ({
           sidebarOpen: state.sidebarOpen,
           selectedView: state.selectedView,
+          userPreferences: state.userPreferences,
         }),
       }
     ),
@@ -1370,4 +1494,10 @@ export const useAnalytics = () => {
 export const useNotifications = () => {
   const { notifications, addNotification, removeNotification, markNotificationAsRead, clearAllNotifications } = useMissionControlStore();
   return { notifications, addNotification, removeNotification, markNotificationAsRead, clearAllNotifications };
+};
+
+// User Preferences Hook
+export const useUserPreferences = () => {
+  const { userPreferences, updateUserPreferences, loadUserPreferences, resetPreferencesToDefaults } = useMissionControlStore();
+  return { userPreferences, updateUserPreferences, loadUserPreferences, resetPreferencesToDefaults };
 };

@@ -71,6 +71,16 @@ export function MissionControl() {
     address: ''
   });
 
+  const handleSavePreferences = async (preferences: any) => {
+  try {
+    await updateUserPreferences(preferences);
+    // Success notification is handled in the store
+  } catch (error) {
+    // Error notification is handled in the store
+    throw error; // Re-throw so SettingsModal can handle UI state
+  }
+};
+
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -811,8 +821,17 @@ const testProfileAPI = async () => {
         isOpen={activeModal === 'clients'} 
         onClose={() => setActiveModal(null)} 
       />
-
-      {/* Settings Modal - Fixed Integration */}
+{/* NEW: Settings Modal Integration */}
+{user && (
+  <SettingsModal
+    isOpen={activeModal === 'settings'}
+    onClose={() => setActiveModal(null)}
+    user={user}
+    preferences={userPreferences}
+    onSavePreferences={handleSavePreferences}
+  />
+)}
+ {/* Settings Modal - Fixed Integration */}
 {showSettingsModal && (
   <SettingsModal
     isOpen={showSettingsModal}

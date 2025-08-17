@@ -1,4 +1,4 @@
-// apps/web/src/lib/api-client.ts - FIXED: Cleaned method definitions, proper endpoint routing
+// apps/web/src/lib/api-client.ts - ENHANCED WITH USER PREFERENCES AND PROFILE METHODS
 import { Client, Property, Timeline } from '@/stores/missionControlStore';
 
 export interface ApiResponse<T = any> {
@@ -55,6 +55,7 @@ export interface ClientResponse {
   };
 }
 
+// NEW: Enhanced Profile Types
 export interface UserProfile {
   id: string;
   email: string;
@@ -109,6 +110,22 @@ export interface UpdateProfileRequest {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
+}
+
+// NEW: User Preferences Types
+export interface UserPreferencesResponse {
+  emailTemplateStyle: 'modern' | 'classical';
+  notifications: {
+    email: boolean;
+    desktop: boolean;
+    feedback: boolean;
+    newProperties: boolean;
+  };
+  theme: 'dark' | 'light' | 'system';
+  soundEnabled: boolean;
+  timezone: string;
+  brandColor: string;
+  logo: string;
 }
 
 export interface TimelineResponse {
@@ -584,12 +601,7 @@ class ApiClient {
     }, true); // Skip auth for register
   }
 
-  // FIXED: Authentication Profile (lightweight, from JWT)
-  async getAuthProfile(): Promise<ApiResponse<any>> {
-    return this.request('/api/v1/auth/profile');
-  }
-
-  // FIXED: Detailed User Profile (comprehensive, from database)
+  // NEW: Detailed User Profile (comprehensive, from database)
   async getUserProfile(): Promise<ApiResponse<UserProfile>> {
     return this.request('/api/v1/users/profile');
   }
@@ -605,6 +617,24 @@ class ApiClient {
     return this.request('/api/v1/users/change-password', {
       method: 'POST',
       body: JSON.stringify(passwordData),
+    });
+  }
+
+  // NEW: User Preferences Methods
+  async getUserPreferences(): Promise<ApiResponse<UserPreferencesResponse>> {
+    return this.request('/api/v1/users/preferences');
+  }
+
+  async updateUserPreferences(preferences: Partial<UserPreferencesResponse>): Promise<ApiResponse<UserPreferencesResponse>> {
+    return this.request('/api/v1/users/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(preferences),
+    });
+  }
+
+  async resetUserPreferences(): Promise<ApiResponse<UserPreferencesResponse>> {
+    return this.request('/api/v1/users/preferences/reset', {
+      method: 'POST',
     });
   }
 

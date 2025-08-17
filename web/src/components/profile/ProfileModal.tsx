@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, User, Mail, Phone, Building, Globe, Award, Clock,
   Camera, Edit3, Save, Briefcase, Star, Calendar, Search,
-  CheckCircle, AlertCircle
+  CheckCircle, AlertCircle, LogOut
 } from 'lucide-react';
 import { useProfile, useProfileActions, UpdateProfileData } from '@/stores/profileStore';
 import { useMissionControlStore } from '@/stores/missionControlStore';
@@ -25,12 +25,13 @@ const SPECIALTIES = [
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { profile, isLoading, error, loadProfile, clearErrors } = useProfile();
   const { updateProfile, isUpdating, updateError } = useProfileActions();
-  const { addNotification } = useMissionControlStore();
+  const { addNotification, logout } = useMissionControlStore();
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateProfileData>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   // Enhanced specialties state
   const [specialtySearch, setSpecialtySearch] = useState('');
@@ -195,6 +196,17 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   };
 
+  const handleLogout = () => {
+    logout();
+    onClose();
+    addNotification({
+      type: 'info',
+      title: 'Logged Out',
+      message: 'You have been successfully logged out.',
+      read: false,
+    });
+  };
+
   // Filter specialties based on search
   const filteredSpecialties = SPECIALTIES.map(category => ({
     ...category,
@@ -234,13 +246,42 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               
               <div className="flex items-center space-x-3">
                 {!isEditing ? (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    <span>Edit Profile</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      <span>Edit Profile</span>
+                    </button>
+                    
+                    {/* Logout Button */}
+                    {!showLogoutConfirm ? (
+                      <button
+                        onClick={() => setShowLogoutConfirm(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Logout</span>
+                      </button>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-red-400">Confirm logout?</span>
+                        <button
+                          onClick={handleLogout}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => setShowLogoutConfirm(false)}
+                          className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm transition-colors"
+                        >
+                          No
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <button
@@ -274,7 +315,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </div>
             </div>
 
-            {/* Content */}
+            {/* Content - Rest remains the same */}
             <div className="overflow-y-auto max-h-[calc(95vh-140px)]">
               {isLoading ? (
                 <div className="flex items-center justify-center py-20">
