@@ -1,6 +1,6 @@
-// apps/api/src/users/users.controller.ts - ENHANCED WITH PREFERENCES ENDPOINTS
+// apps/api/src/users/users.controller.ts - FIXED VERSION
 
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
@@ -15,7 +15,6 @@ export class UsersController {
 
   @Get('profile')
   async getProfile(@CurrentUser() user: any) {
-    // Uses user.id from JWT strategy
     return this.usersService.getProfile(user.id);
   }
 
@@ -24,7 +23,6 @@ export class UsersController {
     @CurrentUser() user: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    // Uses user.id from JWT strategy
     return this.usersService.updateProfile(user.id, updateProfileDto);
   }
 
@@ -33,17 +31,38 @@ export class UsersController {
     @CurrentUser() user: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
-    // Uses user.id from JWT strategy
     return this.usersService.changePassword(user.id, changePasswordDto);
   }
 
-  // NEW: Get user preferences
+  // EMAIL PREFERENCES ENDPOINTS
+  @Get('email-preferences')
+  async getEmailPreferences(@CurrentUser() user: any) {
+    const userProfile = await this.usersService.findById(user.id);
+    return {
+      preferredTemplate: userProfile.profile?.preferredEmailTemplate || 'modern',
+      brandColor: userProfile.profile?.brandColor || '#3b82f6',
+      companyName: userProfile.profile?.company || '',
+      agentName: `${userProfile.profile?.firstName || ''} ${userProfile.profile?.lastName || ''}`.trim(),
+    };
+  }
+
+  @Patch('email-preferences')
+  async updateEmailPreferences(
+    @CurrentUser() user: any,
+    @Body() preferences: { 
+      preferredTemplate?: 'modern' | 'classical';
+      brandColor?: string;
+    }
+  ) {
+    return this.usersService.updateEmailPreferences(user.id, preferences);
+  }
+
+  // GENERAL PREFERENCES ENDPOINTS (if you want to keep these separate)
   @Get('preferences')
   async getPreferences(@CurrentUser() user: any) {
     return this.usersService.getUserPreferences(user.id);
   }
 
-  // NEW: Update user preferences
   @Patch('preferences')
   async updatePreferences(
     @CurrentUser() user: any,
@@ -52,7 +71,6 @@ export class UsersController {
     return this.usersService.updateUserPreferences(user.id, updatePreferencesDto);
   }
 
-  // NEW: Reset preferences to defaults
   @Post('preferences/reset')
   async resetPreferences(@CurrentUser() user: any) {
     return this.usersService.resetUserPreferences(user.id);

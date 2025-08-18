@@ -86,6 +86,9 @@ model Profile {
   // Branding (Pro+ feature)
   logo         String? // URL to logo image
   brandColor   String? @default("#0ea5e9") // Hex color code
+
+  // 🆕 ADD EMAIL TEMPLATE PREFERENCE
+  preferredEmailTemplate String? @default("modern") // 'modern' or 'classical'
   
   // Subscription management
   plan         Plan    @default(FREE)

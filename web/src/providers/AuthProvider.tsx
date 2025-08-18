@@ -1,10 +1,8 @@
-// apps/web/src/providers/AuthProvider.tsx
+// apps/web/src/providers/AuthProvider.tsx - FIXED
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
-import { useProfileStore } from '@/stores/profileStore';
-import { apiClient } from '@/lib/api-client';
 
 interface AuthContextType {
   isInitialized: boolean;
@@ -21,30 +19,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   
   const { 
-    isAuthenticated, 
-    logout,
-    loadClients,
-    loadAnalytics,
+    isAuthenticated,
     checkAuthStatus
   } = useMissionControlStore();
-
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check initial auth status
+        // Just check auth status - the store will handle data loading
         checkAuthStatus();
-        
-        // If authenticated, load initial data
-        if (isAuthenticated) {
-          await Promise.all([
-            loadClients(),
-            loadAnalytics(),
-          ]);
-        }
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        logout();
       } finally {
         setIsInitialized(true);
         setIsLoading(false);
@@ -52,19 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-  }, []);
+  }, []); // Run once on mount
 
-  // Handle tab focus - refresh data when user returns
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const handleFocus = () => {
-      loadAnalytics();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [isAuthenticated, loadAnalytics]);
+  // Remove the tab focus listener - let components that need fresh data handle it
 
   return (
     <AuthContext.Provider value={{ isInitialized, isLoading }}>

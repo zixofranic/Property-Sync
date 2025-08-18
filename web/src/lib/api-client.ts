@@ -725,17 +725,74 @@ class ApiClient {
     });
   }
 
-  async sendTimelineEmail(timelineId: string): Promise<ApiResponse<{
-    message: string;
-    sentTo: string;
-    spouseSentTo?: string;
-    propertyCount: number;
-    shareUrl: string;
-  }>> {
-    return this.request(`/api/v1/timelines/${timelineId}/send-email`, {
-      method: 'POST',
-    });
+  async sendTimelineEmail(
+  timelineId: string, 
+  templateOverride?: 'modern' | 'classical'
+): Promise<ApiResponse<{
+  message: string;
+  sentTo: string;
+  spouseSentTo?: string;
+  propertyCount: number;
+  shareUrl: string;
+  templateStyle: string;
+  emailProvider?: string;
+  messageId?: string;
+}>> {
+  const body: any = {};
+  if (templateOverride) {
+    body.templateStyle = templateOverride;
   }
+
+  return this.request(`/api/v1/timelines/${timelineId}/send-email`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+async sendPropertyNotification(
+  timelineId: string, 
+  propertyId: string
+): Promise<ApiResponse<{
+  message: string;
+  sentTo: string;
+  spouseSentTo?: string;
+  propertyAddress: string;
+  emailProvider?: string;
+  messageId?: string;
+}>> {
+  return this.request(`/api/v1/timelines/${timelineId}/send-property-notification`, {
+    method: 'POST',
+    body: JSON.stringify({ propertyId }),
+  });
+}
+
+async getEmailPreferences(): Promise<ApiResponse<{
+  preferredTemplate: 'modern' | 'classical';
+  brandColor: string;
+  companyName: string;
+  agentName: string;
+}>> {
+  return this.request('/api/v1/users/email-preferences');
+}
+
+// Update email template preferences
+async updateEmailPreferences(preferences: {
+  preferredTemplate?: 'modern' | 'classical';
+  brandColor?: string;
+}): Promise<ApiResponse<{
+  message: string;
+  preferences: {
+    preferredTemplate: 'modern' | 'classical';
+    brandColor: string;
+    companyName: string;
+    agentName: string;
+  };
+}>> {
+  return this.request('/api/v1/users/email-preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(preferences),
+  });
+}
 
   async revokeTimelineAccess(timelineId: string): Promise<ApiResponse<{
     message: string;

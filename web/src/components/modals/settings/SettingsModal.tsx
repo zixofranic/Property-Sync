@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Settings, User, Mail, Bell, Shield, 
   CreditCard, HelpCircle, Palette, Save,
-  Monitor, Moon, Sun, Volume2, VolumeX,
   MapPin, Camera, Eye, EyeOff, Lock,
   Upload, Check, AlertTriangle
 } from 'lucide-react';
@@ -70,9 +69,8 @@ export function SettingsModal({
 
   const tabs = [
     { id: 'branding', label: 'Branding', icon: Palette },
-    { id: 'professional', label: 'Professional Settings', icon: Settings },
+    { id: 'professional', label: 'Password', icon: Lock },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'appearance', label: 'Appearance', icon: Monitor },
     { id: 'account', label: 'Account & Security', icon: Shield },
     { id: 'help', label: 'Help & Support', icon: HelpCircle },
   ];
@@ -282,7 +280,7 @@ export function SettingsModal({
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-6">Professional Settings</h3>
+              <h3 className="text-lg font-semibold text-white mb-6">Password & Security</h3>
               
               {/* Timezone */}
               <div className="space-y-4">
@@ -373,7 +371,7 @@ export function SettingsModal({
                 {/* Desktop Notifications */}
                 <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
                   <h4 className="font-medium text-white mb-4 flex items-center space-x-2">
-                    <Monitor className="w-4 h-4 text-green-400" />
+                    <Bell className="w-4 h-4 text-green-400" />
                     <span>Desktop & Browser Notifications</span>
                   </h4>
                   <div className="space-y-3">
@@ -393,68 +391,6 @@ export function SettingsModal({
                       </label>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'appearance':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Appearance Settings</h3>
-              
-              <div className="space-y-4">
-                {/* Theme Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Theme</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { id: 'light', label: 'Light', icon: Sun },
-                      { id: 'dark', label: 'Dark', icon: Moon },
-                      { id: 'system', label: 'System', icon: Monitor }
-                    ].map((theme) => {
-                      const Icon = theme.icon;
-                      return (
-                        <button
-                          key={theme.id}
-                          onClick={() => updatePreference(['theme'], theme.id)}
-                          className={`p-4 rounded-lg border transition-all ${
-                            preferences.theme === theme.id
-                              ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
-                              : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
-                          }`}
-                        >
-                          <Icon className="w-6 h-6 mx-auto mb-2" />
-                          <span className="text-sm font-medium">{theme.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Sound */}
-                <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/30">
-                  <div className="flex items-center space-x-3">
-                    {preferences.soundEnabled ? 
-                      <Volume2 className="w-5 h-5 text-blue-400" /> : 
-                      <VolumeX className="w-5 h-5 text-slate-400" />
-                    }
-                    <div>
-                      <h4 className="font-medium text-white">Sound Effects</h4>
-                      <p className="text-sm text-slate-400">Play sounds for notifications and actions</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={preferences.soundEnabled}
-                      onChange={(e) => updatePreference(['soundEnabled'], e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
                 </div>
               </div>
             </div>

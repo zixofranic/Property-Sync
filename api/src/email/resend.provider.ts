@@ -40,38 +40,63 @@ export interface FeedbackReminderData {
 export class ResendProvider {
   private readonly logger = new Logger(ResendProvider.name);
   private resend: Resend;
+  private fromEmail: string;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not found. Resend functionality will be limited.');
-    }
-    this.resend = new Resend(apiKey);
+  const apiKey = this.configService.get<string>('RESEND_API_KEY');
+  if (!apiKey) {
+    this.logger.warn('RESEND_API_KEY not found. Resend functionality will be limited.');
   }
+  
+  this.resend = new Resend(apiKey);
+  
+  // Use Resend's verified domain for now
+  this.fromEmail = this.configService.get<string>('RESEND_FROM_EMAIL') || 'Property Sync <onboarding@resend.dev>';
+  
+  this.logger.log(`Resend configured with sender: ${this.fromEmail}`);
+  this.logger.warn('DEVELOPMENT MODE: Resend can only send to your verified email address until domain is verified');
+}
 
   // ENHANCED: Timeline Email with Modern/Classical Templates
-  async sendTimelineEmail(data: TimelineEmailData) {
-    this.logger.log(`Sending timeline email via Resend to ${data.to}`);
+async sendTimelineEmail(data: TimelineEmailData) {
+  this.logger.log(`Sending timeline email via Resend to ${data.to}`);
 
-    const htmlContent = this.generateTimelineEmailHtml(data);
-    const textContent = this.generateTimelineEmailText(data);
+  const htmlContent = this.generateTimelineEmailHtml(data);
+  const textContent = this.generateTimelineEmailText(data);
 
-    try {
-      const result = await this.resend.emails.send({
-        from: 'Property Sync <noreply@propertysync.com>',
-        to: data.to,
-        subject: `Your Property Timeline from ${data.agentName}`,
-        html: htmlContent,
-        text: textContent,
-        headers: {
-          'X-Entity-Ref-ID': `timeline-${Date.now()}`,
-        },
-      });
+  try {
+    const result = await this.resend.emails.send({
+      from: this.fromEmail,
+      to: data.to,
+      subject: `Your Property Timeline from ${data.agentName}`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Entity-Ref-ID': `timeline-${Date.now()}`,
+      },
+    });
 
+    // Check for errors in response
+    if (result.error) {
+      this.logger.error('Resend API returned error:', result.error);
+      
+      // Check if it's a domain verification error (based on your logs)
+      const errorMessage = JSON.stringify(result.error);
+      if (errorMessage.includes('verify a domain') || errorMessage.includes('testing emails')) {
+        this.logger.warn('Domain verification required - falling back to Nodemailer');
+        throw new Error('Domain verification required for Resend');
+      }
+      
+      throw new Error(`Resend API error: ${errorMessage}`);
+    }
+
+    if (result.data?.id) {
+      this.logger.log(`Timeline email sent successfully via Resend: ${result.data.id}`);
+      
       // Send to spouse if provided
       if (data.spouseEmail) {
-        await this.resend.emails.send({
-          from: 'Property Sync <noreply@propertysync.com>',
+        const spouseResult = await this.resend.emails.send({
+          from: this.fromEmail,
           to: data.spouseEmail,
           subject: `Property Timeline for ${data.clientName} from ${data.agentName}`,
           html: htmlContent.replace(new RegExp(data.clientName, 'g'), `${data.clientName} and you`),
@@ -80,14 +105,21 @@ export class ResendProvider {
             'X-Entity-Ref-ID': `timeline-spouse-${Date.now()}`,
           },
         });
+        
+        if (spouseResult.data?.id) {
+          this.logger.log(`Spouse timeline email sent successfully via Resend: ${spouseResult.data.id}`);
+        }
       }
-
-      return result;
-    } catch (error) {
-      this.logger.error('Resend timeline email failed:', error);
-      throw error;
+    } else {
+      throw new Error('Resend returned no message ID');
     }
+
+    return result;
+  } catch (error) {
+    this.logger.error('Resend timeline email failed:', error.message);
+    throw error;
   }
+}
 
   // NEW: Property Update Notification
   async sendPropertyNotification(data: PropertyNotificationData) {
@@ -98,7 +130,7 @@ export class ResendProvider {
 
     try {
       const result = await this.resend.emails.send({
-        from: 'Property Sync <noreply@propertysync.com>',
+        from: this.fromEmail, // 🆕 Use verified domain
         to: data.clientEmail,
         subject: `New Property Added: ${data.propertyAddress}`,
         html: htmlContent,
@@ -108,10 +140,12 @@ export class ResendProvider {
         },
       });
 
+      this.logger.log(`Property notification sent successfully via Resend: ${result.data?.id}`);
+
       // Send to spouse if provided
       if (data.spouseEmail) {
         await this.resend.emails.send({
-          from: 'Property Sync <noreply@propertysync.com>',
+          from: this.fromEmail, // 🆕 Use verified domain
           to: data.spouseEmail,
           subject: `New Property Added: ${data.propertyAddress}`,
           html: htmlContent,
@@ -120,11 +154,17 @@ export class ResendProvider {
             'X-Entity-Ref-ID': `property-notification-spouse-${Date.now()}`,
           },
         });
+        this.logger.log(`Spouse property notification sent successfully via Resend`);
       }
 
       return result;
     } catch (error) {
-      this.logger.error('Resend property notification failed:', error);
+      this.logger.error('Resend property notification failed:', {
+        error: error.message,
+        to: data.clientEmail,
+        from: this.fromEmail,
+        statusCode: error.statusCode
+      });
       throw error;
     }
   }
@@ -137,8 +177,8 @@ export class ResendProvider {
     const textContent = `Hi ${data.clientName}!\n\nYou have ${data.pendingPropertiesCount} properties waiting for your feedback from ${data.agentName}.\n\nIt's been ${data.daysSinceLastActivity} days since your last activity. Your input helps us find you the perfect home!\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
-      return await this.resend.emails.send({
-        from: 'Property Sync <noreply@propertysync.com>',
+      const result = await this.resend.emails.send({
+        from: this.fromEmail, // 🆕 Use verified domain
         to: data.clientEmail,
         subject: `Feedback Requested: ${data.pendingPropertiesCount} Properties Await Your Response`,
         html: htmlContent,
@@ -147,8 +187,16 @@ export class ResendProvider {
           'X-Entity-Ref-ID': `feedback-reminder-${Date.now()}`,
         },
       });
+
+      this.logger.log(`Feedback reminder sent successfully via Resend: ${result.data?.id}`);
+      return result;
     } catch (error) {
-      this.logger.error('Resend feedback reminder failed:', error);
+      this.logger.error('Resend feedback reminder failed:', {
+        error: error.message,
+        to: data.clientEmail,
+        from: this.fromEmail,
+        statusCode: error.statusCode
+      });
       throw error;
     }
   }
@@ -162,8 +210,8 @@ export class ResendProvider {
     const textContent = `Hi ${firstName},\n\nWelcome to Property Sync! Please verify your email address by clicking the link below:\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nBest regards,\nThe Property Sync Team`;
 
     try {
-      return await this.resend.emails.send({
-        from: 'Property Sync <noreply@propertysync.com>',
+      const result = await this.resend.emails.send({
+        from: this.fromEmail, // 🆕 Use verified domain
         to: email,
         subject: 'Welcome to Property Sync - Verify Your Email',
         html: htmlContent,
@@ -172,8 +220,16 @@ export class ResendProvider {
           'X-Entity-Ref-ID': `verification-${Date.now()}`,
         },
       });
+
+      this.logger.log(`Verification email sent successfully via Resend: ${result.data?.id}`);
+      return result;
     } catch (error) {
-      this.logger.error('Resend verification email failed:', error);
+      this.logger.error('Resend verification email failed:', {
+        error: error.message,
+        to: email,
+        from: this.fromEmail,
+        statusCode: error.statusCode
+      });
       throw error;
     }
   }
@@ -187,8 +243,8 @@ export class ResendProvider {
     const textContent = `Hi ${firstName},\n\nYour Property Sync account is now verified and ready to use!\n\nGet started: ${dashboardUrl}\n\nBest regards,\nThe Property Sync Team`;
 
     try {
-      return await this.resend.emails.send({
-        from: 'Property Sync <noreply@propertysync.com>',
+      const result = await this.resend.emails.send({
+        from: this.fromEmail, // 🆕 Use verified domain
         to: email,
         subject: '🎉 Welcome to Property Sync - Your Account is Ready!',
         html: htmlContent,
@@ -197,13 +253,21 @@ export class ResendProvider {
           'X-Entity-Ref-ID': `welcome-${Date.now()}`,
         },
       });
+
+      this.logger.log(`Welcome email sent successfully via Resend: ${result.data?.id}`);
+      return result;
     } catch (error) {
-      this.logger.error('Resend welcome email failed:', error);
+      this.logger.error('Resend welcome email failed:', {
+        error: error.message,
+        to: email,
+        from: this.fromEmail,
+        statusCode: error.statusCode
+      });
       throw error;
     }
   }
 
-  // PRIVATE: Template Generators
+  // PRIVATE: Template Generators (unchanged)
   private generateTimelineEmailHtml(data: TimelineEmailData): string {
     const templateStyle = data.templateStyle || 'modern';
     const brandColor = data.brandColor || '#3b82f6';
@@ -400,7 +464,7 @@ Powered by Property Sync
 </html>`;
   }
 
-  private getVerificationEmailTemplate(firstName: string, verificationUrl: string): string {
+   private getVerificationEmailTemplate(firstName: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
       <html>

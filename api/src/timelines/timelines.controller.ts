@@ -1,111 +1,26 @@
 import { 
   Controller, 
   Get, 
-  Post,
-  Patch,
-  Delete,
+  Post, 
+  Patch, 
+  Delete, 
+  Body, 
   Param, 
   Query, 
-  Body,
+  UseGuards, 
   Request,
-  UseGuards,
   NotFoundException 
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Public } from '../common/decorators/public.decorator';        
+import { Public } from '../common/decorators/public.decorator';
 import { TimelinesService } from './timelines.service';
-import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFeedbackDto } from './dto/property-feedback.dto';
 
 @Controller('api/v1/timelines')
 export class TimelinesController {
   constructor(private readonly timelinesService: TimelinesService) {}
 
-  // Get timeline for agent (backend integration)
-@UseGuards(JwtAuthGuard)
-@Get('agent/:clientId')
-async getAgentTimeline(
-  @Request() req,
-  @Param('clientId') clientId: string
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.getAgentTimeline(agentId, clientId);
-}
-
-// Add property to timeline
-@UseGuards(JwtAuthGuard)
-@Post(':timelineId/properties')
-async addProperty(
-  @Request() req,
-  @Param('timelineId') timelineId: string,
-  @Body() createPropertyDto: CreatePropertyDto
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.addPropertyToTimeline(agentId, timelineId, createPropertyDto);
-}
-
-// Update property
-@UseGuards(JwtAuthGuard)
-@Patch('properties/:propertyId')
-async updateProperty(
-  @Request() req,
-  @Param('propertyId') propertyId: string,
-  @Body() updateData: Partial<CreatePropertyDto>
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.updateProperty(agentId, propertyId, updateData);
-}
-
-// Delete property
-@UseGuards(JwtAuthGuard)
-@Delete('properties/:propertyId')
-async deleteProperty(
-  @Request() req,
-  @Param('propertyId') propertyId: string
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.deleteProperty(agentId, propertyId);
-}
-
-// Submit property feedback (public endpoint for clients)
-@Public()
-@Post(':shareToken/properties/:propertyId/feedback')
-async submitPropertyFeedback(
-  @Param('shareToken') shareToken: string,
-  @Param('propertyId') propertyId: string,
-  @Body() feedbackDto: PropertyFeedbackDto,
-  @Query('client') clientCode?: string
-) {
-  return this.timelinesService.submitPropertyFeedback(
-    shareToken, 
-    propertyId, 
-    feedbackDto, 
-    clientCode
-  );
-}
-
-// Send timeline email
-@UseGuards(JwtAuthGuard)
-@Post(':timelineId/send-email')
-async sendTimelineEmail(
-  @Request() req,
-  @Param('timelineId') timelineId: string
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.sendTimelineEmail(agentId, timelineId);
-}
-
-// Revoke timeline access
-@UseGuards(JwtAuthGuard)
-@Post(':timelineId/revoke-access')
-async revokeTimelineAccess(
-  @Request() req,
-  @Param('timelineId') timelineId: string
-) {
-  const agentId = req.user.id;
-  return this.timelinesService.revokeTimelineAccess(agentId, timelineId);
-}
-
+  // Get timeline by share token (for clients)
   @Public()
   @Get(':shareToken')
   async getTimelineByShareToken(
@@ -115,6 +30,7 @@ async revokeTimelineAccess(
     return this.timelinesService.getTimelineByShareToken(shareToken, clientCode);
   }
 
+  // Validate client access
   @Public()
   @Get(':shareToken/validate-client')
   async validateClientAccess(
@@ -122,5 +38,111 @@ async revokeTimelineAccess(
     @Query('client') clientCode: string
   ) {
     return this.timelinesService.validateClientAccess(shareToken, clientCode);
+  }
+
+  // Submit property feedback (public)
+  @Public()
+  @Post(':shareToken/properties/:propertyId/feedback')
+  async submitPropertyFeedback(
+    @Param('shareToken') shareToken: string,
+    @Param('propertyId') propertyId: string,
+    @Body() feedbackDto: PropertyFeedbackDto,
+    @Query('client') clientCode?: string
+  ) {
+    return this.timelinesService.submitPropertyFeedback(shareToken, propertyId, feedbackDto, clientCode);
+  }
+
+  // Get agent timeline for specific client
+  @UseGuards(JwtAuthGuard)
+  @Get('agent/:clientId')
+  async getAgentTimeline(
+    @Request() req,
+    @Param('clientId') clientId: string
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.getAgentTimeline(agentId, clientId);
+  }
+
+  // Add property to timeline
+  @UseGuards(JwtAuthGuard)
+  @Post(':timelineId/properties')
+  async addProperty(
+    @Request() req,
+    @Param('timelineId') timelineId: string,
+    @Body() propertyData: any
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.addPropertyToTimeline(agentId, timelineId, propertyData);
+  }
+
+  // Update property
+  @UseGuards(JwtAuthGuard)
+  @Patch('properties/:propertyId')
+  async updateProperty(
+    @Request() req,
+    @Param('propertyId') propertyId: string,
+    @Body() updateData: any
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.updateProperty(agentId, propertyId, updateData);
+  }
+
+  // Delete property
+  @UseGuards(JwtAuthGuard)
+  @Delete('properties/:propertyId')
+  async deleteProperty(
+    @Request() req,
+    @Param('propertyId') propertyId: string
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.deleteProperty(agentId, propertyId);
+  }
+
+  // NEW: Send timeline email
+  @UseGuards(JwtAuthGuard)
+  @Post(':timelineId/send-email')
+  async sendTimelineEmail(
+    @Request() req,
+    @Param('timelineId') timelineId: string,
+    @Body() emailOptions?: { templateStyle?: 'modern' | 'classical' }
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.sendTimelineEmail(agentId, timelineId, emailOptions);
+  }
+
+  // NEW: Send property notification
+  @UseGuards(JwtAuthGuard)
+  @Post(':timelineId/send-property-notification')
+  async sendPropertyNotification(
+    @Request() req,
+    @Param('timelineId') timelineId: string,
+    @Body() notificationData: { propertyId: string }
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.sendPropertyNotification(agentId, timelineId, notificationData.propertyId);
+  }
+
+  // Revoke timeline access
+  @UseGuards(JwtAuthGuard)
+  @Post(':timelineId/revoke-access')
+  async revokeTimelineAccess(
+    @Request() req,
+    @Param('timelineId') timelineId: string
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.revokeTimelineAccess(agentId, timelineId);
+  }
+
+  // Check MLS duplicate
+  @UseGuards(JwtAuthGuard)
+  @Get('check-duplicate')
+  async checkMLSDuplicate(
+    @Request() req,
+    @Query('clientId') clientId: string,
+    @Query('mlsLink') mlsLink: string
+  ) {
+    const agentId = req.user.id;
+    const isDuplicate = await this.timelinesService.checkMLSDuplicate(agentId, clientId, mlsLink);
+    return { isDuplicate };
   }
 }

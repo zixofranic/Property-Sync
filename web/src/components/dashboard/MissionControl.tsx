@@ -86,10 +86,10 @@ export function MissionControl() {
 
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // ✅ SIMPLIFIED: Basic online/offline detection only
+  // âœ… SIMPLIFIED: Basic online/offline detection only
   const [isOnline, setIsOnline] = useState(true);
 
-  // ✅ SIMPLIFIED: Basic online/offline monitoring (no session management)
+  // âœ… SIMPLIFIED: Basic online/offline monitoring (no session management)
   useEffect(() => {
     // Only handle online/offline detection
     const handleOnline = () => setIsOnline(true);
@@ -106,7 +106,7 @@ export function MissionControl() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []); // ✅ FIXED: Empty dependency array, no auth dependencies
+  }, []); // âœ… FIXED: Empty dependency array, no auth dependencies
 
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
@@ -115,7 +115,7 @@ export function MissionControl() {
   // Check if there are properties queued for bulk sending
   const bulkQueueCount = properties.filter(p => !p.clientFeedback).length;
 
-  // ✅ FIXED: Date grouping function with null safety
+  // âœ… FIXED: Date grouping function with null safety
   const groupPropertiesByDate = (properties: Property[]) => {
     const groups: { [key: string]: Property[] } = {};
     
@@ -136,7 +136,7 @@ export function MissionControl() {
     return groups;
   };
 
-  // ✅ FIXED: Format relative time with null safety
+  // âœ… FIXED: Format relative time with null safety
   const getRelativeTime = (dateString: string | undefined) => {
     if (!dateString) return 'Unknown';
     
@@ -221,8 +221,25 @@ export function MissionControl() {
       sendBulkProperties(selectedClient.id);
     }
   };
+  const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical') => {
+  if (!selectedClient || !activeTimeline) {
+    addNotification({
+      type: 'error',
+      title: 'Cannot Send Email',
+      message: 'No client or timeline selected',
+      read: false,
+    });
+    return;
+  }
 
-  // ✅ FIXED: Enhanced client selector with search - NULL SAFETY APPLIED
+  try {
+    await sendTimelineEmail(activeTimeline.id, templateOverride);
+  } catch (error) {
+    // Error handling is done in the store action
+    throw error; // Re-throw for modal handling
+  }
+};
+  // âœ… FIXED: Enhanced client selector with search - NULL SAFETY APPLIED
   const [clientSearch, setClientSearch] = useState('');
   const filteredClients = clients.filter(client => {
     if (!client) return false; // Skip null/undefined clients
@@ -253,7 +270,7 @@ const testProfileAPI = async () => {
   }
 };
 
-  // ✅ ADDED: Shimmer loading component for client list
+  // âœ… ADDED: Shimmer loading component for client list
   const ClientShimmer = () => (
     <div className="space-y-4">
       {[1, 2, 3].map((i) => (
@@ -274,7 +291,7 @@ const testProfileAPI = async () => {
     </div>
   );
 
-  // ✅ ADDED: Loading overlay component
+  // âœ… ADDED: Loading overlay component
   const LoadingOverlay = ({ message = "Loading..." }: { message?: string }) => (
     <motion.div
       initial={{ opacity: 0 }}
@@ -299,7 +316,7 @@ const testProfileAPI = async () => {
     </motion.div>
   );
 
-  // ✅ ADDED: Timeline loading skeleton
+  // âœ… ADDED: Timeline loading skeleton
   const TimelineLoadingSkeleton = () => (
     <div className="space-y-12">
       {[1, 2].map((i) => (
@@ -333,14 +350,14 @@ const testProfileAPI = async () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* ✅ ADDED: Show loading overlay for initial data loading */}
+      {/* âœ… ADDED: Show loading overlay for initial data loading */}
       <AnimatePresence>
         {clientsLoading && clients.length === 0 && (
           <LoadingOverlay message="Loading your clients..." />
         )}
       </AnimatePresence>
 
-      {/* ✅ SIMPLIFIED: Basic offline status bar only */}
+      {/* âœ… SIMPLIFIED: Basic offline status bar only */}
       {!isOnline && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -399,7 +416,7 @@ const testProfileAPI = async () => {
                     </div>
                   </div>
 
-                  {/* ✅ ADDED: Client List with loading state */}
+                  {/* âœ… ADDED: Client List with loading state */}
                   <div className="max-h-80 overflow-y-auto">
                     {clientsLoading && clients.length === 0 ? (
                       <ClientShimmer />
@@ -420,7 +437,7 @@ const testProfileAPI = async () => {
                               <div className="font-medium text-white">{client.name || 'Unnamed Client'}</div>
                               <div className="text-sm text-slate-400 truncate">{client.email || 'No email'}</div>
                               <div className="text-xs text-slate-500 mt-1">
-                                {client.propertiesViewed || 0} properties • Last active {getRelativeTime(client.lastActive)}
+                                {client.propertiesViewed || 0} properties â€¢ Last active {getRelativeTime(client.lastActive)}
                               </div>
                             </div>
                             <div className="text-right ml-4">
@@ -490,7 +507,7 @@ const testProfileAPI = async () => {
             )}
 
             <div className="flex items-center space-x-2">
-              {/* ✅ ADDED: Loading indicator for data operations */}
+              {/* âœ… ADDED: Loading indicator for data operations */}
               {(clientsLoading || timelineLoading || analyticsLoading) && (
                 <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
               )}
@@ -578,10 +595,10 @@ const testProfileAPI = async () => {
                     {selectedClient.name || 'Client'}'s Property Journey
                   </h1>
                   
-                  {/* ✅ SIMPLIFIED: Basic user and connection info */}
+                  {/* âœ… SIMPLIFIED: Basic user and connection info */}
                   <div className="flex items-center justify-center space-x-4 text-sm text-slate-400">
                     <span>Welcome back, {user?.firstName || 'Agent'}</span>
-                    <span>•</span>
+                    <span>â€¢</span>
                     <span className={`flex items-center space-x-1 ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
                       {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                       <span>{isOnline ? 'Online' : 'Offline'}</span>
@@ -590,11 +607,11 @@ const testProfileAPI = async () => {
                 </motion.div>
               </div>
 
-              {/* ✅ ADDED: Conditional rendering with loading states */}
+              {/* âœ… ADDED: Conditional rendering with loading states */}
               {timelineLoading ? (
                 <TimelineLoadingSkeleton />
               ) : properties.length > 0 ? (
-                /* ✅ ENHANCED: Timeline with Date Grouping */
+                /* âœ… ENHANCED: Timeline with Date Grouping */
                 <div className="relative">
                   {/* Center Timeline Line for Large Screens */}
                   <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 transform -translate-x-1/2" />
@@ -602,7 +619,7 @@ const testProfileAPI = async () => {
                   {/* Left Timeline Line for Mobile */}
                   <div className="lg:hidden absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500" />
 
-                  {/* ✅ FIXED: Timeline Items - GROUPED BY DATE with null safety */}
+                  {/* âœ… FIXED: Timeline Items - GROUPED BY DATE with null safety */}
                   <div className="space-y-12 lg:space-y-16">
                     {(() => {
                       const sortedProperties = properties
@@ -613,7 +630,7 @@ const testProfileAPI = async () => {
 
                       return Object.entries(groupedProperties).map(([dateString, dayProperties]) => (
                         <div key={dateString} className="space-y-12 lg:space-y-16">
-                          {/* ✅ FIXED: Modern Date Header with error handling */}
+                          {/* âœ… FIXED: Modern Date Header with error handling */}
                           <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -820,7 +837,12 @@ const testProfileAPI = async () => {
       <ClientsModal 
         isOpen={activeModal === 'clients'} 
         onClose={() => setActiveModal(null)} 
-      />
+        />
+
+
+
+
+
 {/* NEW: Settings Modal Integration */}
 {user && (
   <SettingsModal

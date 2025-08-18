@@ -16,12 +16,10 @@ export interface User {
 
 export interface UserPreferences {
   emailTemplateStyle: 'modern' | 'classical';
-  notifications: {
-    email: boolean;
-    desktop: boolean;
-    feedback: boolean;
-    newProperties: boolean;
-  };
+  notificationEmail: boolean;
+  notificationDesktop: boolean;
+  notificationFeedback: boolean;
+  notificationNewProperties: boolean;
   theme: 'dark' | 'light' | 'system';
   soundEnabled: boolean;
   timezone: string;
@@ -86,8 +84,20 @@ export interface Notification {
   read: boolean;
 }
 
+// Email State Interface
+interface EmailState {
+  emailPreferences: {
+    preferredTemplate: 'modern' | 'classical';
+    brandColor: string;
+    companyName: string;
+    agentName: string;
+  } | null;
+  emailPreferencesLoading: boolean;
+  emailPreferencesError: string | null;
+}
+
 // Store State Interface
-interface MissionControlState {
+interface MissionControlState extends EmailState {
   // Authentication State
   user: User | null;
   userPreferences: UserPreferences;
@@ -130,8 +140,22 @@ interface MissionControlState {
   isRetrying: boolean;
 }
 
+// Email Actions Interface
+interface EmailActions {
+  // Email Preferences
+  loadEmailPreferences: () => Promise<void>;
+  updateEmailPreferences: (preferences: { 
+    preferredTemplate?: 'modern' | 'classical'; 
+    brandColor?: string; 
+  }) => Promise<void>;
+  
+  // Email Sending
+  sendTimelineEmail: (timelineId: string, templateOverride?: 'modern' | 'classical') => Promise<void>;
+  sendPropertyNotification: (timelineId: string, propertyId: string) => Promise<void>;
+}
+
 // Store Actions Interface
-interface MissionControlActions {
+interface MissionControlActions extends EmailActions {
   // Authentication Actions
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -139,6 +163,7 @@ interface MissionControlActions {
   checkAuthStatus: () => void;
   refreshAuth: () => Promise<boolean>;
   loadProfile: () => Promise<void>;
+  loadInitialData: () => Promise<void>;
 
   // User Preferences Actions
   updateUserPreferences: (preferences: Partial<UserPreferences>) => Promise<void>;
@@ -157,7 +182,6 @@ interface MissionControlActions {
   addProperty: (propertyData: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => Promise<void>;
   updateProperty: (propertyId: string, updates: Partial<Property>) => Promise<void>;
   deleteProperty: (propertyId: string) => Promise<void>;
-  sendTimelineEmail: (timelineId: string) => Promise<void>;
   revokeTimelineAccess: (timelineId: string) => Promise<void>;
 
   // Analytics Actions
@@ -199,18 +223,40 @@ interface MissionControlActions {
 // Default preferences
 const defaultPreferences: UserPreferences = {
   emailTemplateStyle: 'modern',
-  notifications: {
-    email: true,
-    desktop: true,
-    feedback: true,
-    newProperties: true,
-  },
+  notificationEmail: true,
+  notificationDesktop: true,
+  notificationFeedback: true,
+  notificationNewProperties: true,
   theme: 'dark',
   soundEnabled: true,
   timezone: 'America/New_York',
   brandColor: '#3b82f6',
   logo: '',
 };
+
+class LoadingTracker {
+  private lastLoads: Map<string, number> = new Map();
+  private readonly DEDUPE_WINDOW = 2000; // 2 seconds
+  
+  canLoad(key: string): boolean {
+    const now = Date.now();
+    const lastLoad = this.lastLoads.get(key) || 0;
+    
+    if (now - lastLoad < this.DEDUPE_WINDOW) {
+      console.log(`LoadingTracker: Skipping ${key} - already loaded ${now - lastLoad}ms ago`);
+      return false;
+    }
+    
+    this.lastLoads.set(key, now);
+    return true;
+  }
+  
+  reset() {
+    this.lastLoads.clear();
+  }
+}
+
+const loadingTracker = new LoadingTracker();
 
 // Zustand Store Creation
 export const useMissionControlStore = create<MissionControlState & MissionControlActions>()(
@@ -223,6 +269,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         isAuthenticated: false,
         isLoading: false,
         authError: null,
+
+        // Initial Email State
+        emailPreferences: null,
+        emailPreferencesLoading: false,
+        emailPreferencesError: null,
 
         // Initial Client State
         clients: [],
@@ -297,20 +348,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 read: false,
               });
 
-              // Load data immediately after successful login
-              console.log('Store: Loading data after successful login...');
-              setTimeout(async () => {
-                try {
-                  await Promise.allSettled([
-                    get().loadClients(),
-                    get().loadDashboardAnalytics(),
-                    get().loadUserPreferences()
-                  ]);
-                  console.log('Store: Post-login data loading complete');
-                } catch (error) {
-                  console.warn('Store: Some data failed to load after login:', error);
-                }
-              }, 100);
+              // Reset tracker on new login
+              loadingTracker.reset();
+              
+              // Load initial data once
+              get().loadInitialData();
 
               return true;
             }
@@ -360,6 +402,9 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             retryCount: 0,
             lastDataLoadAttempt: 0,
             isRetrying: false,
+            emailPreferences: null,
+            emailPreferencesLoading: false,
+            emailPreferencesError: null,
           });
 
           // Redirect to login
@@ -368,11 +413,29 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        setUser: (user: User) => {
-          console.log('Store: Setting user:', user.email);
-          set({ user, isAuthenticated: true });
+        // New centralized initial data loading method
+        loadInitialData: async () => {
+          // Only load if we haven't loaded recently
+          if (!loadingTracker.canLoad('initial-data')) {
+            console.log('Store: Initial data already loading/loaded');
+            return;
+          }
+          
+          console.log('Store: Loading initial data...');
+          
+          try {
+            await Promise.allSettled([
+              get().loadClients(),
+              get().loadDashboardAnalytics(),
+              get().loadUserPreferences()
+            ]);
+            console.log('Store: Initial data loading complete');
+          } catch (error) {
+            console.warn('Store: Some initial data failed to load:', error);
+          }
         },
 
+        // Modified checkAuthStatus to prevent duplicate loads
         checkAuthStatus: () => {
           console.log('Store: Checking auth status...');
           const isAuth = apiClient.isAuthenticated();
@@ -385,20 +448,10 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               user: storedUser,
             });
             
-            // Load data after confirming auth on refresh
-            setTimeout(async () => {
-              console.log('Store: Loading data after auth check...');
-              try {
-                await Promise.allSettled([
-                  get().loadClients(),
-                  get().loadDashboardAnalytics(),
-                  get().loadUserPreferences()
-                ]);
-                console.log('Store: Post-auth data loading complete');
-              } catch (error) {
-                console.warn('Store: Some data failed to load after auth check:', error);
-              }
-            }, 100);
+            // Use deduplication for data loading
+            if (loadingTracker.canLoad('auth-check-data')) {
+              get().loadInitialData();
+            }
           } else {
             console.log('Store: Auth status invalid');
             set({
@@ -406,6 +459,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               user: null,
             });
           }
+        },
+
+        setUser: (user: User) => {
+          console.log('Store: Setting user:', user.email);
+          set({ user, isAuthenticated: true });
         },
 
         // User Preferences Actions
@@ -465,13 +523,17 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         },
 
         loadUserPreferences: async () => {
+          if (!loadingTracker.canLoad('preferences')) {
+            console.log('Store: Preferences recently loaded, skipping');
+            return;
+          }
+          
           try {
             console.log('Store: Loading user preferences...');
             const response = await apiClient.getUserPreferences();
             
             if (response.error) {
               console.warn('Store: Preferences loading failed, using defaults:', response.error);
-              // Don't throw - just use defaults silently
               return;
             }
 
@@ -486,7 +548,6 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
           } catch (error) {
             console.warn('Store: Preferences loading error, using defaults:', error);
-            // Don't throw - gracefully degrade to defaults
           }
         },
 
@@ -508,7 +569,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             console.log('Store: Refreshing authentication...');
             set({ isLoading: true });
 
-            const response = await apiClient.getUserProfile();
+            const response = await apiClient.getProfile();
             
             if (response.error) {
               console.log('Store: Auth profile fetch failed:', response.error);
@@ -538,9 +599,9 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               const userFromAuth = {
                 id: response.data.id,
                 email: response.data.email,
-                firstName: response.data.profile?.firstName || '',
-                lastName: response.data.profile?.lastName || '',
-                plan: response.data.profile?.plan || 'FREE',
+                firstName: response.data.firstName || '',
+                lastName: response.data.lastName || '',
+                plan: response.data.plan || 'FREE',
                 emailVerified: response.data.emailVerified || false,
               };
 
@@ -577,11 +638,16 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        // Use getUserProfile for profile loading
+        // Use getProfile for profile loading
         loadProfile: async () => {
+          if (get().isLoading || get().user?.firstName) {
+            console.log('Store: Profile already loading or loaded, skipping');
+            return; // Already loaded or loading
+          }
+          
           try {
             console.log('Store: Loading profile...');
-            const response = await apiClient.getUserProfile();
+            const response = await apiClient.getProfile();
             
             if (response.error) {
               console.error('Store: Profile loading failed:', response.error);
@@ -609,6 +675,131 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
           } catch (error) {
             console.error('Store: Profile loading error:', error);
+          }
+        },
+
+        // Email Preference Actions
+        loadEmailPreferences: async () => {
+          set({ emailPreferencesLoading: true, emailPreferencesError: null });
+
+          try {
+            const response = await apiClient.getEmailPreferences();
+            
+            if (response.error) {
+              set({ emailPreferencesError: response.error, emailPreferencesLoading: false });
+              
+              get().addNotification({
+                type: 'error',
+                title: 'Failed to Load Email Preferences',
+                message: response.error,
+                read: false,
+              });
+              
+              return;
+            }
+
+            if (response.data) {
+              set({
+                emailPreferences: response.data,
+                emailPreferencesLoading: false,
+                emailPreferencesError: null,
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to load email preferences';
+            set({ emailPreferencesError: errorMessage, emailPreferencesLoading: false });
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Network Error',
+              message: errorMessage,
+              read: false,
+            });
+          }
+        },
+
+        updateEmailPreferences: async (preferences: { 
+          preferredTemplate?: 'modern' | 'classical'; 
+          brandColor?: string; 
+        }) => {
+          set({ emailPreferencesLoading: true, emailPreferencesError: null });
+
+          try {
+            const response = await apiClient.updateEmailPreferences(preferences);
+            
+            if (response.error) {
+              set({ emailPreferencesError: response.error, emailPreferencesLoading: false });
+              
+              get().addNotification({
+                type: 'error',
+                title: 'Failed to Update Preferences',
+                message: response.error,
+                read: false,
+              });
+              
+              return;
+            }
+
+            if (response.data) {
+              set({
+                emailPreferences: response.data.preferences,
+                emailPreferencesLoading: false,
+                emailPreferencesError: null,
+              });
+
+              get().addNotification({
+                type: 'success',
+                title: 'Preferences Updated',
+                message: 'Email template preferences saved successfully',
+                read: false,
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update preferences';
+            set({ emailPreferencesError: errorMessage, emailPreferencesLoading: false });
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Update Failed',
+              message: errorMessage,
+              read: false,
+            });
+          }
+        },
+
+        sendPropertyNotification: async (timelineId: string, propertyId: string) => {
+          try {
+            const response = await apiClient.sendPropertyNotification(timelineId, propertyId);
+            
+            if (response.error) {
+              get().addNotification({
+                type: 'error',
+                title: 'Notification Failed',
+                message: response.error,
+                read: false,
+              });
+              throw new Error(response.error);
+            }
+
+            if (response.data) {
+              get().addNotification({
+                type: 'success',
+                title: 'Property Notification Sent!',
+                message: `Notified client about ${response.data.propertyAddress}`,
+                read: false,
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to send property notification';
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Notification Failed',
+              message: errorMessage,
+              read: false,
+            });
+            
+            throw error;
           }
         },
 
@@ -648,8 +839,15 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         loadClients: async () => {
           const state = get();
           
+          // Check if already loading
           if (state.clientsLoading) {
             console.log('Store: Clients already loading');
+            return;
+          }
+          
+          // Check deduplication window
+          if (!loadingTracker.canLoad('clients')) {
+            console.log('Store: Clients recently loaded, skipping');
             return;
           }
 
@@ -934,35 +1132,24 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        addProperty: async (clientIdOrData: string | Omit<Property, 'id' | 'clientId' | 'addedAt'>, propertyData?: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => {
-          let clientId: string;
-          let data: Omit<Property, 'id' | 'clientId' | 'addedAt'>;
-          
-          // Handle both signatures
-          if (typeof clientIdOrData === 'string') {
-            clientId = clientIdOrData;
-            data = propertyData!;
-          } else {
-            const selectedClient = get().selectedClient;
-            if (!selectedClient) {
-              get().addNotification({
-                type: 'error',
-                title: 'No Client Selected',
-                message: 'Please select a client first',
-                read: false,
-              });
-              return;
-            }
-            clientId = selectedClient.id;
-            data = clientIdOrData;
+        addProperty: async (propertyData: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => {
+          const { selectedClient } = get();
+          if (!selectedClient) {
+            get().addNotification({
+              type: 'error',
+              title: 'No Client Selected',
+              message: 'Please select a client first',
+              read: false,
+            });
+            return;
           }
 
           // Ensure timeline exists for this client
-          let timeline = get().getClientTimeline(clientId);
+          let timeline = get().getClientTimeline(selectedClient.id);
           if (!timeline) {
-            console.log('Store: No timeline found, loading for client:', clientId);
-            await get().loadTimeline(clientId);
-            timeline = get().getClientTimeline(clientId);
+            console.log('Store: No timeline found, loading for client:', selectedClient.id);
+            await get().loadTimeline(selectedClient.id);
+            timeline = get().getClientTimeline(selectedClient.id);
           }
 
           if (!timeline?.id) {
@@ -980,11 +1167,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
           try {
             const response = await apiClient.addProperty(timeline.id, {
-              address: data.address,
-              price: data.price,
-              description: data.description,
-              imageUrl: data.imageUrl,
-              mlsLink: data.mlsLink,
+              address: propertyData.address,
+              price: propertyData.price,
+              description: propertyData.description,
+              imageUrl: propertyData.imageUrl,
+              mlsLink: propertyData.mlsLink,
             });
             
             if (response.error) {
@@ -1015,7 +1202,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               get().addNotification({
                 type: 'success',
                 title: 'Property Added',
-                message: `${data.address} has been added to the timeline`,
+                message: `${propertyData.address} has been added to the timeline`,
                 read: false,
               });
             }
@@ -1133,43 +1320,41 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        sendTimelineEmail: async (timelineId: string) => {
+        sendTimelineEmail: async (timelineId: string, templateOverride?: 'modern' | 'classical') => {
           try {
-            console.log('Store: Sending timeline email for:', timelineId);
-            const response = await apiClient.sendTimelineEmail(timelineId);
+            const response = await apiClient.sendTimelineEmail(timelineId, templateOverride);
             
             if (response.error) {
-              set({ timelineError: response.error });
-              
               get().addNotification({
                 type: 'error',
-                title: 'Email Send Failed',
+                title: 'Email Failed',
                 message: response.error,
                 read: false,
               });
-              
-              return;
+              throw new Error(response.error);
             }
 
             if (response.data) {
-              console.log('Store: Timeline email sent successfully');
               get().addNotification({
                 type: 'success',
-                title: 'Timeline Sent!',
-                message: `Timeline email sent to ${response.data.sentTo}`,
+                title: 'Timeline Email Sent!',
+                message: `Successfully sent ${response.data.propertyCount} properties to ${response.data.sentTo}${
+                  response.data.spouseSentTo ? ` and ${response.data.spouseSentTo}` : ''
+                }`,
                 read: false,
               });
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to send timeline email';
-            set({ timelineError: errorMessage });
             
             get().addNotification({
               type: 'error',
-              title: 'Email Error',
+              title: 'Email Send Failed',
               message: errorMessage,
               read: false,
             });
+            
+            throw error; // Re-throw for component handling
           }
         },
 
@@ -1226,6 +1411,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           
           if (state.analyticsLoading) {
             console.log('Store: Analytics already loading');
+            return;
+          }
+          
+          if (!loadingTracker.canLoad('analytics')) {
+            console.log('Store: Analytics recently loaded, skipping');
             return;
           }
 

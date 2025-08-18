@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Share2, Copy, Check, MessageSquare, Mail, 
   Phone, Link as LinkIcon, ExternalLink, Send,
-  Sparkles, Users
+  Sparkles, Users, Settings, AlertCircle, Loader
 } from 'lucide-react';
+import { EmailTemplateSelector } from './EmailTemplateSelector';
 
 interface ShareTimelineModalProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ interface ShareTimelineModalProps {
     propertyCount: number;
   };
   agentName: string;
-  onSendEmail: () => Promise<void>;
+  onSendEmail: (templateOverride?: 'modern' | 'classical') => Promise<void>;
 }
 
 export function ShareTimelineModal({ 
@@ -35,6 +36,10 @@ export function ShareTimelineModal({
 }: ShareTimelineModalProps) {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [isEmailSending, setIsEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classical'>('modern');
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   const shareMessages = {
     email: {
@@ -57,13 +62,21 @@ export function ShareTimelineModal({
   };
 
   const handleSendEmail = async () => {
+    setShowConfirmation(true);
+  };
+
+  const confirmSendEmail = async () => {
     setIsEmailSending(true);
+    setEmailError(null);
+    
     try {
-      await onSendEmail();
+      await onSendEmail(selectedTemplate);
       setCopiedItem('email-sent');
+      setShowConfirmation(false);
       setTimeout(() => setCopiedItem(null), 3000);
     } catch (error) {
       console.error('Failed to send email:', error);
+      setEmailError(error instanceof Error ? error.message : 'Failed to send email');
     } finally {
       setIsEmailSending(false);
     }
@@ -152,6 +165,62 @@ export function ShareTimelineModal({
                   <span>Quick Share</span>
                 </h3>
                 
+                {/* Email Template Selector Toggle */}
+                <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg border border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">Email Template</span>
+                    <span className="text-xs text-slate-400 bg-slate-600/50 px-2 py-1 rounded-full capitalize">{selectedTemplate}</span>
+                  </div>
+                  <button
+                    onClick={() => setShowTemplateSelector(!showTemplateSelector)}
+                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    {showTemplateSelector ? 'Hide' : 'Change'}
+                  </button>
+                </div>
+
+                {/* Template Selector */}
+                <AnimatePresence>
+                  {showTemplateSelector && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <EmailTemplateSelector
+                        currentTemplate={selectedTemplate}
+                        onTemplateChange={setSelectedTemplate}
+                        agentName={agentName}
+                        companyName="Your Company"
+                        brandColor="#3b82f6"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Error Display */}
+                {emailError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start space-x-2"
+                  >
+                    <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-red-400 text-sm font-medium">Email Failed</p>
+                      <p className="text-red-300 text-xs">{emailError}</p>
+                    </div>
+                    <button
+                      onClick={() => setEmailError(null)}
+                      className="text-red-400 hover:text-red-300 ml-auto"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Send Email Button */}
                   <button
@@ -161,7 +230,7 @@ export function ShareTimelineModal({
                   >
                     {isEmailSending ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <Loader className="w-4 h-4 animate-spin" />
                         <span>Sending...</span>
                       </>
                     ) : copiedItem === 'email-sent' ? (
@@ -299,7 +368,7 @@ export function ShareTimelineModal({
                 )}
 
                 {/* Just the Link */}
-                  <div className="space-y-3">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-white flex items-center space-x-2">
                       <LinkIcon className="w-4 h-4 text-purple-400" />
@@ -346,6 +415,65 @@ export function ShareTimelineModal({
           </motion.div>
         </motion.div>
       )}
+
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {showConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-4"
+            onClick={() => setShowConfirmation(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-6 h-6 text-white" />
+                </div>
+                
+                <h3 className="text-lg font-semibold text-white mb-2">Send Timeline Email?</h3>
+                <p className="text-slate-400 mb-6">
+                  Send {timeline.propertyCount} properties to {client.name} using the <span className="capitalize font-medium text-white">{selectedTemplate}</span> template.
+                </p>
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowConfirmation(false)}
+                    disabled={isEmailSending}
+                    className="flex-1 px-4 py-2 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmSendEmail}
+                    disabled={isEmailSending}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {isEmailSending ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Email</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }

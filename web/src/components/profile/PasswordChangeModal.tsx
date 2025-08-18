@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Shield, Eye, EyeOff, Check, AlertTriangle } from 'lucide-react';
-//import { useProfileActions } from '@/stores/profileStore';
+import { useProfileActions } from '@/stores/profileStore';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 
 interface PasswordChangeModalProps {
