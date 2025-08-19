@@ -28,7 +28,9 @@ export function SimplifiedAddPropertyModal({ isOpen, onClose }: SimplifiedAddPro
     addNotification, 
     bulkMode, 
     setBulkMode,
-    checkMLSDuplicate 
+    checkMLSDuplicate,
+    editingProperty, // Add this to handle edit mode
+    updateProperty    // Add this for updating properties
   } = useMissionControlStore();
   
   const [formData, setFormData] = useState<PropertyFormData>({
@@ -43,63 +45,126 @@ export function SimplifiedAddPropertyModal({ isOpen, onClose }: SimplifiedAddPro
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [mlsDuplicateWarning, setMlsDuplicateWarning] = useState(false);
 
-  // Check for MLS duplicates when link changes
+  // ✅ FIX: Load editing property data when modal opens
   useEffect(() => {
-    if (selectedClient && formData.mlsLink) {
-      const isDuplicate = checkMLSDuplicate(selectedClient.id, formData.mlsLink);
-      setMlsDuplicateWarning(isDuplicate);
-    } else {
-      setMlsDuplicateWarning(false);
-    }
-  }, [formData.mlsLink, selectedClient, checkMLSDuplicate]);
-
-  // Extract address from MLS link
-  const extractAddressFromMLS = () => {
-    if (!formData.mlsLink) {
-      addNotification({
-        type: 'warning',
-        title: 'No MLS Link',
-        message: 'Please enter a MLS link first.'
+    if (isOpen && editingProperty) {
+      setFormData({
+        address: editingProperty.address || '',
+        price: editingProperty.price || 0,
+        description: editingProperty.description || '',
+        imageUrl: editingProperty.imageUrl || '',
+        mlsLink: editingProperty.mlsLink || ''
       });
-      return;
-    }
-
-    // Check for duplicate before extracting
-    if (selectedClient && checkMLSDuplicate(selectedClient.id, formData.mlsLink)) {
-      addNotification({
-        type: 'error',
-        title: 'Duplicate Property',
-        message: 'This MLS property has already been shared with this client.'
+      setImagePreview(editingProperty.imageUrl || null);
+    } else if (isOpen && !editingProperty) {
+      // Reset form for new property
+      setFormData({
+        address: '',
+        price: 0,
+        description: '',
+        imageUrl: '',
+        mlsLink: ''
       });
-      return;
+      setImagePreview(null);
     }
+  }, [isOpen, editingProperty]);
 
+// Enhanced duplicate check with backend validation
+useEffect(() => {
+  if (!selectedClient || !formData.mlsLink) {
+    setMlsDuplicateWarning(false);
+    return;
+  }
+
+  const trimmedMlsLink = formData.mlsLink.trim();
+  if (!trimmedMlsLink) {
+    setMlsDuplicateWarning(false);
+    return;
+  }
+
+  // Debounce the duplicate check to avoid excessive API calls
+  const timeoutId = setTimeout(async () => {
     try {
-      const url = new URL(formData.mlsLink);
-      const pathParts = url.pathname.split('/');
-      const addressPart = pathParts[pathParts.length - 1];
+      const isDuplicate = await checkMLSDuplicate(selectedClient.id, trimmedMlsLink);
       
-      if (addressPart) {
-        const extractedAddress = addressPart
-          .replace(/-/g, ' ')
-          .replace(/\b\w/g, (letter) => letter.toUpperCase());
-        
-        setFormData(prev => ({ ...prev, address: extractedAddress }));
-        
-        addNotification({
-          type: 'success',
-          title: 'Address Extracted!',
-          message: `Address extracted: ${extractedAddress}`
-        });
+      // If we're editing, don't flag as duplicate if it's the same property
+      if (isDuplicate && editingProperty && editingProperty.mlsLink === trimmedMlsLink) {
+        setMlsDuplicateWarning(false);
+      } else {
+        setMlsDuplicateWarning(isDuplicate);
       }
     } catch (error) {
+      console.error('Duplicate check failed:', error);
+      setMlsDuplicateWarning(false);
+    }
+  }, 500); // 500ms debounce
+
+  return () => clearTimeout(timeoutId);
+}, [formData.mlsLink, selectedClient, checkMLSDuplicate, editingProperty]);
+
+
+const extractAddressFromMLS = async () => {
+  if (!formData.mlsLink) {
+    addNotification({
+      type: 'warning',
+      title: 'No MLS Link',
+      message: 'Please enter a MLS link first.',
+      read: false
+    });
+    return;
+  }
+
+  const trimmedLink = formData.mlsLink.trim();
+  
+  // Check for duplicate with backend validation
+  if (selectedClient) {
+    try {
+      const isDuplicate = await checkMLSDuplicate(selectedClient.id, trimmedLink);
+      
+      // Only block if we're not editing the same property
+      if (isDuplicate && (!editingProperty || editingProperty.mlsLink !== trimmedLink)) {
+        addNotification({
+          type: 'error',
+          title: 'Duplicate Property',
+          message: 'This MLS property has already been shared with this client.',
+          read: false
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Duplicate check failed:', error);
+    }
+  }
+
+  try {
+    const url = new URL(trimmedLink);
+    const pathParts = url.pathname.split('/');
+    const addressPart = pathParts[pathParts.length - 1];
+    
+    if (addressPart) {
+      const extractedAddress = addressPart
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      
+      setFormData(prev => ({ ...prev, address: extractedAddress }));
+      
       addNotification({
-        type: 'error',
-        title: 'Extraction Failed',
-        message: 'Could not extract address from MLS link.'
+        type: 'success',
+        title: 'Address Extracted!',
+        message: `Address extracted: ${extractedAddress}`,
+        read: false
       });
     }
-  };
+  } catch (error) {
+    addNotification({
+      type: 'error',
+      title: 'Extraction Failed',
+      message: 'Could not extract address from MLS link.',
+      read: false
+    });
+  }
+};
+
 
   // Handle image operations
   const handleImageUrl = (url: string) => {
@@ -109,7 +174,8 @@ export function SimplifiedAddPropertyModal({ isOpen, onClose }: SimplifiedAddPro
     addNotification({
       type: 'success',
       title: 'Image Added',
-      message: 'Property image has been set successfully.'
+      message: 'Property image has been set successfully.',
+      read: false
     });
   };
 
@@ -124,109 +190,118 @@ export function SimplifiedAddPropertyModal({ isOpen, onClose }: SimplifiedAddPro
   };
 
   const handleDrop = (e: React.DragEvent) => {
-  e.preventDefault();
-  setDragOver(false);
+    e.preventDefault();
+    setDragOver(false);
 
-  // 1. Handle dropped image files - just use blob URL since we don't need persistence
-  const files = Array.from(e.dataTransfer.files);
-  const imageFile = files.find(file => file.type.startsWith('image/'));
-  
-  if (imageFile) {
-    const blobUrl = URL.createObjectURL(imageFile);
-    setFormData(prev => ({ ...prev, imageUrl: blobUrl }));
-    setImagePreview(blobUrl);
+    // Handle dropped image files
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
     
-    addNotification({
-      type: 'success',
-      title: 'Image Added',
-      message: 'Property image loaded successfully.'
-    });
-    return;
-  }
-
-  // 2. Handle dropped URLs
-  const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-  if (urlData && urlData.trim()) {
-    const url = urlData.trim();
-    
-    // Just use any URL - if property gets sold and removed from MLS, we don't care
-    if (url.startsWith('http')) {
-      handleImageUrl(url);
-    } else {
+    if (imageFile) {
+      const blobUrl = URL.createObjectURL(imageFile);
+      setFormData(prev => ({ ...prev, imageUrl: blobUrl }));
+      setImagePreview(blobUrl);
+      
       addNotification({
-        type: 'warning',
-        title: 'Invalid URL',
-        message: 'Please drop a valid image URL starting with http:// or https://'
+        type: 'success',
+        title: 'Image Added',
+        message: 'Property image loaded successfully.',
+        read: false
       });
+      return;
     }
-  }
-};
 
-  // ✅ FIX: Replace the handleSubmit function with this:
-const handleSubmit = async (e: React.FormEvent) => {
+    // Handle dropped URLs
+    const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (urlData && urlData.trim()) {
+      const url = urlData.trim();
+      
+      if (url.startsWith('http')) {
+        handleImageUrl(url);
+      } else {
+        addNotification({
+          type: 'warning',
+          title: 'Invalid URL',
+          message: 'Please drop a valid image URL starting with http:// or https://',
+          read: false
+        });
+      }
+    }
+  };
+
+  // ✅ FIX: Enhanced submit handler with proper duplicate prevention
+ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   
   if (!selectedClient) {
     addNotification({
       type: 'error',
       title: 'No Client Selected',
-      message: 'Please select a client first.'
+      message: 'Please select a client first.',
+      read: false
     });
     return;
   }
 
-  // Final duplicate check
-  if (formData.mlsLink && checkMLSDuplicate(selectedClient.id, formData.mlsLink)) {
-    addNotification({
-      type: 'error',
-      title: 'Duplicate Property Blocked',
-      message: 'This MLS property has already been shared with this client.'
-    });
-    return;
-  }
-
+  // Validate required fields
   if (!formData.address || !formData.price || !formData.description) {
     addNotification({
       type: 'error',
       title: 'Missing Information',
-      message: 'Please fill in all required fields.'
+      message: 'Please fill in all required fields.',
+      read: false
     });
     return;
+  }
+
+  const trimmedMlsLink = formData.mlsLink?.trim();
+  
+  // CRITICAL FIX: Final duplicate check with backend validation
+  if (trimmedMlsLink && selectedClient) {
+    try {
+      const isDuplicate = await checkMLSDuplicate(selectedClient.id, trimmedMlsLink);
+      
+      // Block duplicates unless we're editing the same property
+      if (isDuplicate && (!editingProperty || editingProperty.mlsLink !== trimmedMlsLink)) {
+        addNotification({
+          type: 'error',
+          title: 'Duplicate Property Blocked',
+          message: 'This MLS property has already been shared with this client. Please check your timeline.',
+          read: false
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Final duplicate check failed:', error);
+      addNotification({
+        type: 'warning',
+        title: 'Validation Warning',
+        message: 'Could not verify if this is a duplicate. Proceeding with caution.',
+        read: false
+      });
+    }
   }
 
   setIsLoading(true);
 
   try {
-    // ✅ FIX: Ensure valid URLs for backend validation
+    // Process image URL
     let validImageUrl = formData.imageUrl;
     
-    // Convert blob URLs or invalid URLs to a default
     if (!validImageUrl || 
         validImageUrl.startsWith('blob:') || 
         !validImageUrl.match(/^https?:\/\/.+/)) {
       validImageUrl = 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&h=600&fit=crop';
-      
-      addNotification({
-        type: 'info',
-        title: 'Image URL Fixed',
-        message: 'Using default image since uploaded file cannot be persisted.',
-        read: false,
-      });
     }
 
-    // ✅ FIX: Clean MLS link
-    let validMlsLink = formData.mlsLink?.trim();
-    if (validMlsLink && !validMlsLink.match(/^https?:\/\/.+/)) {
-      validMlsLink = undefined; // Remove invalid MLS links
-    }
-
-    // ✅ FIX: Ensure price is proper number
+    // Validate price
     const cleanPrice = parseInt(formData.price.toString()) || 0;
     if (cleanPrice <= 0) {
       addNotification({
         type: 'error',
         title: 'Invalid Price',
-        message: 'Please enter a valid price greater than 0'
+        message: 'Please enter a valid price greater than 0',
+        read: false
       });
       setIsLoading(false);
       return;
@@ -237,20 +312,30 @@ const handleSubmit = async (e: React.FormEvent) => {
       price: cleanPrice,
       description: formData.description.trim(),
       imageUrl: validImageUrl,
-      mlsLink: validMlsLink,
+      mlsLink: trimmedMlsLink,
     };
 
-    console.log('🔍 Sending property data:', propertyData);
-
-    await addProperty(selectedClient.id, propertyData);
-
-    const modeText = bulkMode ? 'Added to bulk queue!' : 'Email sent to client!';
-    
-    addNotification({
-      type: 'success',
-      title: 'Property Added',
-      message: `${formData.address} - ${modeText}`
-    });
+    // Handle both edit and create modes
+    if (editingProperty) {
+      await updateProperty(editingProperty.id, propertyData);
+      
+      addNotification({
+        type: 'success',
+        title: 'Property Updated',
+        message: `${formData.address} has been updated successfully`,
+        read: false
+      });
+    } else {
+      await addProperty(propertyData);
+      
+      const modeText = bulkMode ? 'Added to bulk queue!' : 'Email sent to client!';
+      addNotification({
+        type: 'success',
+        title: 'Property Added',
+        message: `${formData.address} - ${modeText}`,
+        read: false
+      });
+    }
 
     // Reset form
     setFormData({
@@ -263,15 +348,17 @@ const handleSubmit = async (e: React.FormEvent) => {
     setImagePreview(null);
     setMlsDuplicateWarning(false);
 
-    if (!bulkMode) {
+    // Close modal unless in bulk mode and creating new property
+    if (!bulkMode || editingProperty) {
       onClose();
     }
   } catch (error) {
-    console.error('Property creation error:', error);
+    console.error('Property operation error:', error);
     addNotification({
       type: 'error',
-      title: 'Failed to Add Property',
-      message: 'Something went wrong. Please try again.'
+      title: editingProperty ? 'Failed to Update Property' : 'Failed to Add Property',
+      message: 'Something went wrong. Please try again.',
+      read: false
     });
   } finally {
     setIsLoading(false);
@@ -298,38 +385,42 @@ const handleSubmit = async (e: React.FormEvent) => {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-700">
               <div>
-                <h2 className="text-2xl font-bold text-white">Add Property</h2>
+                <h2 className="text-2xl font-bold text-white">
+                  {editingProperty ? 'Edit Property' : 'Add Property'}
+                </h2>
                 {selectedClient && (
                   <p className="text-slate-400 mt-1">for {selectedClient.name}</p>
                 )}
               </div>
               
               <div className="flex items-center space-x-4">
-                {/* Bulk Mode Toggle */}
-                <div className="flex items-center space-x-2 bg-slate-700 rounded-lg p-1">
-                  <button
-                    onClick={() => setBulkMode(false)}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                      !bulkMode
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>Send Now</span>
-                  </button>
-                  <button
-                    onClick={() => setBulkMode(true)}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                      bulkMode
-                        ? 'bg-purple-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Package className="w-4 h-4" />
-                    <span>Bulk</span>
-                  </button>
-                </div>
+                {/* ✅ FIX: Hide bulk mode toggle when editing */}
+                {!editingProperty && (
+                  <div className="flex items-center space-x-2 bg-slate-700 rounded-lg p-1">
+                    <button
+                      onClick={() => setBulkMode(false)}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        !bulkMode
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Send Now</span>
+                    </button>
+                    <button
+                      onClick={() => setBulkMode(true)}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        bulkMode
+                          ? 'bg-purple-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Package className="w-4 h-4" />
+                      <span>Bulk</span>
+                    </button>
+                  </div>
+                )}
 
                 <button
                   onClick={onClose}
@@ -341,20 +432,22 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             {/* Mode Description */}
-            <div className="px-6 py-3 bg-slate-700/30 border-b border-slate-700">
-              {!bulkMode ? (
-                <p className="text-sm text-slate-300">
-                  📧 <strong>Send Now:</strong> Property will be emailed to client immediately.
-                </p>
-              ) : (
-                <p className="text-sm text-slate-300">
-                  📦 <strong>Bulk Mode:</strong> Queue properties, then send all at once.
-                </p>
-              )}
-            </div>
+            {!editingProperty && (
+              <div className="px-6 py-3 bg-slate-700/30 border-b border-slate-700">
+                {!bulkMode ? (
+                  <p className="text-sm text-slate-300">
+                    📧 <strong>Send Now:</strong> Property will be emailed to client immediately.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-300">
+                    📦 <strong>Bulk Mode:</strong> Queue properties, then send all at once.
+                  </p>
+                )}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              {/* MLS Link with Duplicate Warning */}
+              {/* MLS Link with Enhanced Duplicate Warning */}
               <div className={`border rounded-lg p-4 transition-all ${
                 mlsDuplicateWarning 
                   ? 'bg-red-500/10 border-red-500/30' 
@@ -370,13 +463,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                   )}
                 </label>
                 
-                {/* Duplicate Warning */}
+                {/* Enhanced Duplicate Warning */}
                 {mlsDuplicateWarning && (
                   <div className="mb-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
                     <div className="flex items-center space-x-2 text-red-300">
                       <AlertTriangle className="w-4 h-4" />
                       <span className="text-sm font-medium">
-                        This property has already been shared with {selectedClient?.name}
+                        This MLS property has already been shared with {selectedClient?.name}. 
+                        Each property can only be added once per client.
                       </span>
                     </div>
                   </div>
@@ -463,14 +557,13 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </p>
               </div>
 
-              {/* Image Upload - Simplified */}
+              {/* Image Upload - Same as before */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Property Image
                 </label>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Drop Zone */}
                   <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -499,7 +592,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                     />
                   </div>
 
-                  {/* Image URL Input */}
                   <div>
                     <label className="block text-sm text-slate-400 mb-2">Or paste image URL:</label>
                     <div className="flex space-x-2">
@@ -554,8 +646,11 @@ const handleSubmit = async (e: React.FormEvent) => {
               {/* Form Actions */}
               <div className="flex items-center justify-between pt-6 border-t border-slate-700">
                 <div className="text-sm text-slate-400">
-                  {bulkMode && (
+                  {bulkMode && !editingProperty && (
                     <span>💡 Keep adding properties, then send bulk email</span>
+                  )}
+                  {editingProperty && (
+                    <span>✏️ Editing existing property</span>
                   )}
                 </div>
                 
@@ -566,14 +661,16 @@ const handleSubmit = async (e: React.FormEvent) => {
                     className="px-6 py-3 text-slate-400 hover:text-white transition-colors"
                     disabled={isLoading}
                   >
-                    {bulkMode ? 'Close' : 'Cancel'}
+                    Cancel
                   </button>
                   
                   <motion.button
                     type="submit"
                     disabled={isLoading || !selectedClient || mlsDuplicateWarning}
                     className={`px-8 py-3 text-white rounded-lg font-medium transition-all duration-200 disabled:cursor-not-allowed ${
-                      !bulkMode
+                      editingProperty
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 disabled:from-slate-600 disabled:to-slate-600'
+                        : !bulkMode
                         ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-slate-600 disabled:to-slate-600'
                         : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 disabled:from-slate-600 disabled:to-slate-600'
                     }`}
@@ -583,12 +680,17 @@ const handleSubmit = async (e: React.FormEvent) => {
                     {isLoading ? (
                       <div className="flex items-center">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                        Adding...
+                        {editingProperty ? 'Updating...' : 'Adding...'}
                       </div>
                     ) : mlsDuplicateWarning ? (
                       <div className="flex items-center">
                         <AlertTriangle className="w-4 h-4 mr-2" />
                         Duplicate Blocked
+                      </div>
+                    ) : editingProperty ? (
+                      <div className="flex items-center">
+                        <Check className="w-4 h-4 mr-2" />
+                        Update Property
                       </div>
                     ) : !bulkMode ? (
                       <div className="flex items-center">

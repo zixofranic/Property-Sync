@@ -4,12 +4,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, User, Mail, Phone, Building, Globe, Award, Clock,
-  Camera, Edit3, Save, Briefcase, Star, Calendar, Search,
+  X, User, Mail, Phone, Building, Globe, Award, Clock, Edit3, Save, Briefcase, Star, Calendar, Search,
   CheckCircle, AlertCircle, LogOut
 } from 'lucide-react';
 import { useProfile, useProfileActions, UpdateProfileData } from '@/stores/profileStore';
 import { useMissionControlStore } from '@/stores/missionControlStore';
+import { ImageUrlInput } from '@/components/ui/ImageUrlInput';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -29,8 +29,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateProfileData>({});
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   // Enhanced specialties state
@@ -44,23 +42,22 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   }, [isOpen, profile, loadProfile]);
 
-  // Initialize form data when profile loads
   useEffect(() => {
-    if (profile && !isEditing) {
-      setFormData({
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        company: profile.company || '',
-        phone: profile.phone || '',
-        website: profile.website || '',
-        licenseNumber: profile.licenseNumber || '',
-        bio: profile.bio || '',
-        specialties: profile.specialties || [],
-        yearsExperience: profile.yearsExperience || 0,
-      });
-      setAvatarPreview(profile.avatar || null);
-    }
-  }, [profile, isEditing]);
+  if (isOpen && profile && !formData.firstName) { // Only if form is empty
+    setFormData({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      company: profile.company || '',
+      phone: profile.phone || '',
+      website: profile.website || '',
+      licenseNumber: profile.licenseNumber || '',
+      bio: profile.bio || '',
+      specialties: profile.specialties || [],
+      yearsExperience: profile.yearsExperience || 0,
+      avatar: profile.avatar || '',
+    });
+  }
+}, [isOpen, profile]);
 
   const handleInputChange = (field: keyof UpdateProfileData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -89,112 +86,57 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   };
 
   // Enhanced avatar upload with validation
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // File validation
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    
-    if (file.size > maxSize) {
-      addNotification({
-        type: 'error',
-        title: 'File Too Large',
-        message: 'Please select an image under 2MB.',
-        read: false,
-      });
-      return;
-    }
-
-    if (!allowedTypes.includes(file.type)) {
-      addNotification({
-        type: 'error',
-        title: 'Invalid File Type',
-        message: 'Please select a JPEG, PNG, or WebP image.',
-        read: false,
-      });
-      return;
-    }
-
-    // Store file for upload
-    setAvatarFile(file);
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setAvatarPreview(result);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleSave = async () => {
-    try {
-      // If avatar file exists, we need to handle file upload
-      let finalFormData = { ...formData };
-      
-      if (avatarFile) {
-        // For now, convert to base64 - this should be replaced with proper file upload
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(avatarFile);
-        });
-        
-        const base64Avatar = await base64Promise;
-        finalFormData.avatar = base64Avatar;
-      }
-
-      const success = await updateProfile(finalFormData);
-      
-      if (success) {
-        setIsEditing(false);
-        setAvatarFile(null);
-        addNotification({
-          type: 'success',
-          title: 'Profile Updated',
-          message: 'Your profile has been saved successfully.',
-          read: false,
-        });
-      } else {
-        addNotification({
-          type: 'error',
-          title: 'Update Failed',
-          message: updateError || 'Failed to update profile.',
-          read: false,
-        });
-      }
-    } catch (error) {
+  try {
+    const success = await updateProfile(formData);
+    
+    if (success) {
+      setIsEditing(false);
+      addNotification({
+        type: 'success',
+        title: 'Profile Updated',
+        message: 'Your profile has been saved successfully.',
+        read: false,
+      });
+    } else {
       addNotification({
         type: 'error',
-        title: 'Update Error',
-        message: 'An unexpected error occurred.',
+        title: 'Update Failed',
+        message: updateError || 'Failed to update profile.',
         read: false,
       });
     }
-  };
+  } catch (error) {
+    console.error('Profile update error:', error); // Add this for debugging
+    addNotification({
+      type: 'error',
+      title: 'Update Error',
+      message: 'An unexpected error occurred.',
+      read: false,
+    });
+  }
+};
 
   const handleCancel = () => {
-    setIsEditing(false);
-    setAvatarFile(null);
-    clearErrors();
-    // Reset form data to profile values
-    if (profile) {
-      setFormData({
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        company: profile.company || '',
-        phone: profile.phone || '',
-        website: profile.website || '',
-        licenseNumber: profile.licenseNumber || '',
-        bio: profile.bio || '',
-        specialties: profile.specialties || [],
-        yearsExperience: profile.yearsExperience || 0,
-      });
-      setAvatarPreview(profile.avatar || null);
-    }
-  };
+  setIsEditing(false);
+  clearErrors();
+  // Reset form data to profile values
+  if (profile) {
+    setFormData({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      company: profile.company || '',
+      phone: profile.phone || '',
+      website: profile.website || '',
+      licenseNumber: profile.licenseNumber || '',
+      bio: profile.bio || '',
+      specialties: profile.specialties || [],
+      yearsExperience: profile.yearsExperience || 0,
+      avatar: profile.avatar || '',
+    });
+  }
+};
 
   const handleLogout = () => {
     logout();
@@ -342,43 +284,47 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column - Avatar & Status */}
                     <div className="space-y-6">
-                      {/* Avatar */}
-                      <div className="text-center">
-                        <div className="relative inline-block">
-                          <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
-                            {avatarPreview ? (
-                              <img
-                                src={avatarPreview}
-                                alt="Profile"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <User className="w-16 h-16 text-white" />
-                            )}
-                          </div>
-                          {isEditing && (
-                            <label className="absolute bottom-0 right-0 w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center cursor-pointer transition-colors">
-                              <Camera className="w-5 h-5 text-white" />
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                onChange={handleAvatarUpload}
-                                className="hidden"
-                              />
-                            </label>
+                    {/* Avatar Section */}
+                    <div className="text-center">
+                      <div className="relative inline-block mb-4">
+                        <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                          {formData.avatar ? (
+                            <img
+                              src={formData.avatar}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-16 h-16 text-white" />
                           )}
                         </div>
-                        <h3 className="text-xl font-bold text-white mt-4">
-                          {profile.firstName} {profile.lastName}
-                        </h3>
-                        <p className="text-slate-400">{profile.company || 'Real Estate Professional'}</p>
-                        <div className="flex items-center justify-center space-x-2 mt-2">
-                          <div className={`w-3 h-3 rounded-full ${profile.emailVerified ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                          <span className="text-sm text-slate-400">
-                            {profile.emailVerified ? 'Verified' : 'Pending Verification'}
-                          </span>
-                        </div>
                       </div>
+
+                      {/* Avatar URL Input */}
+                      {isEditing ? (
+                        <ImageUrlInput
+                          value={formData.avatar || ''}
+                          onChange={(url) => handleInputChange('avatar', url)}
+                          placeholder="https://yourwebsite.com/photo.jpg"
+                          label="Profile Photo URL"
+                          preview={false}
+                          className="text-left"
+                        />
+                      ) : (
+                        <>
+                          <h3 className="text-xl font-bold text-white">
+                            {profile.firstName} {profile.lastName}
+                          </h3>
+                          <p className="text-slate-400">{profile.company || 'Real Estate Professional'}</p>
+                          <div className="flex items-center justify-center space-x-2 mt-2">
+                            <div className={`w-3 h-3 rounded-full ${profile.emailVerified ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                            <span className="text-sm text-slate-400">
+                              {profile.emailVerified ? 'Verified' : 'Pending Verification'}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                       {/* Quick Stats */}
                       <div className="bg-slate-700/30 rounded-lg p-4">

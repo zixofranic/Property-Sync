@@ -477,20 +477,21 @@ export class TimelinesService {
   }
 
   async checkMLSDuplicate(agentId: string, clientId: string, mlsLink: string): Promise<boolean> {
-    if (!mlsLink) return false;
+  if (!mlsLink) return false;
 
-    const existingProperty = await this.prisma.property.findFirst({
-      where: {
-        listingUrl: mlsLink,
-        timeline: {
-          agentId,
-          clientId,
-        },
+  const existingProperty = await this.prisma.property.findFirst({
+    where: {
+      listingUrl: mlsLink.trim(),
+      timeline: {
+        agentId,
+        clientId,
+        isActive: true,
       },
-    });
+    },
+  });
 
-    return !!existingProperty;
-  }
+  return !!existingProperty;
+}
 
   // PRIVATE HELPER METHODS
   private formatPropertyResponse(property: any, clientId: string): PropertyResponseDto {

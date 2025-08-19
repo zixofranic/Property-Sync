@@ -809,14 +809,14 @@ async updateEmailPreferences(preferences: {
   }
 
   // Utility Methods
-  async checkMLSDuplicate(clientId: string, mlsLink: string): Promise<ApiResponse<{ isDuplicate: boolean }>> {
-    const params = new URLSearchParams({
-      clientId,
-      mlsLink,
-    });
-    
-    return this.request(`/api/v1/timelines/check-duplicate?${params}`);
-  }
+ async checkMLSDuplicate(clientId: string, mlsLink: string): Promise<ApiResponse<{ isDuplicate: boolean }>> {
+  const params = new URLSearchParams({
+    clientId,
+    mlsLink: mlsLink.trim(),
+  });
+  
+  return this.request(`/api/v1/timelines/check-duplicate?${params}`);
+}
 
   // Public Timeline Methods (for client access)
   async getPublicTimeline(shareToken: string, clientCode?: string): Promise<ApiResponse<any>> {

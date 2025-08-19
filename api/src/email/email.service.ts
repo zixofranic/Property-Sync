@@ -273,7 +273,7 @@ export class EmailService {
   private async sendTimelineEmailViaNodemailer(data: TimelineEmailData): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
     try {
       const mailOptions = {
-        from: '"Property Sync" <noreply@propertysync.com>',
+        from: 'Acme <onboarding@resend.dev>', // this the production send email'"Property Sync" <noreply@propertysync.com>',
         to: data.clientEmail,
         subject: `Your Property Timeline from ${data.agentName}`,
         html: this.generateTimelineEmailHtmlNodemailer(data),

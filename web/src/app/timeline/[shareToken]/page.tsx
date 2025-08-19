@@ -3,7 +3,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Share2, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock } from 'lucide-react';
+import { Home, Share2, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles } from 'lucide-react';
 
 // API Response Types
 interface ClientTimelineData {
@@ -62,6 +62,9 @@ interface ClientAuthForm {
   phoneLastFour: string;
 }
 
+// Property Status Types
+type PropertyStatus = 'new' | 'unseen' | 'viewed';
+
 export default function ClientTimelineView({ params }: { params: Promise<{ shareToken: string }> }) {
   // Fix Next.js 15 params Promise issue
   const resolvedParams = use(params);
@@ -84,6 +87,76 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     show: false,
     message: ''
   });
+
+  // Utility: Calculate property status (new/unseen/viewed)
+  const getPropertyStatus = (property: any): PropertyStatus => {
+    const now = new Date();
+    const createdAt = new Date(property.createdAt);
+    const hoursOld = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+    
+    // Has feedback = viewed (no icon needed)
+    if (property.feedback && property.feedback.length > 0) {
+      return 'viewed';
+    }
+    
+    // Less than 12 hours = new
+    if (hoursOld < 12) {
+      return 'new';
+    }
+    
+    // More than 12 hours but no feedback = unseen
+    return 'unseen';
+  };
+
+  // Component: Flashing Notification Icon
+  const FlashingNotificationIcon = ({ status, className = "" }: { status: PropertyStatus; className?: string }) => {
+    if (status === 'viewed') return null;
+    
+    const isNew = status === 'new';
+    
+    return (
+      <motion.div
+        className={`absolute z-30 ${className}`}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", duration: 0.5 }}
+      >
+        <div className="flex flex-col items-center space-y-1">
+          <div className={`relative ${isNew ? 'w-6 h-6' : 'w-5 h-5'}`}>
+            {/* Pulsing background */}
+            <div 
+              className={`absolute inset-0 rounded-full ${
+                isNew 
+                  ? 'bg-green-400 animate-ping' 
+                  : 'bg-yellow-400 animate-pulse'
+              }`}
+            />
+            {/* Solid icon */}
+            <div 
+              className={`relative w-full h-full rounded-full flex items-center justify-center ${
+                isNew 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-yellow-500 text-white'
+              }`}
+            >
+              {isNew ? (
+                <Sparkles className="w-3 h-3" />
+              ) : (
+                <Eye className="w-3 h-3" />
+              )}
+            </div>
+          </div>
+          
+          {/* NEW label for new properties only */}
+          {isNew && (
+            <div className="bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-bold tracking-wide">
+              NEW
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
 
   // Fetch timeline data
   useEffect(() => {
@@ -180,7 +253,7 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         throw new Error('Failed to submit feedback');
       }
 
-      // Update local state
+      // Update local state - this will remove the flashing icon
       setTimelineData(prev => {
         if (!prev) return prev;
         return {
@@ -433,7 +506,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
     );
   }
 
-  // Main timeline view - EXACT REPLICA OF AGENT DASHBOARD
+  // Main timeline view - ENHANCED WITH PROPER ALTERNATING LAYOUT
   const sortedProperties = [...timelineData.properties].sort((a, b) => 
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -511,7 +584,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         </div>
       </div>
 
-      {/* Main Content - EXACT REPLICA */}
+      {/* Main Content - ENHANCED ALTERNATING TIMELINE */}
       <div className="pt-28 px-6 pb-24">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
@@ -531,7 +604,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
           </div>
 
           {sortedProperties.length > 0 ? (
-            /* EXACT AGENT DASHBOARD TIMELINE */
+            /* ENHANCED ALTERNATING TIMELINE */
             <div className="relative">
               {/* Center Timeline Line for Large Screens */}
               <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 transform -translate-x-1/2" />
@@ -539,14 +612,14 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
               {/* Left Timeline Line for Mobile */}
               <div className="lg:hidden absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500" />
 
-              {/* Timeline Items - GROUPED BY DATE like agent dashboard */}
+              {/* Timeline Items - GROUPED BY DATE with proper alternating */}
               <div className="space-y-12 lg:space-y-16">
-                {Object.entries(groupedProperties).map(([dateString, dayProperties], groupIndex) => {
-                  let globalIndex = 0;
+                {(() => {
+                  let globalPropertyIndex = 0; // Track global property index for alternating
                   
-                  return (
+                  return Object.entries(groupedProperties).map(([dateString, dayProperties], groupIndex) => (
                     <div key={dateString} className="space-y-12 lg:space-y-16">
-                      {/* Date Header - EXACT AGENT DASHBOARD STYLE */}
+                      {/* Date Header */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -572,13 +645,14 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                         </div>
                       </motion.div>
                       
-                      {/* Properties for this date - EXACT AGENT DASHBOARD LAYOUT */}
+                      {/* Properties for this date - FIXED ALTERNATING LAYOUT */}
                       {dayProperties.map((property, dayIndex) => {
                         if (!property || !property.id) return null;
                         
-                        const currentIndex = globalIndex++;
+                        const currentIndex = globalPropertyIndex++;
                         const latestFeedback = property.feedback[0];
                         const isLeft = currentIndex % 2 === 0;
+                        const propertyStatus = getPropertyStatus(property);
                         
                         return (
                           <motion.div
@@ -586,229 +660,249 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                             initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: currentIndex * 0.1 }}
-                            className={`relative flex ${isLeft ? 'flex-row' : 'flex-row-reverse'} items-center justify-center lg:justify-start w-full`}
+                            className="relative w-full"
                           >
-                            {/* Timeline Dot - EXACT AGENT DASHBOARD */}
-                            <div className="hidden lg:flex absolute left-1/2 top-8 transform -translate-x-1/2 z-20">
-                              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                            {/* FIXED: Proper alternating layout for large screens */}
+                            <div className={`
+                              flex items-start justify-center lg:justify-start w-full
+                              ${isLeft ? 'lg:flex-row' : 'lg:flex-row-reverse'}
+                              flex-row
+                            `}>
+                              
+                              {/* Timeline Dot - CLEAN (NO FLASHING ICON) */}
+                              <div className="hidden lg:flex absolute left-1/2 top-8 transform -translate-x-1/2 z-20">
+                                <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Regular Timeline Dot for Mobile */}
-                            <div className="lg:hidden relative z-10 flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-lg">
-                              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                                <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full" />
+                              {/* Mobile Timeline Dot - CLEAN (NO FLASHING ICON) */}
+                              <div className="lg:hidden relative z-10 flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-lg mr-6">
+                                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                                  <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full" />
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Property Card - EXACT AGENT DASHBOARD DESIGN */}
-                            <motion.div
-                              className={`w-full lg:w-[calc(50%-2rem)] flex-shrink-0 ${isLeft ? '' : 'lg:ml-0'} ${!isLeft ? 'ml-6' : ''} bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:bg-slate-700/50 transition-all duration-300`}
-                              whileHover={{ scale: 1.02, x: 0 }}
-                            >
-                              {/* Property Image - EXACT AGENT DASHBOARD BIGGER WITH OVERLAYS */}
-                              <div className="relative h-80 bg-slate-700">
-                                <img
-                                  src={property.imageUrls[0] || '/api/placeholder/400/300'}
-                                  alt={property.address}
-                                  className="w-full h-full object-cover"
+                              {/* Property Card - FIXED POSITIONING */}
+                              <motion.div
+                                className={`
+                                  relative
+                                  w-full lg:w-[calc(50%-2rem)] 
+                                  flex-shrink-0 
+                                  ${isLeft ? 'lg:mr-8' : 'lg:ml-8'}
+                                  bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:bg-slate-700/50 transition-all duration-300
+                                `}
+                                whileHover={{ scale: 1.02 }}
+                              >
+                                {/* Flashing Icon on Property Card - ADJUSTED POSITIONING */}
+                                <FlashingNotificationIcon 
+                                  status={propertyStatus} 
+                                  className="top-5 right-5 z-30" 
                                 />
-                                
-                                {/* Dark Gradient Overlay for Text Readability */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
-                                
-                                {/* Address - Top Left with Google Maps link - EXACT AGENT DASHBOARD */}
-                                <div className="absolute top-4 left-4">
-                                  <a
-                                    href={getGoogleMapsUrl(property.address)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white font-bold text-lg leading-tight drop-shadow-lg hover:text-blue-200 transition-colors inline-block"
-                                  >
-                                    {property.address}
-                                  </a>
-                                </div>
 
-                                {/* Price - Bottom Right - EXACT AGENT DASHBOARD */}
-                                <div className="absolute bottom-4 right-4">
-                                  <p className="text-white text-2xl font-bold drop-shadow-lg">
-                                    ${property.price.toLocaleString()}
-                                  </p>
-                                </div>
-
-                                {/* View Details Button - Bottom Left - EXACT AGENT DASHBOARD */}
-                                {property.listingUrl && (
-                                  <div className="absolute bottom-4 left-4">
-                                    <button
-                                      onClick={() => handleMLSClick(property)}
-                                      className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
+                                {/* Property Image - ENHANCED WITH OVERLAYS */}
+                                <div className="relative h-80 bg-slate-700">
+                                  <img
+                                    src={property.imageUrls[0] || '/api/placeholder/400/300'}
+                                    alt={property.address}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  
+                                  {/* Dark Gradient Overlay for Text Readability */}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
+                                  
+                                  {/* Address - Top Left with Google Maps link */}
+                                  <div className="absolute top-4 left-4">
+                                    <a
+                                      href={getGoogleMapsUrl(property.address)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-white font-bold text-lg leading-tight drop-shadow-lg hover:text-blue-200 transition-colors inline-block"
                                     >
-                                      <ExternalLink className="w-4 h-4" />
-                                      <span>View Details</span>
-                                    </button>
+                                      {property.address}
+                                    </a>
                                   </div>
-                                )}
-                              </div>
 
-                              {/* Property Details - EXACT AGENT DASHBOARD */}
-                              <div className="p-6">
-                                {/* Description - EXACT AGENT DASHBOARD */}
-                                {property.description && (
-                                  <div className="mb-4">
-                                    <p className="text-slate-300 text-lg leading-relaxed font-medium">
-                                      {property.description}
+                                  {/* Price - Bottom Right */}
+                                  <div className="absolute bottom-4 right-4">
+                                    <p className="text-white text-2xl font-bold drop-shadow-lg">
+                                      ${property.price.toLocaleString()}
                                     </p>
                                   </div>
-                                )}
 
-                                {/* CLIENT FEEDBACK SECTION - Keep existing feedback functionality */}
-                                <div className="space-y-4">
-                                  <div className="border-t border-slate-600 pt-4">
-                                    <p className="text-slate-300 text-sm mb-3 font-medium">
-                                      How do you feel about this property?
-                                    </p>
-                                    
-                                    {/* Show existing feedback or feedback form */}
-                                    {latestFeedback ? (
-                                      <div className="bg-slate-700/30 rounded-lg p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span className={`px-3 py-1 rounded-full text-xs font-medium text-white ${
-                                            latestFeedback.feedback === 'love' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
-                                            latestFeedback.feedback === 'like' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                                            'bg-gradient-to-r from-red-500 to-rose-500'
-                                          }`}>
-                                            {latestFeedback.feedback === 'love' ? 'Love It! ❤️' :
-                                             latestFeedback.feedback === 'like' ? 'Let\'s Talk 💬' : 'Not for Me ❌'}
-                                          </span>
-                                          <span className="text-xs text-slate-400">
-                                            {formatRelativeTime(latestFeedback.createdAt)}
-                                          </span>
-                                        </div>
-                                        {latestFeedback.notes && (
-                                          <p className="text-sm text-slate-300 italic">"{latestFeedback.notes}"</p>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-4">
-                                        {/* Feedback Buttons */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                          <motion.button
-                                            onClick={() => handleFeedbackButtonClick(property.id, 'love')}
-                                            className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
-                                              selectedFeedback[property.id] === 'love'
-                                                ? 'bg-gradient-to-br from-pink-500 via-rose-500 to-red-500 text-white scale-105 shadow-2xl'
-                                                : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-pink-500/20 hover:via-rose-500/20 hover:to-red-500/20 hover:text-pink-400 hover:scale-105 shadow-lg hover:shadow-pink-500/25'
-                                            }`}
-                                            whileHover={{ scale: 1.05, y: -2 }}
-                                            whileTap={{ scale: 0.98 }}
-                                          >
-                                            <Heart className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'love' ? 'currentColor' : 'none'} />
-                                            <div className="text-center">
-                                              <div className="font-bold text-lg">Love It!</div>
-                                              <div className="text-sm opacity-80">Perfect match</div>
-                                            </div>
-                                          </motion.button>
-
-                                          <motion.button
-                                            onClick={() => handleFeedbackButtonClick(property.id, 'like')}
-                                            className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
-                                              selectedFeedback[property.id] === 'like'
-                                                ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white scale-105 shadow-2xl'
-                                                : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-emerald-500/20 hover:via-green-500/20 hover:to-teal-500/20 hover:text-emerald-400 hover:scale-105 shadow-lg hover:shadow-emerald-500/25'
-                                            }`}
-                                            whileHover={{ scale: 1.05, y: -2 }}
-                                            whileTap={{ scale: 0.98 }}
-                                          >
-                                            <MessageSquare className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'like' ? 'currentColor' : 'none'} />
-                                            <div className="text-center">
-                                              <div className="font-bold text-lg">Let's Talk</div>
-                                              <div className="text-sm opacity-80">Schedule a visit</div>
-                                            </div>
-                                          </motion.button>
-
-                                          <motion.button
-                                            onClick={() => handleFeedbackButtonClick(property.id, 'dislike')}
-                                            className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
-                                              selectedFeedback[property.id] === 'dislike'
-                                                ? 'bg-gradient-to-br from-orange-500 via-red-500 to-rose-500 text-white scale-105 shadow-2xl'
-                                                : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-orange-500/20 hover:via-red-500/20 hover:to-rose-500/20 hover:text-orange-400 hover:scale-105 shadow-lg hover:shadow-orange-500/25'
-                                            }`}
-                                            whileHover={{ scale: 1.05, y: -2 }}
-                                            whileTap={{ scale: 0.98 }}
-                                          >
-                                            <X className="w-8 h-8 mx-auto mb-3" />
-                                            <div className="text-center">
-                                              <div className="font-bold text-lg">Not for Me</div>
-                                              <div className="text-sm opacity-80">Keep searching</div>
-                                            </div>
-                                          </motion.button>
-                                        </div>
-
-                                        {/* Feedback Prompt Bubble */}
-                                        {selectedFeedback[property.id] && (
-                                          <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg"
-                                          >
-                                            <p className="text-blue-400 text-sm text-center">
-                                              💭 Add a note about this property or submit your feedback now!
-                                            </p>
-                                          </motion.div>
-                                        )}
-
-                                        {/* Feedback Notes */}
-                                        <div>
-                                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                                            Your thoughts (optional):
-                                          </label>
-                                          <textarea
-                                            value={feedbackNotes[property.id] || ''}
-                                            onChange={(e) => setFeedbackNotes(prev => ({ ...prev, [property.id]: e.target.value }))}
-                                            placeholder="Share your thoughts about this property..."
-                                            rows={3}
-                                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                                          />
-                                          
-                                          {/* Submit Feedback Button */}
-                                          <motion.button
-                                            onClick={() => handleSubmitFeedback(property.id)}
-                                            disabled={!selectedFeedback[property.id]}
-                                            className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
-                                              selectedFeedback[property.id]
-                                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                                : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                                            }`}
-                                            whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
-                                            whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
-                                          >
-                                            💾 Share Your Feedback
-                                          </motion.button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                  {/* View Details Button - Bottom Left */}
+                                  {property.listingUrl && (
+                                    <div className="absolute bottom-4 left-4">
+                                      <button
+                                        onClick={() => handleMLSClick(property)}
+                                        className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>View Details</span>
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
 
-                                {/* Property Meta - EXACT AGENT DASHBOARD */}
-                                <div className="mt-4 pt-3 border-t border-slate-600 flex items-center justify-between text-xs text-slate-400">
-                                  <div className="flex items-center space-x-4">
-                                    <span className="text-blue-400 font-medium">{formatRelativeTime(property.createdAt)}</span>
+                                {/* Property Details */}
+                                <div className="p-6">
+                                  {/* Description */}
+                                  {property.description && (
+                                    <div className="mb-4">
+                                      <p className="text-slate-300 text-lg leading-relaxed font-medium">
+                                        {property.description}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* CLIENT FEEDBACK SECTION */}
+                                  <div className="space-y-4">
+                                    <div className="border-t border-slate-600 pt-4">
+                                      <p className="text-slate-300 text-sm mb-3 font-medium">
+                                        How do you feel about this property?
+                                      </p>
+                                      
+                                      {/* Show existing feedback or feedback form */}
+                                      {latestFeedback ? (
+                                        <div className="bg-slate-700/30 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium text-white ${
+                                              latestFeedback.feedback === 'love' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
+                                              latestFeedback.feedback === 'like' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                                              'bg-gradient-to-r from-red-500 to-rose-500'
+                                            }`}>
+                                              {latestFeedback.feedback === 'love' ? 'Love It! ❤️' :
+                                               latestFeedback.feedback === 'like' ? 'Let\'s Talk 💬' : 'Not for Me ❌'}
+                                            </span>
+                                            <span className="text-xs text-slate-400">
+                                              {formatRelativeTime(latestFeedback.createdAt)}
+                                            </span>
+                                          </div>
+                                          {latestFeedback.notes && (
+                                            <p className="text-sm text-slate-300 italic">"{latestFeedback.notes}"</p>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-4">
+                                          {/* Feedback Buttons */}
+                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <motion.button
+                                              onClick={() => handleFeedbackButtonClick(property.id, 'love')}
+                                              className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
+                                                selectedFeedback[property.id] === 'love'
+                                                  ? 'bg-gradient-to-br from-pink-500 via-rose-500 to-red-500 text-white scale-105 shadow-2xl'
+                                                  : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-pink-500/20 hover:via-rose-500/20 hover:to-red-500/20 hover:text-pink-400 hover:scale-105 shadow-lg hover:shadow-pink-500/25'
+                                              }`}
+                                              whileHover={{ scale: 1.05, y: -2 }}
+                                              whileTap={{ scale: 0.98 }}
+                                            >
+                                              <Heart className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'love' ? 'currentColor' : 'none'} />
+                                              <div className="text-center">
+                                                <div className="font-bold text-lg">Love It!</div>
+                                                <div className="text-sm opacity-80">Perfect match</div>
+                                              </div>
+                                            </motion.button>
+
+                                            <motion.button
+                                              onClick={() => handleFeedbackButtonClick(property.id, 'like')}
+                                              className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
+                                                selectedFeedback[property.id] === 'like'
+                                                  ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white scale-105 shadow-2xl'
+                                                  : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-emerald-500/20 hover:via-green-500/20 hover:to-teal-500/20 hover:text-emerald-400 hover:scale-105 shadow-lg hover:shadow-emerald-500/25'
+                                              }`}
+                                              whileHover={{ scale: 1.05, y: -2 }}
+                                              whileTap={{ scale: 0.98 }}
+                                            >
+                                              <MessageSquare className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'like' ? 'currentColor' : 'none'} />
+                                              <div className="text-center">
+                                                <div className="font-bold text-lg">Let's Talk</div>
+                                                <div className="text-sm opacity-80">Schedule a visit</div>
+                                              </div>
+                                            </motion.button>
+
+                                            <motion.button
+                                              onClick={() => handleFeedbackButtonClick(property.id, 'dislike')}
+                                              className={`p-6 rounded-2xl text-base font-bold transition-all duration-300 transform ${
+                                                selectedFeedback[property.id] === 'dislike'
+                                                  ? 'bg-gradient-to-br from-orange-500 via-red-500 to-rose-500 text-white scale-105 shadow-2xl'
+                                                  : 'bg-slate-700/50 text-slate-300 hover:bg-gradient-to-br hover:from-orange-500/20 hover:via-red-500/20 hover:to-rose-500/20 hover:text-orange-400 hover:scale-105 shadow-lg hover:shadow-orange-500/25'
+                                              }`}
+                                              whileHover={{ scale: 1.05, y: -2 }}
+                                              whileTap={{ scale: 0.98 }}
+                                            >
+                                              <X className="w-8 h-8 mx-auto mb-3" />
+                                              <div className="text-center">
+                                                <div className="font-bold text-lg">Not for Me</div>
+                                                <div className="text-sm opacity-80">Keep searching</div>
+                                              </div>
+                                            </motion.button>
+                                          </div>
+
+                                          {/* Feedback Prompt Bubble */}
+                                          {selectedFeedback[property.id] && (
+                                            <motion.div
+                                              initial={{ opacity: 0, y: -10 }}
+                                              animate={{ opacity: 1, y: 0 }}
+                                              className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                                            >
+                                              <p className="text-blue-400 text-sm text-center">
+                                                💭 Add a note about this property or submit your feedback now!
+                                              </p>
+                                            </motion.div>
+                                          )}
+
+                                          {/* Feedback Notes */}
+                                          <div>
+                                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                              Your thoughts (optional):
+                                            </label>
+                                            <textarea
+                                              value={feedbackNotes[property.id] || ''}
+                                              onChange={(e) => setFeedbackNotes(prev => ({ ...prev, [property.id]: e.target.value }))}
+                                              placeholder="Share your thoughts about this property..."
+                                              rows={3}
+                                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                                            />
+                                            
+                                            {/* Submit Feedback Button */}
+                                            <motion.button
+                                              onClick={() => handleSubmitFeedback(property.id)}
+                                              disabled={!selectedFeedback[property.id]}
+                                              className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
+                                                selectedFeedback[property.id]
+                                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                  : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                              }`}
+                                              whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
+                                              whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
+                                            >
+                                              💾 Share Your Feedback
+                                            </motion.button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Property Meta */}
+                                  <div className="mt-4 pt-3 border-t border-slate-600 flex items-center justify-between text-xs text-slate-400">
+                                    <div className="flex items-center space-x-4">
+                                      <span className="text-blue-400 font-medium">{formatRelativeTime(property.createdAt)}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </motion.div>
+                              </motion.div>
+                            </div>
                           </motion.div>
                         );
                       })}
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
             </div>
           ) : (
-            /* Empty State - EXACT AGENT DASHBOARD */
+            /* Empty State */
             <div className="text-center py-20">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}

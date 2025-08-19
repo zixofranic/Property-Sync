@@ -20,6 +20,47 @@ import { PropertyFeedbackDto } from './dto/property-feedback.dto';
 export class TimelinesController {
   constructor(private readonly timelinesService: TimelinesService) {}
 
+  // CRITICAL FIX: Move all specific routes BEFORE parameterized routes
+  
+  // Check MLS duplicate - MOVED TO TOP
+  @UseGuards(JwtAuthGuard)
+  @Get('check-duplicate')
+  async checkMLSDuplicate(
+    @Request() req,
+    @Query('clientId') clientId: string,
+    @Query('mlsLink') mlsLink: string
+  ) {
+    if (!clientId || !mlsLink) {
+      return {
+        error: 'Missing clientId or mlsLink parameter',
+      };
+    }
+
+    try {
+      const agentId = req.user.id;
+      const isDuplicate = await this.timelinesService.checkMLSDuplicate(agentId, clientId, mlsLink);
+      return { isDuplicate };
+    } catch (error) {
+      console.error('MLS duplicate check error:', error);
+      return {
+        error: 'Failed to check for duplicates',
+      };
+    }
+  }
+
+  // Get agent timeline for specific client - MOVED UP
+  @UseGuards(JwtAuthGuard)
+  @Get('agent/:clientId')
+  async getAgentTimeline(
+    @Request() req,
+    @Param('clientId') clientId: string
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.getAgentTimeline(agentId, clientId);
+  }
+
+  // NOW the parameterized routes that can catch anything:
+
   // Get timeline by share token (for clients)
   @Public()
   @Get(':shareToken')
@@ -50,17 +91,6 @@ export class TimelinesController {
     @Query('client') clientCode?: string
   ) {
     return this.timelinesService.submitPropertyFeedback(shareToken, propertyId, feedbackDto, clientCode);
-  }
-
-  // Get agent timeline for specific client
-  @UseGuards(JwtAuthGuard)
-  @Get('agent/:clientId')
-  async getAgentTimeline(
-    @Request() req,
-    @Param('clientId') clientId: string
-  ) {
-    const agentId = req.user.id;
-    return this.timelinesService.getAgentTimeline(agentId, clientId);
   }
 
   // Add property to timeline
@@ -98,7 +128,7 @@ export class TimelinesController {
     return this.timelinesService.deleteProperty(agentId, propertyId);
   }
 
-  // NEW: Send timeline email
+  // Send timeline email
   @UseGuards(JwtAuthGuard)
   @Post(':timelineId/send-email')
   async sendTimelineEmail(
@@ -110,7 +140,7 @@ export class TimelinesController {
     return this.timelinesService.sendTimelineEmail(agentId, timelineId, emailOptions);
   }
 
-  // NEW: Send property notification
+  // Send property notification
   @UseGuards(JwtAuthGuard)
   @Post(':timelineId/send-property-notification')
   async sendPropertyNotification(
@@ -131,18 +161,5 @@ export class TimelinesController {
   ) {
     const agentId = req.user.id;
     return this.timelinesService.revokeTimelineAccess(agentId, timelineId);
-  }
-
-  // Check MLS duplicate
-  @UseGuards(JwtAuthGuard)
-  @Get('check-duplicate')
-  async checkMLSDuplicate(
-    @Request() req,
-    @Query('clientId') clientId: string,
-    @Query('mlsLink') mlsLink: string
-  ) {
-    const agentId = req.user.id;
-    const isDuplicate = await this.timelinesService.checkMLSDuplicate(agentId, clientId, mlsLink);
-    return { isDuplicate };
   }
 }

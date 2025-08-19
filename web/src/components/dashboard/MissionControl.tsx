@@ -437,7 +437,7 @@ const testProfileAPI = async () => {
                               <div className="font-medium text-white">{client.name || 'Unnamed Client'}</div>
                               <div className="text-sm text-slate-400 truncate">{client.email || 'No email'}</div>
                               <div className="text-xs text-slate-500 mt-1">
-                                {client.propertiesViewed || 0} properties â€¢ Last active {getRelativeTime(client.lastActive)}
+                                {client.propertiesViewed || 0} properties Last active {getRelativeTime(client.lastActive)}
                               </div>
                             </div>
                             <div className="text-right ml-4">
@@ -533,8 +533,8 @@ const testProfileAPI = async () => {
   }}
   onSavePreferences={updateUserPreferences}
 />
-
-{/* Share Timeline Modal */}
+      </div>
+      {/* Share Timeline Modal */}
 {selectedClient && (
   <ShareTimelineModal
     isOpen={showShareModal}
@@ -555,7 +555,6 @@ const testProfileAPI = async () => {
     onSendEmail={() => sendTimelineEmail(currentTimeline?.id || '')}
   />
 )}
-      </div>
 
       {/* Enhanced Bulk Send Notification Bar */}
       {selectedClient && bulkMode && bulkQueueCount > 0 && (
@@ -598,7 +597,6 @@ const testProfileAPI = async () => {
                   {/* âœ… SIMPLIFIED: Basic user and connection info */}
                   <div className="flex items-center justify-center space-x-4 text-sm text-slate-400">
                     <span>Welcome back, {user?.firstName || 'Agent'}</span>
-                    <span>â€¢</span>
                     <span className={`flex items-center space-x-1 ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
                       {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                       <span>{isOnline ? 'Online' : 'Offline'}</span>
@@ -838,7 +836,6 @@ const testProfileAPI = async () => {
         isOpen={activeModal === 'clients'} 
         onClose={() => setActiveModal(null)} 
         />
-
 
 
 

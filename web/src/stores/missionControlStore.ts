@@ -32,6 +32,7 @@ export interface Client {
   name: string;
   email: string;
   phone?: string;
+  spouseEmail?: string;
   avatar?: string;
   propertiesViewed: number;
   lastActive: string;
@@ -880,6 +881,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 name: client.name,
                 email: client.email,
                 phone: client.phone,
+                spouseEmail: client.spouseEmail,
                 avatar: client.avatar,
                 propertiesViewed: client.propertiesViewed,
                 lastActive: client.lastActive,
@@ -977,60 +979,73 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         },
 
         updateClient: async (clientId: string, updates: Partial<Client>) => {
-          try {
-            console.log('Store: Updating client:', clientId);
-            const response = await apiClient.updateClient(clientId, updates);
-            
-            if (response.error) {
-              set({ clientsError: response.error });
-              
-              get().addNotification({
-                type: 'error',
-                title: 'Update Failed',
-                message: response.error,
-                read: false,
-              });
-              
-              return;
-            }
+  try {
+    console.log('Store: Updating client:', clientId);
+    
+    // Transform the updates to match backend expectations
+    const backendUpdates: any = { ...updates };
+    
+    // If name is provided, split it into firstName/lastName
+    if (updates.name) {
+      const nameParts = updates.name.trim().split(' ');
+      backendUpdates.firstName = nameParts[0] || '';
+      backendUpdates.lastName = nameParts.slice(1).join(' ') || '';
+      delete backendUpdates.name; // Remove the combined name field
+    }
+    
+    const response = await apiClient.updateClient(clientId, backendUpdates);
+    
+    if (response.error) {
+      set({ clientsError: response.error });
+      
+      get().addNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: response.error,
+        read: false,
+      });
+      
+      return;
+    }
 
-            if (response.data) {
-              console.log('Store: Client updated successfully');
-              
-              set((state) => ({
-                clients: state.clients.map((client) =>
-                  client.id === clientId
-                    ? {
-                        ...client,
-                        name: response.data!.name,
-                        email: response.data!.email,
-                        phone: response.data!.phone,
-                        ...updates,
-                      }
-                    : client
-                ),
-                clientsError: null,
-              }));
+    if (response.data) {
+      console.log('Store: Client updated successfully');
+      
+      set((state) => ({
+        clients: state.clients.map((client) =>
+          client.id === clientId
+            ? {
+                ...client,
+                name: response.data!.name,
+                email: response.data!.email,
+                phone: response.data!.phone,
+                spouseEmail: response.data!.spouseEmail,
+                ...updates,
+              }
+            : client
+        ),
+        clientsError: null,
+      }));
 
-              get().addNotification({
-                type: 'success',
-                title: 'Client Updated',
-                message: 'Client information has been updated successfully',
-                read: false,
-              });
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to update client';
-            set({ clientsError: errorMessage });
-            
-            get().addNotification({
-              type: 'error',
-              title: 'Update Error',
-              message: errorMessage,
-              read: false,
-            });
-          }
-        },
+      get().addNotification({
+        type: 'success',
+        title: 'Client Updated',
+        message: 'Client information has been updated successfully',
+        read: false,
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update client';
+    set({ clientsError: errorMessage });
+    
+    get().addNotification({
+      type: 'error',
+      title: 'Update Error',
+      message: errorMessage,
+      read: false,
+    });
+  }
+},
 
         deleteClient: async (clientId: string) => {
           try {
@@ -1611,14 +1626,35 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           return client.timeline.shareToken;
         },
 
-        checkMLSDuplicate: (clientId: string, mlsLink: string): boolean => {
-          const timeline = get().getClientTimeline(clientId);
-          if (!timeline?.properties) return false;
-          
-          return timeline.properties.some(property => 
-            property.mlsLink && property.mlsLink === mlsLink
-          );
-        },
+      checkMLSDuplicate: async (clientId: string, mlsLink: string): Promise<boolean> => {
+  if (!mlsLink?.trim()) return false;
+  
+  try {
+    const response = await apiClient.checkMLSDuplicate(clientId, mlsLink.trim());
+    
+    if (response.error) {
+      console.warn('Duplicate check failed:', response.error);
+      // Fallback to local check if API fails
+      const timeline = get().getClientTimeline(clientId);
+      if (!timeline?.properties) return false;
+      
+      return timeline.properties.some(property => 
+        property.mlsLink && property.mlsLink.trim() === mlsLink.trim()
+      );
+    }
+    
+    return response.data?.isDuplicate || false;
+  } catch (error) {
+    console.error('Duplicate check error:', error);
+    // Fallback to local check
+    const timeline = get().getClientTimeline(clientId);
+    if (!timeline?.properties) return false;
+    
+    return timeline.properties.some(property => 
+      property.mlsLink && property.mlsLink.trim() === mlsLink.trim()
+    );
+  }
+},
 
         addClient: async (clientData: any) => {
           console.log('Store: addClient called with:', clientData);

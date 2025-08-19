@@ -26,6 +26,10 @@ export class UpdateClientDto {
   notes?: string;
 
   @IsOptional()
+  @IsEmail()
+  spouseEmail?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

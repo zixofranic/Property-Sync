@@ -86,6 +86,7 @@ export class UsersService {
     if (updateData.specialties !== undefined) profileUpdateData.specialties = updateData.specialties;
     if (updateData.brandColor !== undefined) profileUpdateData.brandColor = updateData.brandColor;
     if (updateData.logo !== undefined) profileUpdateData.logo = updateData.logo;
+    if (updateData.avatar !== undefined) profileUpdateData.avatar = updateData.avatar;
 
     try {
       const updatedProfile = await this.prisma.profile.upsert({
@@ -104,6 +105,7 @@ export class UsersService {
           specialties: profileUpdateData.specialties || [],
           brandColor: profileUpdateData.brandColor || '#3b82f6',
           logo: profileUpdateData.logo || null,
+          avatar: profileUpdateData.avatar || null,
           plan: 'FREE',
         },
       });

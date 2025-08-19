@@ -109,7 +109,7 @@ export function ShareTimelineModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-xl z-[9999] flex items-start justify-center pt-16 px-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 flex items-start justify-center pt-16 px-4"
           onClick={onClose}
         >
           <motion.div

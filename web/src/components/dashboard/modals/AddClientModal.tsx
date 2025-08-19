@@ -1,31 +1,56 @@
 // apps/web/src/components/dashboard/modals/AddClientModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Mail, Phone, UserPlus } from 'lucide-react';
-import { useMissionControlStore } from '@/stores/missionControlStore';
+import { X, User, Mail, Phone, UserPlus, Heart, Edit3 } from 'lucide-react';
+import { useMissionControlStore, Client } from '@/stores/missionControlStore';
 
 interface AddClientModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editingClient?: Client | null; // New prop for edit mode
 }
 
 interface ClientFormData {
   name: string;
   email: string;
   phone: string;
+  spouseEmail: string;
 }
 
-export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
-  const { addClient, addNotification } = useMissionControlStore();
+export function AddClientModal({ isOpen, onClose, editingClient = null }: AddClientModalProps) {
+  const { addClient, updateClient, addNotification } = useMissionControlStore();
   
   const [formData, setFormData] = useState<ClientFormData>({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    spouseEmail: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+
+  const isEditMode = !!editingClient;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingClient) {
+      setFormData({
+        name: editingClient.name || '',
+        email: editingClient.email || '',
+        phone: editingClient.phone || '',
+        spouseEmail: editingClient.spouseEmail || ''
+      });
+    } else {
+      // Reset form for add mode
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        spouseEmail: ''
+      });
+    }
+  }, [editingClient, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +59,8 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
       addNotification({
         type: 'error',
         title: 'Missing Information',
-        message: 'Please fill in name and email fields.'
+        message: 'Please fill in name and email fields.',
+        read: false
       });
       return;
     }
@@ -42,47 +68,65 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
     setIsLoading(true);
 
     try {
-      // 🔧 FIX: Parse name into firstName/lastName for backend
-      const nameParts = formData.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      if (isEditMode && editingClient) {
+        // Edit existing client
+        await updateClient(editingClient.id, {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone?.trim() || undefined,
+          spouseEmail: formData.spouseEmail?.trim() || undefined,
+        });
 
-      // 🔧 FIX: Send data in the format the backend expects
-      const clientData = {
-        //name: formData.name, // Keep for display
-        email: formData.email.trim(),
-        phone: formData.phone?.trim() || undefined,
-        // Add the parsed fields that backend validation expects
-        firstName: firstName,
-        lastName: lastName,
-      };
-
-      console.log('Sending client data:', clientData); // Debug log
-
-      const success = await addClient(clientData);
-
-      if (success) {
         addNotification({
           type: 'success',
-          title: 'Client Added',
-          message: `${formData.name} has been added to your client list.`
+          title: 'Client Updated',
+          message: `${formData.name} has been updated successfully.`,
+          read: false
         });
+      } else {
+        // Add new client
+        const nameParts = formData.name.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
 
-        // Reset form
-        setFormData({
-          name: '',
-          email: '',
-          phone: ''
-        });
+        const clientData = {
+          email: formData.email.trim(),
+          phone: formData.phone?.trim() || undefined,
+          spouseEmail: formData.spouseEmail?.trim() || undefined,
+          firstName: firstName,
+          lastName: lastName,
+        };
 
-        onClose();
+        const success = await addClient(clientData);
+
+        if (success) {
+          addNotification({
+            type: 'success',
+            title: 'Client Added',
+            message: `${formData.name} has been added to your client list.`,
+            read: false
+          });
+        } else {
+          throw new Error('Failed to create client');
+        }
       }
+
+      // Reset form and close
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        spouseEmail: ''
+      });
+      onClose();
+
     } catch (error) {
-      console.error('Client creation error:', error);
+      console.error('Client operation error:', error);
       addNotification({
         type: 'error',
-        title: 'Failed to Add Client',
-        message: 'Something went wrong. Please try again.'
+        title: isEditMode ? 'Failed to Update Client' : 'Failed to Add Client',
+        message: 'Something went wrong. Please try again.',
+        read: false
       });
     } finally {
       setIsLoading(false);
@@ -109,12 +153,16 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-700">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <UserPlus className="w-5 h-5 text-white" />
+                <div className={`w-10 h-10 bg-gradient-to-br ${isEditMode ? 'from-orange-500 to-red-600' : 'from-blue-500 to-purple-600'} rounded-full flex items-center justify-center`}>
+                  {isEditMode ? <Edit3 className="w-5 h-5 text-white" /> : <UserPlus className="w-5 h-5 text-white" />}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Add New Client</h2>
-                  <p className="text-sm text-slate-400">Create a new client profile</p>
+                  <h2 className="text-xl font-bold text-white">
+                    {isEditMode ? 'Edit Client' : 'Add New Client'}
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    {isEditMode ? 'Update client information' : 'Create a new client profile'}
+                  </p>
                 </div>
               </div>
               
@@ -142,7 +190,7 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
                   required
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  Enter full name (will be split into first/last name)
+                  {isEditMode ? 'Update the client name' : 'Enter full name (will be split into first/last name)'}
                 </p>
               </div>
 
@@ -160,6 +208,24 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
                   placeholder="sarah.johnson@email.com"
                   required
                 />
+              </div>
+
+              {/* Spouse Email */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <Heart className="w-4 h-4 inline mr-2" />
+                  Spouse Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.spouseEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, spouseEmail: e.target.value }))}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  placeholder="mike.johnson@email.com"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Optional: Spouse will also receive property timeline emails
+                </p>
               </div>
 
               {/* Phone */}
@@ -191,19 +257,19 @@ export function AddClientModal({ isOpen, onClose }: AddClientModalProps) {
                 <motion.button
                   type="submit"
                   disabled={isLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-slate-600 disabled:to-slate-600 text-white rounded-lg font-medium transition-all duration-200 disabled:cursor-not-allowed"
+                  className={`px-8 py-3 bg-gradient-to-r ${isEditMode ? 'from-orange-600 to-red-700 hover:from-orange-500 hover:to-red-600' : 'from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600'} disabled:from-slate-600 disabled:to-slate-600 text-white rounded-lg font-medium transition-all duration-200 disabled:cursor-not-allowed`}
                   whileHover={{ scale: isLoading ? 1 : 1.02 }}
                   whileTap={{ scale: isLoading ? 1 : 0.98 }}
                 >
                   {isLoading ? (
                     <div className="flex items-center">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                      Adding Client...
+                      {isEditMode ? 'Updating...' : 'Adding Client...'}
                     </div>
                   ) : (
                     <div className="flex items-center">
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Add Client
+                      {isEditMode ? <Edit3 className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                      {isEditMode ? 'Update Client' : 'Add Client'}
                     </div>
                   )}
                 </motion.button>
