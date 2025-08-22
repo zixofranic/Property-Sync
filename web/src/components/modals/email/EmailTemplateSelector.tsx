@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Eye, Palette, Sparkles, FileText, Check } from 'lucide-react';
+import { Mail, Eye, Palette, Sparkles, FileText, Check, X } from 'lucide-react';
 
 interface EmailTemplateSelectorProps {
   currentTemplate: 'modern' | 'classical';

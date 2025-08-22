@@ -592,7 +592,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 Welcome, {timelineData.client.firstName}! 👋
               </h1>
               <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-                I've personally selected these properties based on your preferences. 
+                I&apos;ve personally selected these properties based on your preferences. 
                 Take your time reviewing each one, add your notes, and share your feedback.
               </p>
             </motion.div>
