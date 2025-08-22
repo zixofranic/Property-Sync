@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(PORT=3002 npm run start:dev)",
+      "Bash(powershell:*)",
+      "Bash(npm run kill-ports:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(node:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\Users\\ziadf\\Documents\\Projects\\property-sync",
+      "C:\\c\\Users\\ziadf\\Documents\\Projects"
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import { EmailService } from '../email/email.service';
 import { MLSParserService } from '../mls-parser/mls-parser.service';
 import { BatchManagementService } from '../mls-parser/batch-management.service';
 import { UsersService } from '../users/users.service';
+import { AppConfigService } from '../config/app.config';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { PropertyFeedbackDto } from './dto/property-feedback.dto';
 
@@ -20,6 +21,7 @@ export class TimelinesService {
     private mlsParser: MLSParserService,
     private batchService: BatchManagementService,
     private usersService: UsersService,
+    private appConfig: AppConfigService,
   ) {}
 
   // Keep all existing methods unchanged until sendTimelineEmail
@@ -377,7 +379,7 @@ export class TimelinesService {
       timeline.client.phone || undefined,
     );
 
-    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
+    const shareUrl = this.appConfig.getTimelineShareUrl(timeline.shareToken, clientLoginCode);
 
     try {
       // Call EmailService which handles Resend + Nodemailer fallback automatically
@@ -459,7 +461,7 @@ export class TimelinesService {
       timeline.client.firstName,
       timeline.client.phone || undefined,
     );
-    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
+    const shareUrl = this.appConfig.getTimelineShareUrl(timeline.shareToken, clientLoginCode);
 
     const emailResult = await this.emailService.sendPropertyNotification({
       clientEmail: timeline.client.email,
@@ -839,7 +841,7 @@ export class TimelinesService {
       timeline.client.phone || undefined,
     );
 
-    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
+    const shareUrl = this.appConfig.getTimelineShareUrl(timeline.shareToken, clientLoginCode);
 
     const emailResult = await this.emailService.sendBatchImportNotification({
       clientEmail: timeline.client.email,

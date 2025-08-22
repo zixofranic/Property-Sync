@@ -227,7 +227,7 @@ class ApiClient {
   private lastActivityTime: number = Date.now();
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
     
     // Initialize with stored tokens
     if (typeof window !== 'undefined') {
@@ -888,9 +888,38 @@ async updateEmailPreferences(preferences: {
 }
 
   // Public Timeline Methods (for client access)
-  async getPublicTimeline(shareToken: string, clientCode?: string): Promise<ApiResponse<any>> {
-    const params = clientCode ? `?client=${clientCode}` : '';
-    return this.request(`/api/v1/timelines/${shareToken}${params}`, {}, true); // Skip auth for public
+  async getPublicTimeline(shareToken: string, clientCode?: string, sessionToken?: string): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (clientCode) params.append('client', clientCode);
+    if (sessionToken) params.append('sessionToken', sessionToken);
+    
+    const queryString = params.toString();
+    const url = queryString ? `/api/v1/share/${shareToken}?${queryString}` : `/api/v1/share/${shareToken}`;
+    
+    return this.request(url, {}, true); // Skip auth for public
+  }
+
+  async authenticateClientAccess(shareToken: string, clientName: string, phoneLastFour: string): Promise<ApiResponse<{
+    sessionToken: string;
+    clientName: string;
+  }>> {
+    return this.request(`/api/v1/share/${shareToken}/authenticate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        clientName,
+        phoneLastFour
+      }),
+    }, true); // Skip auth for public authentication
+  }
+
+  async trackTimelineView(shareToken: string, metadata?: any): Promise<ApiResponse<void>> {
+    return this.request(`/api/v1/analytics/track/${shareToken}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        eventType: 'timeline_view',
+        metadata: metadata || { source: 'client_access' }
+      }),
+    }, true); // Skip auth for public tracking
   }
 
   async submitPropertyFeedback(
@@ -902,11 +931,17 @@ async updateEmailPreferences(preferences: {
     clientName?: string,
     clientEmail?: string
   ): Promise<ApiResponse<{ message: string }>> {
-    const params = clientCode ? `?client=${clientCode}` : '';
-    return this.request(`/api/v1/timelines/${shareToken}/properties/${propertyId}/feedback${params}`, {
+    // Map feedback to the expected enum format
+    const typeMapping = {
+      'love': 'LOVE_IT',
+      'like': 'LIKE_IT',
+      'dislike': 'DISLIKE_IT'
+    };
+
+    return this.request(`/api/v1/share/${shareToken}/properties/${propertyId}/feedback`, {
       method: 'POST',
       body: JSON.stringify({ 
-        feedback, 
+        type: typeMapping[feedback] || 'LIKE_IT',
         notes,
         clientName: clientName || 'Unknown Client',
         clientEmail: clientEmail || 'unknown@email.com'

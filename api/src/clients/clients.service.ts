@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AppConfigService } from '../config/app.config';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { ClientResponseDto } from './dto/client-response.dto';
@@ -15,6 +16,7 @@ export class ClientsService {
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
+    private appConfig: AppConfigService,
   ) {}
 
   // 🆕 UPDATED CREATE METHOD - FRONTEND COMPATIBLE
@@ -235,7 +237,7 @@ export class ClientsService {
       client.phone,
     );
     const shareUrl = timeline
-      ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`
+      ? this.appConfig.getTimelineShareUrl(timeline.shareToken, clientLoginCode)
       : '';
 
     return {

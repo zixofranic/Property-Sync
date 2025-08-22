@@ -5,9 +5,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
 import { MLSParserModule } from '../mls-parser/mls-parser.module';
 import { UsersModule } from '../users/users.module';
+import { AppConfigModule } from '../config/config.module';
 
 @Module({
-  imports: [PrismaModule, EmailModule, MLSParserModule, UsersModule],
+  imports: [PrismaModule, EmailModule, MLSParserModule, UsersModule, AppConfigModule],
   controllers: [TimelinesController],
   providers: [TimelinesService],
   exports: [TimelinesService],
