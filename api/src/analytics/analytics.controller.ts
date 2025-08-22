@@ -41,10 +41,7 @@ export class AnalyticsController {
   // Protected endpoints for agents
   @UseGuards(JwtAuthGuard)
   @Get('agent/recent')
-  async getAgentRecentActivity(
-    @Request() req,
-    @Query('since') since?: string,
-  ) {
+  async getAgentRecentActivity(@Request() req, @Query('since') since?: string) {
     const agentId = req.user.id;
     const sinceDate = since ? new Date(since) : undefined;
     return this.analyticsService.getAgentRecentActivity(agentId, sinceDate);
@@ -59,7 +56,11 @@ export class AnalyticsController {
   ) {
     const agentId = req.user.id;
     const limitNumber = limit ? parseInt(limit, 10) : 20;
-    return this.analyticsService.getClientActivity(agentId, clientId, limitNumber);
+    return this.analyticsService.getClientActivity(
+      agentId,
+      clientId,
+      limitNumber,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

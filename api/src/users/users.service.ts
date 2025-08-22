@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitsService } from './plan-limits.service';
 import { RegisterDto } from '../auth/dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
@@ -9,15 +15,18 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planLimitsService: PlanLimitsService,
+  ) {}
 
   // FIXED: Email Preferences Method
   async updateEmailPreferences(
-    userId: string, 
-    preferences: { 
+    userId: string,
+    preferences: {
       preferredTemplate?: 'modern' | 'classical';
       brandColor?: string;
-    }
+    },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -57,7 +66,8 @@ export class UsersService {
         preferredTemplate: updatedProfile.preferredEmailTemplate || 'modern',
         brandColor: updatedProfile.brandColor || '#3b82f6',
         companyName: updatedProfile.company || '',
-        agentName: `${updatedProfile.firstName || ''} ${updatedProfile.lastName || ''}`.trim(),
+        agentName:
+          `${updatedProfile.firstName || ''} ${updatedProfile.lastName || ''}`.trim(),
       },
     };
   }
@@ -75,18 +85,28 @@ export class UsersService {
 
     // Filter out undefined values
     const profileUpdateData: any = {};
-    if (updateData.firstName !== undefined) profileUpdateData.firstName = updateData.firstName;
-    if (updateData.lastName !== undefined) profileUpdateData.lastName = updateData.lastName;
-    if (updateData.company !== undefined) profileUpdateData.company = updateData.company;
-    if (updateData.phone !== undefined) profileUpdateData.phone = updateData.phone;
-    if (updateData.website !== undefined) profileUpdateData.website = updateData.website;
-    if (updateData.licenseNumber !== undefined) profileUpdateData.licenseNumber = updateData.licenseNumber;
+    if (updateData.firstName !== undefined)
+      profileUpdateData.firstName = updateData.firstName;
+    if (updateData.lastName !== undefined)
+      profileUpdateData.lastName = updateData.lastName;
+    if (updateData.company !== undefined)
+      profileUpdateData.company = updateData.company;
+    if (updateData.phone !== undefined)
+      profileUpdateData.phone = updateData.phone;
+    if (updateData.website !== undefined)
+      profileUpdateData.website = updateData.website;
+    if (updateData.licenseNumber !== undefined)
+      profileUpdateData.licenseNumber = updateData.licenseNumber;
     if (updateData.bio !== undefined) profileUpdateData.bio = updateData.bio;
-    if (updateData.yearsExperience !== undefined) profileUpdateData.yearsExperience = updateData.yearsExperience;
-    if (updateData.specialties !== undefined) profileUpdateData.specialties = updateData.specialties;
-    if (updateData.brandColor !== undefined) profileUpdateData.brandColor = updateData.brandColor;
+    if (updateData.yearsExperience !== undefined)
+      profileUpdateData.yearsExperience = updateData.yearsExperience;
+    if (updateData.specialties !== undefined)
+      profileUpdateData.specialties = updateData.specialties;
+    if (updateData.brandColor !== undefined)
+      profileUpdateData.brandColor = updateData.brandColor;
     if (updateData.logo !== undefined) profileUpdateData.logo = updateData.logo;
-    if (updateData.avatar !== undefined) profileUpdateData.avatar = updateData.avatar;
+    if (updateData.avatar !== undefined)
+      profileUpdateData.avatar = updateData.avatar;
 
     try {
       const updatedProfile = await this.prisma.profile.upsert({
@@ -109,7 +129,7 @@ export class UsersService {
           plan: 'FREE',
         },
       });
-      
+
       return {
         id: user.id,
         email: user.email,
@@ -171,7 +191,10 @@ export class UsersService {
     return result;
   }
 
-  async createWithVerification(registerDto: RegisterDto, verificationData: { verificationToken: string; verificationExpiry: Date }) {
+  async createWithVerification(
+    registerDto: RegisterDto,
+    verificationData: { verificationToken: string; verificationExpiry: Date },
+  ) {
     const existingUser = await this.findByEmail(registerDto.email);
     if (existingUser) {
       throw new ConflictException('Email already exists');
@@ -228,7 +251,10 @@ export class UsersService {
     return result;
   }
 
-  async updateVerificationToken(userId: string, verificationData: { verificationToken: string; verificationExpiry: Date }) {
+  async updateVerificationToken(
+    userId: string,
+    verificationData: { verificationToken: string; verificationExpiry: Date },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -311,12 +337,18 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const isCurrentPasswordValid = await bcrypt.compare(changePasswordDto.currentPassword, user.password);
+    const isCurrentPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
     if (!isCurrentPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
     }
 
-    const hashedNewPassword = await bcrypt.hash(changePasswordDto.newPassword, 12);
+    const hashedNewPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      12,
+    );
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -339,22 +371,25 @@ export class UsersService {
     }
 
     return {
-      emailTemplateStyle: user.profile?.preferredEmailTemplate || 'modern',
+      emailTemplateStyle: user.profile?.emailTemplateStyle || user.profile?.preferredEmailTemplate || 'modern',
       notifications: {
-        email: true,
-        desktop: true,
-        feedback: true,
-        newProperties: true,
+        email: user.profile?.notificationEmail ?? true,
+        desktop: user.profile?.notificationDesktop ?? true,
+        feedback: user.profile?.notificationFeedback ?? true,
+        newProperties: user.profile?.notificationNewProperties ?? true,
       },
       theme: 'dark' as const,
       soundEnabled: true,
-      timezone: 'America/New_York',
+      timezone: user.profile?.timezone || 'America/New_York',
       brandColor: user.profile?.brandColor || '#3b82f6',
       logo: user.profile?.logo || '',
     };
   }
 
-  async updateUserPreferences(userId: string, preferences: UpdatePreferencesDto) {
+  async updateUserPreferences(
+    userId: string,
+    preferences: UpdatePreferencesDto,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true },
@@ -365,17 +400,33 @@ export class UsersService {
     }
 
     const updateData: any = {};
-    
+
     if (preferences.brandColor !== undefined) {
       updateData.brandColor = preferences.brandColor;
     }
-    
+
     if (preferences.logo !== undefined) {
       updateData.logo = preferences.logo;
     }
 
     if (preferences.emailTemplateStyle !== undefined) {
       updateData.preferredEmailTemplate = preferences.emailTemplateStyle;
+      updateData.emailTemplateStyle = preferences.emailTemplateStyle;
+    }
+
+    if (preferences.notifications !== undefined) {
+      if (preferences.notifications.email !== undefined) {
+        updateData.notificationEmail = preferences.notifications.email;
+      }
+      if (preferences.notifications.desktop !== undefined) {
+        updateData.notificationDesktop = preferences.notifications.desktop;
+      }
+      if (preferences.notifications.feedback !== undefined) {
+        updateData.notificationFeedback = preferences.notifications.feedback;
+      }
+      if (preferences.notifications.newProperties !== undefined) {
+        updateData.notificationNewProperties = preferences.notifications.newProperties;
+      }
     }
 
     let updatedProfile = user.profile;
@@ -393,15 +444,18 @@ export class UsersService {
     }
 
     return {
-      emailTemplateStyle: updatedProfile?.preferredEmailTemplate || 'modern',
-      notifications: preferences.notifications || {
-        email: true,
-        desktop: true,
-        feedback: true,
-        newProperties: true,
+      emailTemplateStyle: updatedProfile?.emailTemplateStyle || updatedProfile?.preferredEmailTemplate || 'modern',
+      notifications: {
+        email: updatedProfile?.notificationEmail ?? true,
+        desktop: updatedProfile?.notificationDesktop ?? true,
+        feedback: updatedProfile?.notificationFeedback ?? true,
+        newProperties: updatedProfile?.notificationNewProperties ?? true,
       },
       theme: preferences.theme || 'dark',
-      soundEnabled: preferences.soundEnabled !== undefined ? preferences.soundEnabled : true,
+      soundEnabled:
+        preferences.soundEnabled !== undefined
+          ? preferences.soundEnabled
+          : true,
       timezone: preferences.timezone || 'America/New_York',
       brandColor: updatedProfile?.brandColor || '#3b82f6',
       logo: updatedProfile?.logo || '',
@@ -451,7 +505,137 @@ export class UsersService {
     };
   }
 
-  async validatePassword(password: string, hashedPassword: string): Promise<boolean> {
+  async validatePassword(
+    password: string,
+    hashedPassword: string,
+  ): Promise<boolean> {
     return bcrypt.compare(password, hashedPassword);
+  }
+
+  // PLAN AND LIMITS METHODS
+  async getCurrentPlanInfo(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user || !user.profile) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const planLimits = this.planLimitsService.getLimitsForPlan(user.profile.plan);
+    
+    return {
+      currentPlan: user.profile.plan,
+      limits: planLimits,
+      subscriptionStatus: user.profile.subscriptionStatus,
+    };
+  }
+
+  async getCurrentUsage(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { 
+        clients: true,
+        timelines: {
+          include: {
+            properties: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const totalProperties = user.timelines.reduce(
+      (sum, timeline) => sum + timeline.properties.length,
+      0
+    );
+
+    return {
+      clients: user.clients.length,
+      properties: totalProperties,
+    };
+  }
+
+  async validateCurrentUsage(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { 
+        profile: true,
+        clients: true,
+        timelines: {
+          include: {
+            properties: true,
+          },
+        },
+      },
+    });
+
+    if (!user || !user.profile) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const totalProperties = user.timelines.reduce(
+      (sum, timeline) => sum + timeline.properties.length,
+      0
+    );
+
+    const validation = this.planLimitsService.validateUsageAgainstPlan(
+      user.profile.plan,
+      user.clients.length,
+      totalProperties
+    );
+
+    return {
+      ...validation,
+      upgradeMessage: !validation.isValid 
+        ? this.planLimitsService.getUpgradeMessage(
+            user.profile.plan,
+            validation.clientExceeded,
+            validation.propertyExceeded
+          )
+        : null,
+    };
+  }
+
+  async checkCanAddClients(userId: string, clientCount = 1): Promise<{ canAdd: boolean; reason?: string }> {
+    const validation = await this.validateCurrentUsage(userId);
+    
+    const newValidation = this.planLimitsService.validateUsageAgainstPlan(
+      validation.limits.clientLimit >= validation.usage.clients ? 'FREE' : 'TIER_1', // This is a simplified check
+      validation.usage.clients,
+      validation.usage.properties,
+      clientCount,
+      0
+    );
+
+    return {
+      canAdd: newValidation.isValid,
+      reason: !newValidation.isValid 
+        ? `Adding ${clientCount} client(s) would exceed your plan limit of ${newValidation.limits.clientLimit} clients.`
+        : undefined,
+    };
+  }
+
+  async checkCanAddProperties(userId: string, propertyCount = 1): Promise<{ canAdd: boolean; reason?: string }> {
+    const validation = await this.validateCurrentUsage(userId);
+    
+    const newValidation = this.planLimitsService.validateUsageAgainstPlan(
+      validation.limits.propertyLimit >= validation.usage.properties ? 'FREE' : 'TIER_1', // This is a simplified check
+      validation.usage.clients,
+      validation.usage.properties,
+      0,
+      propertyCount
+    );
+
+    return {
+      canAdd: newValidation.isValid,
+      reason: !newValidation.isValid 
+        ? `Adding ${propertyCount} property(ies) would exceed your plan limit of ${newValidation.limits.propertyLimit} properties.`
+        : undefined,
+    };
   }
 }

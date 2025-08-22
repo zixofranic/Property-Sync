@@ -5,8 +5,8 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  name?: string;                   // Frontend sends this (combined name)
-  
+  name?: string; // Frontend sends this (combined name)
+
   // 🆕 BACKEND PROCESSING - Split name fields
   @IsString()
   @MaxLength(50)
@@ -18,11 +18,11 @@ export class CreateClientDto {
 
   // 🆕 DUAL EMAIL SUPPORT
   @IsEmail()
-  email: string;                   // Primary email
+  email: string; // Primary email
 
   @IsOptional()
   @IsEmail()
-  spouseEmail?: string;            // Secondary email for spouse
+  spouseEmail?: string; // Secondary email for spouse
 
   @IsOptional()
   @IsString()
@@ -36,5 +36,5 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
-  avatar?: string;                 // Profile image URL
+  avatar?: string; // Profile image URL
 }

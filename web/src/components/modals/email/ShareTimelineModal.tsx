@@ -24,6 +24,7 @@ interface ShareTimelineModalProps {
   };
   agentName: string;
   onSendEmail: (templateOverride?: 'modern' | 'classical') => Promise<void>;
+  initialTemplate?: 'modern' | 'classical';
 }
 
 export function ShareTimelineModal({ 
@@ -32,13 +33,14 @@ export function ShareTimelineModal({
   client, 
   timeline, 
   agentName,
-  onSendEmail 
+  onSendEmail,
+  initialTemplate = 'modern'
 }: ShareTimelineModalProps) {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classical'>('modern');
+  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classical'>(initialTemplate);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   const shareMessages = {

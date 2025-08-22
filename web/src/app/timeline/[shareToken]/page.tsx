@@ -613,33 +613,49 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
               <div className="lg:hidden absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500" />
 
               {/* Timeline Items - GROUPED BY DATE with proper alternating */}
-              <div className="space-y-12 lg:space-y-16">
+              <div className="space-y-12 lg:space-y-16 relative">
                 {(() => {
                   let globalPropertyIndex = 0; // Track global property index for alternating
                   
                   return Object.entries(groupedProperties).map(([dateString, dayProperties], groupIndex) => (
-                    <div key={dateString} className="space-y-12 lg:space-y-16">
-                      {/* Date Header */}
+                    <div key={dateString} className="space-y-12 lg:space-y-16 w-full">
+                      {/* Date Header - FIXED RESPONSIVE ALIGNMENT */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: groupIndex * 0.1 }}
-                        className="flex items-center justify-center mb-8"
+                        className="flex items-center justify-center mb-8 px-4 w-full"
                       >
-                        <div className="relative">
-                          <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-8 py-4 rounded-2xl font-bold text-xl shadow-2xl border border-white/20 backdrop-blur-sm">
-                            {(() => {
-                              try {
-                                return new Date(dateString).toLocaleDateString('en-US', { 
-                                  weekday: 'long', 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                });
-                              } catch (error) {
-                                return dateString;
-                              }
-                            })()}
+                        <div className="relative mx-auto max-w-md lg:max-w-lg">
+                          <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-2xl font-bold text-lg sm:text-xl text-center shadow-2xl border border-white/20 backdrop-blur-sm mx-auto">
+                            <span className="block sm:hidden">
+                              {(() => {
+                                try {
+                                  return new Date(dateString).toLocaleDateString('en-US', { 
+                                    weekday: 'short', 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                  });
+                                } catch (error) {
+                                  return dateString;
+                                }
+                              })()}
+                            </span>
+                            <span className="hidden sm:block">
+                              {(() => {
+                                try {
+                                  return new Date(dateString).toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  });
+                                } catch (error) {
+                                  return dateString;
+                                }
+                              })()}
+                            </span>
                           </div>
                           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 rounded-2xl blur opacity-30" />
                         </div>

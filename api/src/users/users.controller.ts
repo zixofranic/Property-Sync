@@ -1,9 +1,18 @@
 // apps/api/src/users/users.controller.ts - FIXED VERSION
 
-import { Body, Controller, Get, Patch, Post, UseGuards, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
+import { PlanLimitsService } from './plan-limits.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
@@ -11,7 +20,10 @@ import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 @Controller('api/v1/users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private planLimitsService: PlanLimitsService,
+  ) {}
 
   @Get('profile')
   async getProfile(@CurrentUser() user: any) {
@@ -39,20 +51,23 @@ export class UsersController {
   async getEmailPreferences(@CurrentUser() user: any) {
     const userProfile = await this.usersService.findById(user.id);
     return {
-      preferredTemplate: userProfile.profile?.preferredEmailTemplate || 'modern',
+      preferredTemplate:
+        userProfile.profile?.preferredEmailTemplate || 'modern',
       brandColor: userProfile.profile?.brandColor || '#3b82f6',
       companyName: userProfile.profile?.company || '',
-      agentName: `${userProfile.profile?.firstName || ''} ${userProfile.profile?.lastName || ''}`.trim(),
+      agentName:
+        `${userProfile.profile?.firstName || ''} ${userProfile.profile?.lastName || ''}`.trim(),
     };
   }
 
   @Patch('email-preferences')
   async updateEmailPreferences(
     @CurrentUser() user: any,
-    @Body() preferences: { 
+    @Body()
+    preferences: {
       preferredTemplate?: 'modern' | 'classical';
       brandColor?: string;
-    }
+    },
   ) {
     return this.usersService.updateEmailPreferences(user.id, preferences);
   }
@@ -68,11 +83,35 @@ export class UsersController {
     @CurrentUser() user: any,
     @Body() updatePreferencesDto: UpdatePreferencesDto,
   ) {
-    return this.usersService.updateUserPreferences(user.id, updatePreferencesDto);
+    return this.usersService.updateUserPreferences(
+      user.id,
+      updatePreferencesDto,
+    );
   }
 
   @Post('preferences/reset')
   async resetPreferences(@CurrentUser() user: any) {
     return this.usersService.resetUserPreferences(user.id);
+  }
+
+  // PLAN AND LIMITS ENDPOINTS
+  @Get('plan/current')
+  async getCurrentPlan(@CurrentUser() user: any) {
+    return this.usersService.getCurrentPlanInfo(user.id);
+  }
+
+  @Get('plan/available')
+  async getAvailablePlans() {
+    return this.planLimitsService.getAllPlans();
+  }
+
+  @Get('plan/usage')
+  async getCurrentUsage(@CurrentUser() user: any) {
+    return this.usersService.getCurrentUsage(user.id);
+  }
+
+  @Get('plan/validate')
+  async validateCurrentUsage(@CurrentUser() user: any) {
+    return this.usersService.validateCurrentUsage(user.id);
   }
 }

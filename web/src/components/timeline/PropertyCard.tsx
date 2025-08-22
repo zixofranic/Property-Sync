@@ -3,7 +3,8 @@
 // apps/web/src/components/timeline/PropertyCard.tsx
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, X, ExternalLink, MapPin, DollarSign } from 'lucide-react';
+import { Heart, MessageCircle, X, ExternalLink, MapPin, DollarSign, ChevronLeft, ChevronRight, Bed, Bath, Square } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Property } from '@/stores/missionControlStore';
 
 interface PropertyCardProps {
@@ -31,6 +32,19 @@ export function PropertyCard({
     property.clientFeedback || null
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Get all images (handle both single imageUrl and multiple imageUrls)
+  const images = property.imageUrls?.length > 0 
+    ? property.imageUrls 
+    : property.imageUrl 
+    ? [property.imageUrl]
+    : ['/api/placeholder/400/300'];
+
+  const hasMultipleImages = images.length > 1;
+  
+  // Loading state - check if property is still parsing
+  const isLoading = property.loadingProgress < 100 || !property.isFullyParsed;
 
   const handleFeedbackSubmit = (feedback: 'love' | 'like' | 'dislike') => {
     setSelectedFeedback(feedback);
@@ -130,10 +144,50 @@ export function PropertyCard({
         {/* Property Image - BIGGER WITH OVERLAYS */}
         <div className="relative h-80 bg-slate-700">
           <img
-            src={property.imageUrl || '/api/placeholder/400/200'}
+            src={images[currentImageIndex]}
             alt={property.address}
             className="w-full h-full object-cover"
           />
+          
+          {/* Loading Overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+              <LoadingSpinner progress={property.loadingProgress} />
+            </div>
+          )}
+          
+          {/* Image Navigation Arrows */}
+          {hasMultipleImages && !isLoading && (
+            <>
+              <button
+                onClick={() => setCurrentImageIndex((prev) => prev === 0 ? images.length - 1 : prev - 1)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-20"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setCurrentImageIndex((prev) => prev === images.length - 1 ? 0 : prev + 1)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-20"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+              
+              {/* Image Dots Indicator */}
+              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex space-x-2 z-20">
+                {images.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                      index === currentImageIndex 
+                        ? 'bg-white' 
+                        : 'bg-white/50 hover:bg-white/70'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
           
           {/* Dark Gradient Overlay for Text Readability */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
@@ -173,6 +227,33 @@ export function PropertyCard({
 
         {/* Property Details */}
         <div className="p-6">
+          {/* Property Stats - Beds/Baths/SqFt */}
+          {(property.bedrooms || property.bathrooms || property.squareFootage) && (
+            <div className="flex items-center justify-center space-x-6 mb-6 p-4 bg-slate-700/30 rounded-xl border border-slate-600/30">
+              {property.bedrooms && (
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <Bed className="w-5 h-5 text-blue-400" />
+                  <span className="font-semibold">{property.bedrooms}</span>
+                  <span className="text-sm opacity-80">{property.bedrooms === 1 ? 'bed' : 'beds'}</span>
+                </div>
+              )}
+              {property.bathrooms && (
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <Bath className="w-5 h-5 text-teal-400" />
+                  <span className="font-semibold">{property.bathrooms}</span>
+                  <span className="text-sm opacity-80">{property.bathrooms === 1 ? 'bath' : 'baths'}</span>
+                </div>
+              )}
+              {property.squareFootage && (
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <Square className="w-5 h-5 text-purple-400" />
+                  <span className="font-semibold">{property.squareFootage.toLocaleString()}</span>
+                  <span className="text-sm opacity-80">sq ft</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Description */}
           {property.description && (
             <div className="mb-4">

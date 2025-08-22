@@ -4,22 +4,38 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Enable CORS
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3004',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:3002',
+      'http://127.0.0.1:3004',
+      'http://192.168.1.209:3000',
+      'http://192.168.1.209:3001',
+      'http://192.168.1.209:3002',
+      'http://192.168.1.209:3004',
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
 
   // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
-  await app.listen(3001);
-  console.log('🚀 API running on http://localhost:3001');
+  const port = process.env.PORT || 3002;
+  await app.listen(port);
+  console.log(`🚀 API running on http://localhost:${port}`);
 }
 bootstrap();

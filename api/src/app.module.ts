@@ -12,6 +12,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { ShareModule } from './share/share.module'; // Add this import
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { EmailModule } from './email/email.module';
+import { MLSParserModule } from './mls-parser/mls-parser.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { EmailModule } from './email/email.module';
     AnalyticsModule,
     ShareModule,
     EmailModule,
+    MLSParserModule,
   ],
   controllers: [AppController],
   providers: [

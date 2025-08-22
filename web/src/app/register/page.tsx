@@ -12,7 +12,7 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     phone: '',
-    companyName: '',
+    company: '',
     plan: 'FREE'
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -61,7 +61,7 @@ export default function RegisterPage() {
           email: formData.email,
           password: formData.password,
           phone: formData.phone,
-          companyName: formData.companyName,
+          company: formData.company,
           plan: formData.plan
         }),
       });
@@ -88,7 +88,7 @@ export default function RegisterPage() {
         password: '',
         confirmPassword: '',
         phone: '',
-        companyName: '',
+        company: '',
         plan: 'FREE'
       });
 
@@ -253,8 +253,8 @@ export default function RegisterPage() {
                 </label>
                 <input
                   type="text"
-                  name="companyName"
-                  value={formData.companyName}
+                  name="company"
+                  value={formData.company}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                   placeholder="Premier Realty Group"

@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { MLSParserService } from '../mls-parser/mls-parser.service';
+import { BatchManagementService } from '../mls-parser/batch-management.service';
+import { UsersService } from '../users/users.service';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { PropertyFeedbackDto } from './dto/property-feedback.dto';
 
@@ -9,6 +17,9 @@ export class TimelinesService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private mlsParser: MLSParserService,
+    private batchService: BatchManagementService,
+    private usersService: UsersService,
   ) {}
 
   // Keep all existing methods unchanged until sendTimelineEmail
@@ -18,7 +29,7 @@ export class TimelinesService {
       include: {
         client: true,
         agent: {
-          include: { profile: true }
+          include: { profile: true },
         },
         properties: {
           orderBy: { position: 'asc' },
@@ -39,9 +50,9 @@ export class TimelinesService {
     if (clientCode) {
       const expectedClientCode = this.generateClientLoginCode(
         timeline.client.firstName,
-        timeline.client.phone || undefined
+        timeline.client.phone || undefined,
       );
-      
+
       if (clientCode.toLowerCase() !== expectedClientCode.toLowerCase()) {
         throw new UnauthorizedException('Invalid client access code');
       }
@@ -59,14 +70,14 @@ export class TimelinesService {
       lastViewed: timeline.lastViewed?.toISOString(),
       createdAt: timeline.createdAt.toISOString(),
       updatedAt: timeline.updatedAt.toISOString(),
-      
+
       client: {
         id: timeline.client.id,
         firstName: timeline.client.firstName,
         lastName: timeline.client.lastName,
         name: `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
       },
-      
+
       agent: {
         firstName: timeline.agent.profile?.firstName || '',
         lastName: timeline.agent.profile?.lastName || '',
@@ -74,9 +85,9 @@ export class TimelinesService {
         brandColor: timeline.agent.profile?.brandColor || '#0ea5e9',
         logo: timeline.agent.profile?.logo,
       },
-      
-      properties: timeline.properties.map(property => 
-        this.formatPropertyResponse(property, timeline.client.id)
+
+      properties: timeline.properties.map((property) =>
+        this.formatPropertyResponse(property, timeline.client.id),
       ),
     };
   }
@@ -93,23 +104,26 @@ export class TimelinesService {
 
     const expectedClientCode = this.generateClientLoginCode(
       timeline.client.firstName,
-      timeline.client.phone || undefined
+      timeline.client.phone || undefined,
     );
 
-    const isValid = clientCode.toLowerCase() === expectedClientCode.toLowerCase();
+    const isValid =
+      clientCode.toLowerCase() === expectedClientCode.toLowerCase();
 
     return {
       valid: isValid,
-      clientName: isValid ? `${timeline.client.firstName} ${timeline.client.lastName}` : null,
+      clientName: isValid
+        ? `${timeline.client.firstName} ${timeline.client.lastName}`
+        : null,
     };
   }
 
   async getAgentTimeline(agentId: string, clientId: string) {
     const timeline = await this.prisma.timeline.findFirst({
-      where: { 
+      where: {
         agentId,
         clientId,
-        isActive: true 
+        isActive: true,
       },
       include: {
         properties: {
@@ -139,8 +153,8 @@ export class TimelinesService {
     return {
       id: timeline.id,
       clientId: timeline.clientId,
-      properties: timeline.properties.map(property => 
-        this.formatPropertyResponse(property, clientId)
+      properties: timeline.properties.map((property) =>
+        this.formatPropertyResponse(property, clientId),
       ),
       createdAt: timeline.createdAt.toISOString(),
       updatedAt: timeline.updatedAt.toISOString(),
@@ -150,7 +164,17 @@ export class TimelinesService {
   }
 
   // FIXED: Property creation with corrected notification call
-  async addPropertyToTimeline(agentId: string, timelineId: string, propertyData: any) {
+  async addPropertyToTimeline(
+    agentId: string,
+    timelineId: string,
+    propertyData: any,
+  ) {
+    // Check plan limits before adding property
+    const canAdd = await this.usersService.checkCanAddProperties(agentId, 1);
+    if (!canAdd.canAdd) {
+      throw new BadRequestException(canAdd.reason);
+    }
+
     const timeline = await this.prisma.timeline.findFirst({
       where: { id: timelineId, agentId },
     });
@@ -183,9 +207,9 @@ export class TimelinesService {
 
   async updateProperty(agentId: string, propertyId: string, updateData: any) {
     const property = await this.prisma.property.findFirst({
-      where: { 
+      where: {
         id: propertyId,
-        timeline: { agentId }
+        timeline: { agentId },
       },
       include: {
         timeline: true,
@@ -211,14 +235,17 @@ export class TimelinesService {
       },
     });
 
-    return this.formatPropertyResponse(updatedProperty, property.timeline.clientId);
+    return this.formatPropertyResponse(
+      updatedProperty,
+      property.timeline.clientId,
+    );
   }
 
   async deleteProperty(agentId: string, propertyId: string) {
     const property = await this.prisma.property.findFirst({
-      where: { 
+      where: {
         id: propertyId,
-        timeline: { agentId }
+        timeline: { agentId },
       },
       include: { timeline: true },
     });
@@ -231,18 +258,18 @@ export class TimelinesService {
       where: { id: propertyId },
     });
 
-    return { 
+    return {
       message: 'Property deleted successfully',
       propertyId,
-      address: property.address 
+      address: property.address,
     };
   }
 
   async submitPropertyFeedback(
-    shareToken: string, 
-    propertyId: string, 
-    feedbackDto: PropertyFeedbackDto, 
-    clientCode?: string
+    shareToken: string,
+    propertyId: string,
+    feedbackDto: PropertyFeedbackDto,
+    clientCode?: string,
   ) {
     const timeline = await this.prisma.timeline.findUnique({
       where: { shareToken },
@@ -256,18 +283,18 @@ export class TimelinesService {
     if (clientCode) {
       const expectedClientCode = this.generateClientLoginCode(
         timeline.client.firstName,
-        timeline.client.phone || undefined
+        timeline.client.phone || undefined,
       );
-      
+
       if (clientCode.toLowerCase() !== expectedClientCode.toLowerCase()) {
         throw new UnauthorizedException('Invalid client access code');
       }
     }
 
     const property = await this.prisma.property.findFirst({
-      where: { 
+      where: {
         id: propertyId,
-        timelineId: timeline.id 
+        timelineId: timeline.id,
       },
     });
 
@@ -317,93 +344,102 @@ export class TimelinesService {
 
   // FIXED: Send Timeline Email with proper error handling
   async sendTimelineEmail(
-  agentId: string, 
-  timelineId: string, 
-  emailOptions?: { templateStyle?: 'modern' | 'classical' }
-) {
-  const timeline = await this.prisma.timeline.findFirst({
-    where: { 
-      id: timelineId, 
-      agentId 
-    },
-    include: {
-      client: true,
-      agent: {
-        include: { profile: true }
+    agentId: string,
+    timelineId: string,
+    emailOptions?: { templateStyle?: 'modern' | 'classical' },
+  ) {
+    const timeline = await this.prisma.timeline.findFirst({
+      where: {
+        id: timelineId,
+        agentId,
       },
-      properties: true,
-    },
-  });
-
-  if (!timeline) {
-    throw new NotFoundException('Timeline not found');
-  }
-
-  const agentProfile = timeline.agent.profile;
-  const templateStyle: 'modern' | 'classical' = (emailOptions?.templateStyle || 
-                                             agentProfile?.preferredEmailTemplate || 
-                                             'modern') as 'modern' | 'classical';
-
-  const clientLoginCode = this.generateClientLoginCode(
-    timeline.client.firstName,
-    timeline.client.phone || undefined
-  );
-
-  const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
-
-  try {
-    // Call EmailService which handles Resend + Nodemailer fallback automatically
-    const emailResult = await this.emailService.sendTimelineEmail({
-      clientEmail: timeline.client.email,
-      clientName: `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
-      agentName: `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() || 'Your Agent',
-      agentCompany: agentProfile?.company || 'Real Estate Professional',
-      timelineUrl: shareUrl,
-      propertyCount: timeline.properties.length,
-      spouseEmail: timeline.client.spouseEmail || undefined,
-      agentPhoto: agentProfile?.logo || undefined,
-      brandColor: agentProfile?.brandColor || '#3b82f6',
-      templateStyle: templateStyle,
+      include: {
+        client: true,
+        agent: {
+          include: { profile: true },
+        },
+        properties: true,
+      },
     });
 
-    // Check final result (after Resend attempt + potential Nodemailer fallback)
-    if (!emailResult.success) {
-      throw new Error(`Failed to send timeline email: ${emailResult.error || 'Unknown error'}`);
+    if (!timeline) {
+      throw new NotFoundException('Timeline not found');
     }
 
-    // Track successful email send
-    await this.trackAnalyticsEvent(timeline.clientId, 'timeline_email_sent', {
-      timelineId,
-      propertyCount: timeline.properties.length,
-      hasSpouseEmail: !!timeline.client.spouseEmail,
-      provider: emailResult.provider, // 'resend' or 'nodemailer'
-      templateStyle,
-    });
+    const agentProfile = timeline.agent.profile;
+    const templateStyle: 'modern' | 'classical' =
+      (emailOptions?.templateStyle ||
+        agentProfile?.emailTemplateStyle ||
+        'modern') as 'modern' | 'classical';
 
-    return {
-      message: 'Timeline email sent successfully',
-      sentTo: timeline.client.email,
-      spouseSentTo: timeline.client.spouseEmail,
-      propertyCount: timeline.properties.length,
-      shareUrl,
-      provider: emailResult.provider,
-      messageId: emailResult.messageId,
-    };
+    const clientLoginCode = this.generateClientLoginCode(
+      timeline.client.firstName,
+      timeline.client.phone || undefined,
+    );
 
-} catch (error) {
-  console.error('Timeline email send failed:', {
-    timelineId,
-    clientEmail: timeline.client.email,
-    error: error.message,
-  });
-  
-  // Re-throw with more context
-  throw new Error(`Timeline email delivery failed: ${error.message}`);
-}
-}
+    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
+
+    try {
+      // Call EmailService which handles Resend + Nodemailer fallback automatically
+      const emailResult = await this.emailService.sendTimelineEmail({
+        clientEmail: timeline.client.email,
+        clientName:
+          `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+        agentName:
+          `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() ||
+          'Your Agent',
+        agentCompany: agentProfile?.company || 'Real Estate Professional',
+        timelineUrl: shareUrl,
+        propertyCount: timeline.properties.length,
+        spouseEmail: timeline.client.spouseEmail || undefined,
+        agentPhoto: agentProfile?.logo || undefined,
+        brandColor: agentProfile?.brandColor || '#3b82f6',
+        templateStyle: templateStyle,
+      });
+
+      // Check final result (after Resend attempt + potential Nodemailer fallback)
+      if (!emailResult.success) {
+        throw new Error(
+          `Failed to send timeline email: ${emailResult.error || 'Unknown error'}`,
+        );
+      }
+
+      // Track successful email send
+      await this.trackAnalyticsEvent(timeline.clientId, 'timeline_email_sent', {
+        timelineId,
+        propertyCount: timeline.properties.length,
+        hasSpouseEmail: !!timeline.client.spouseEmail,
+        provider: emailResult.provider, // 'resend' or 'nodemailer'
+        templateStyle,
+      });
+
+      return {
+        message: 'Timeline email sent successfully',
+        sentTo: timeline.client.email,
+        spouseSentTo: timeline.client.spouseEmail,
+        propertyCount: timeline.properties.length,
+        shareUrl,
+        provider: emailResult.provider,
+        messageId: emailResult.messageId,
+      };
+    } catch (error) {
+      console.error('Timeline email send failed:', {
+        timelineId,
+        clientEmail: timeline.client.email,
+        error: error.message,
+      });
+
+      // Re-throw with more context
+      throw new Error(`Timeline email delivery failed: ${error.message}`);
+    }
+  }
 
   // FIXED: Property notification with correct method signature
-  async sendPropertyNotification(agentId: string, timelineId: string, propertyId: string) {
+  async sendPropertyNotification(
+    agentId: string,
+    timelineId: string,
+    propertyId: string,
+  ) {
     const timeline = await this.prisma.timeline.findFirst({
       where: { id: timelineId, agentId },
       include: {
@@ -421,17 +457,21 @@ export class TimelinesService {
     const agentProfile = timeline.agent.profile;
     const clientLoginCode = this.generateClientLoginCode(
       timeline.client.firstName,
-      timeline.client.phone || undefined
+      timeline.client.phone || undefined,
     );
     const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
 
     const emailResult = await this.emailService.sendPropertyNotification({
       clientEmail: timeline.client.email,
-      clientName: `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
-      agentName: `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() || 'Your Agent',
+      clientName:
+        `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+      agentName:
+        `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() ||
+        'Your Agent',
       propertyAddress: property.address,
       propertyPrice: property.price,
-      propertyDescription: property.description || 'New property added to your timeline',
+      propertyDescription:
+        property.description || 'New property added to your timeline',
       propertyImageUrl: property.imageUrls[0] || '/api/placeholder/400/300',
       timelineUrl: shareUrl,
       spouseEmail: timeline.client.spouseEmail || undefined,
@@ -453,9 +493,9 @@ export class TimelinesService {
 
   async revokeTimelineAccess(agentId: string, timelineId: string) {
     const timeline = await this.prisma.timeline.findFirst({
-      where: { 
-        id: timelineId, 
-        agentId 
+      where: {
+        id: timelineId,
+        agentId,
       },
     });
 
@@ -476,40 +516,414 @@ export class TimelinesService {
     };
   }
 
-  async checkMLSDuplicate(agentId: string, clientId: string, mlsLink: string): Promise<boolean> {
-  if (!mlsLink) return false;
+  // Enhanced MLS duplicate checking (replaces your current method)
+  async checkMLSDuplicate(
+    agentId: string,
+    clientId: string,
+    mlsLink: string,
+  ): Promise<boolean> {
+    if (!mlsLink) return false;
 
-  const existingProperty = await this.prisma.property.findFirst({
-    where: {
-      listingUrl: mlsLink.trim(),
-      timeline: {
+    // Check by exact URL match
+    const existingByUrl = await this.prisma.property.findFirst({
+      where: {
+        OR: [
+          { listingUrl: mlsLink.trim() },
+          { originalMlsUrl: mlsLink.trim() },
+        ],
+        timeline: {
+          agentId,
+          clientId,
+          isActive: true,
+        },
+      },
+    });
+
+    if (existingByUrl) return true;
+
+    // Enhanced check: try to parse the URL and check by normalized address
+    try {
+      if (mlsLink.includes('flexmls.com')) {
+        const parseResult = await this.mlsParser.parseSingleMLS(mlsLink);
+
+        if (parseResult.success) {
+          if (parseResult.data) {
+            const duplicateCheck = await this.mlsParser.checkEnhancedDuplicate(
+              agentId,
+              clientId,
+              parseResult.data,
+            );
+            return duplicateCheck.isDuplicate;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        'Enhanced duplicate check failed, falling back to URL check:',
+        error,
+      );
+    }
+
+    return false;
+  }
+
+  // Create batch and start parsing MLS URLs
+  // NEW: Create instant batch - properties appear immediately, parse in background
+  async createInstantBatch(
+    agentId: string,
+    clientId: string,
+    timelineId: string,
+    mlsUrls: string[],
+  ) {
+    try {
+      let timeline;
+
+      // If no timeline ID provided or empty, find or create one
+      if (!timelineId || timelineId.trim() === '') {
+        timeline = await this.prisma.timeline.findFirst({
+          where: {
+            agentId,
+            clientId,
+            isActive: true,
+          },
+          include: {
+            client: true,
+            agent: { include: { profile: true } },
+          },
+        });
+
+        // Create timeline if none exists
+        if (!timeline) {
+          const client = await this.prisma.client.findFirst({
+            where: { id: clientId, agentId },
+          });
+
+          if (!client) {
+            throw new NotFoundException('Client not found or access denied');
+          }
+
+          timeline = await this.prisma.timeline.create({
+            data: {
+              agentId,
+              clientId,
+              title: `Properties for ${client.firstName} ${client.lastName}`,
+              description: 'Property timeline created automatically',
+              isActive: true,
+              shareToken: this.generateNewShareToken(),
+            },
+            include: {
+              client: true,
+              agent: { include: { profile: true } },
+            },
+          });
+        }
+      } else {
+        // Validate provided timeline belongs to agent
+        timeline = await this.prisma.timeline.findFirst({
+          where: {
+            id: timelineId,
+            client: { agentId },
+          },
+          include: {
+            client: true,
+            agent: { include: { profile: true } },
+          },
+        });
+
+        if (!timeline) {
+          throw new NotFoundException('Timeline not found or access denied');
+        }
+      }
+
+      // Create batch
+      const batch = await this.batchService.createPropertyBatch(
         agentId,
         clientId,
-        isActive: true,
-      },
-    },
-  });
+        timeline.id,
+      );
 
-  return !!existingProperty;
-}
+      // Add URLs to batch
+      await this.batchService.addMLSUrlsToBatch(batch.id, mlsUrls);
+
+      // Create properties instantly and start background parsing
+      const result = await this.batchService.createInstantBatch(batch.id);
+
+      return {
+        success: true,
+        message: 'Properties created instantly, parsing in background',
+        batchId: batch.id,
+        properties: result.properties,
+        instantCreationCompleted: true,
+        backgroundParsingStarted: true,
+      };
+    } catch (error) {
+      console.error('Instant batch creation error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to create instant batch',
+      };
+    }
+  }
+
+  async createAndParseBatch(
+    agentId: string,
+    clientId: string,
+    timelineId: string,
+    mlsUrls: string[],
+  ) {
+    try {
+      // Validate timeline belongs to agent
+      const timeline = await this.prisma.timeline.findFirst({
+        where: {
+          id: timelineId,
+          agentId,
+          clientId,
+          isActive: true,
+        },
+      });
+
+      if (!timeline) {
+        throw new Error('Timeline not found or access denied');
+      }
+
+      // Create batch
+      const batch = await this.batchService.createPropertyBatch(
+        agentId,
+        clientId,
+        timelineId,
+      );
+
+      // Add URLs to batch
+      await this.batchService.addMLSUrlsToBatch(batch.id, mlsUrls);
+
+      // Start parsing in background
+      this.batchService.parseBatchProperties(batch.id).catch((error) => {
+        console.error(
+          `Background parsing failed for batch ${batch.id}:`,
+          error,
+        );
+      });
+
+      return {
+        batchId: batch.id,
+        message: 'Batch created and parsing started',
+        totalUrls: mlsUrls.length,
+      };
+    } catch (error) {
+      throw new Error(`Failed to create batch: ${error.message}`);
+    }
+  }
+
+  // Get batch status with parsed properties
+  async getBatchStatus(agentId: string, batchId: string) {
+    const batch = await this.prisma.propertyBatch.findFirst({
+      where: {
+        id: batchId,
+        agentId,
+      },
+      include: {
+        batchProperties: {
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+
+    if (!batch) {
+      throw new Error('Batch not found');
+    }
+
+    // Transform batch properties for frontend
+    const properties = batch.batchProperties.map((bp) => ({
+      id: bp.id,
+      mlsUrl: bp.mlsUrl,
+      parseStatus: bp.parseStatus,
+      parseError: bp.parseError,
+      position: bp.position,
+      parsedData: bp.parsedData
+        ? {
+            address: (bp.parsedData as any).address?.full,
+            price: (bp.parsedData as any).pricing?.listPrice,
+            priceNumeric: (bp.parsedData as any).pricing?.priceNumeric,
+            beds: (bp.parsedData as any).propertyDetails?.beds,
+            baths: (bp.parsedData as any).propertyDetails?.baths,
+            sqft: (bp.parsedData as any).propertyDetails?.sqft,
+            imageCount: (bp.parsedData as any).images?.length || 0,
+            images: (bp.parsedData as any).images
+              ?.slice(0, 3)
+              .map((img: any) => img.url), // First 3 images for preview
+          }
+        : null,
+    }));
+
+    return {
+      id: batch.id,
+      status: batch.status,
+      totalProperties: batch.totalProperties,
+      successCount: batch.successCount,
+      failureCount: batch.failureCount,
+      startedAt: batch.startedAt?.toISOString(),
+      completedAt: batch.completedAt?.toISOString(),
+      properties,
+    };
+  }
+
+  // Import selected properties from batch
+  async importBatchProperties(
+    agentId: string,
+    batchId: string,
+    propertySelections: {
+      batchPropertyId: string;
+      customDescription?: string;
+      agentNotes?: string;
+    }[],
+  ) {
+    try {
+      // Validate batch belongs to agent
+      const batch = await this.prisma.propertyBatch.findFirst({
+        where: { id: batchId, agentId },
+      });
+
+      if (!batch) {
+        throw new Error('Batch not found or access denied');
+      }
+
+      // Import properties
+      const importResults = await this.batchService.importParsedProperties(
+        batchId,
+        propertySelections,
+      );
+
+      // Send email notifications for successfully imported properties
+      const successfulImports = importResults.importResults.filter(
+        (r) => r.success,
+      );
+
+      if (successfulImports.length > 0) {
+        try {
+          // Get timeline for email sending
+          const timeline = await this.prisma.timeline.findUnique({
+            where: { id: batch.timelineId },
+            include: {
+              client: true,
+              agent: { include: { profile: true } },
+            },
+          });
+
+          if (timeline) {
+            // Send batch notification email
+            await this.sendBatchImportNotification(timeline, successfulImports);
+          }
+        } catch (emailError) {
+          console.warn('Failed to send import notification email:', emailError);
+          // Don't fail the import if email fails
+        }
+      }
+
+      return {
+        message: `Successfully imported ${successfulImports.length} properties`,
+        ...importResults,
+      };
+    } catch (error) {
+      throw new Error(`Failed to import properties: ${error.message}`);
+    }
+  }
+
+  // Send notification email for batch import
+  private async sendBatchImportNotification(
+    timeline: any,
+    importedProperties: any[],
+  ) {
+    const agentProfile = timeline.agent.profile;
+    const clientLoginCode = this.generateClientLoginCode(
+      timeline.client.firstName,
+      timeline.client.phone || undefined,
+    );
+
+    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/timeline/${timeline.shareToken}?client=${clientLoginCode}`;
+
+    const emailResult = await this.emailService.sendBatchImportNotification({
+      clientEmail: timeline.client.email,
+      clientName:
+        `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+      agentName:
+        `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() ||
+        'Your Agent',
+      propertyCount: importedProperties.length,
+      timelineUrl: shareUrl,
+      spouseEmail: timeline.client.spouseEmail || undefined,
+      propertyAddresses: importedProperties.map((p) => p.address).slice(0, 5), // First 5 addresses
+    });
+
+    return emailResult;
+  }
+
+  // Delete batch (cleanup)
+  async deleteBatch(agentId: string, batchId: string) {
+    const batch = await this.prisma.propertyBatch.findFirst({
+      where: { id: batchId, agentId },
+    });
+
+    if (!batch) {
+      throw new Error('Batch not found');
+    }
+
+    await this.prisma.propertyBatch.delete({
+      where: { id: batchId },
+    });
+
+    return { message: 'Batch deleted successfully' };
+  }
+
+  // Get agent's recent batches
+  async getAgentBatches(agentId: string) {
+    const batches = await this.prisma.propertyBatch.findMany({
+      where: { agentId },
+      include: {
+        client: {
+          select: { firstName: true, lastName: true },
+        },
+        _count: {
+          select: { batchProperties: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return batches.map((batch) => ({
+      id: batch.id,
+      status: batch.status,
+      clientName: `${batch.client.firstName} ${batch.client.lastName}`,
+      totalProperties: batch.totalProperties,
+      successCount: batch.successCount,
+      failureCount: batch.failureCount,
+      createdAt: batch.createdAt.toISOString(),
+      completedAt: batch.completedAt?.toISOString(),
+    }));
+  }
 
   // PRIVATE HELPER METHODS
-  private formatPropertyResponse(property: any, clientId: string): PropertyResponseDto {
+  private formatPropertyResponse(
+    property: any,
+    clientId: string,
+  ): PropertyResponseDto {
     const addressParts = [
       property.address,
       property.city,
       property.state,
-      property.zipCode
+      property.zipCode,
     ].filter(Boolean);
     const combinedAddress = addressParts.join(', ');
 
-    const primaryImage = Array.isArray(property.imageUrls) && property.imageUrls.length > 0
-      ? property.imageUrls[0]
-      : property.imageUrl || '/api/placeholder/400/300';
+    const primaryImage =
+      Array.isArray(property.imageUrls) && property.imageUrls.length > 0
+        ? property.imageUrls[0]
+        : property.imageUrl || '/api/placeholder/400/300';
 
-    const latestFeedback = property.feedback && property.feedback.length > 0 
-      ? property.feedback[0] 
-      : null;
+    const latestFeedback =
+      property.feedback && property.feedback.length > 0
+        ? property.feedback[0]
+        : null;
 
     return {
       id: property.id,
@@ -537,13 +951,17 @@ export class TimelinesService {
       isViewed: property.isViewed,
       viewedAt: property.viewedAt?.toISOString(),
       createdAt: property.createdAt.toISOString(),
+      loadingProgress: property.loadingProgress || 100,
+      isFullyParsed: property.isFullyParsed !== false,
       updatedAt: property.updatedAt.toISOString(),
-      feedback: latestFeedback ? {
-        id: latestFeedback.id,
-        feedback: latestFeedback.feedback,
-        notes: latestFeedback.notes || undefined,
-        createdAt: latestFeedback.createdAt.toISOString(),
-      } : undefined,
+      feedback: latestFeedback
+        ? {
+            id: latestFeedback.id,
+            feedback: latestFeedback.feedback,
+            notes: latestFeedback.notes || undefined,
+            createdAt: latestFeedback.createdAt.toISOString(),
+          }
+        : undefined,
     };
   }
 
@@ -559,7 +977,7 @@ export class TimelinesService {
 
   private generateClientLoginCode(firstName: string, phone?: string): string {
     const cleanFirstName = firstName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-    
+
     if (!phone) {
       const randomDigits = Math.floor(1000 + Math.random() * 9000);
       return `${cleanFirstName}${randomDigits}`;
@@ -567,7 +985,7 @@ export class TimelinesService {
 
     const digits = phone.replace(/[^\d]/g, '');
     const lastFourDigits = digits.slice(-4) || '0000';
-    
+
     return `${cleanFirstName}${lastFourDigits}`;
   }
 
@@ -583,13 +1001,18 @@ export class TimelinesService {
       data: {
         lastActivity: new Date(),
         feedbackRate: {
-          increment: engagementPoints[feedback as keyof typeof engagementPoints] || 0,
+          increment:
+            engagementPoints[feedback as keyof typeof engagementPoints] || 0,
         },
       },
     });
   }
 
-  private async trackAnalyticsEvent(clientId: string, eventType: string, metadata: any) {
+  private async trackAnalyticsEvent(
+    clientId: string,
+    eventType: string,
+    metadata: any,
+  ) {
     await this.prisma.trackEvent.create({
       data: {
         clientId,

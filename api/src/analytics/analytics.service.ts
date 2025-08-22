@@ -8,7 +8,11 @@ export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
 
   // Track client events (called from client timeline)
-  async trackEvent(shareToken: string, trackEventDto: TrackEventDto, request?: any) {
+  async trackEvent(
+    shareToken: string,
+    trackEventDto: TrackEventDto,
+    request?: any,
+  ) {
     // Verify timeline exists
     const timeline = await this.prisma.timeline.findUnique({
       where: { shareToken },
@@ -49,7 +53,10 @@ export class AnalyticsService {
     }
 
     // Update property view count if it's a property view
-    if (trackEventDto.eventType === 'property_view' && trackEventDto.propertyId) {
+    if (
+      trackEventDto.eventType === 'property_view' &&
+      trackEventDto.propertyId
+    ) {
       await this.prisma.property.update({
         where: { id: trackEventDto.propertyId },
         data: {
@@ -63,7 +70,10 @@ export class AnalyticsService {
   }
 
   // Get recent activity for agent dashboard (REST polling)
-  async getAgentRecentActivity(agentId: string, since?: Date): Promise<AnalyticsResponseDto[]> {
+  async getAgentRecentActivity(
+    agentId: string,
+    since?: Date,
+  ): Promise<AnalyticsResponseDto[]> {
     const sinceDate = since || new Date(Date.now() - 300000); // Last 5 minutes by default
 
     const recentActivity = await this.prisma.clientAnalytics.findMany({
@@ -92,7 +102,11 @@ export class AnalyticsService {
   }
 
   // Get specific client activity
-  async getClientActivity(agentId: string, clientId: string, limit = 20): Promise<AnalyticsResponseDto[]> {
+  async getClientActivity(
+    agentId: string,
+    clientId: string,
+    limit = 20,
+  ): Promise<AnalyticsResponseDto[]> {
     const timeline = await this.prisma.timeline.findFirst({
       where: {
         clientId,
@@ -173,15 +187,26 @@ export class AnalyticsService {
 
     return {
       totalClients: timelines.length,
-      totalProperties: timelines.reduce((sum, t) => sum + t._count.properties, 0),
+      totalProperties: timelines.reduce(
+        (sum, t) => sum + t._count.properties,
+        0,
+      ),
       totalViews: timelines.reduce((sum, t) => sum + t.totalViews, 0),
       recentActivity,
       feedbackStats: {
-        love: feedbackStats.find(f => f.feedback === 'love')?._count.feedback || 0,
-like: feedbackStats.find(f => f.feedback === 'like')?._count.feedback || 0,
-dislike: feedbackStats.find(f => f.feedback === 'dislike')?._count.feedback || 0,
+        love:
+          feedbackStats.find((f) => f.feedback === 'love')?._count.feedback ||
+          0,
+        like:
+          feedbackStats.find((f) => f.feedback === 'like')?._count.feedback ||
+          0,
+        dislike:
+          feedbackStats.find((f) => f.feedback === 'dislike')?._count
+            .feedback || 0,
       },
-      activeTimelines: timelines.filter(t => t.lastViewed && t.lastViewed > last24Hours).length,
+      activeTimelines: timelines.filter(
+        (t) => t.lastViewed && t.lastViewed > last24Hours,
+      ).length,
     };
   }
 
@@ -217,9 +242,9 @@ dislike: feedbackStats.find(f => f.feedback === 'dislike')?._count.feedback || 0
       eventType: analytics.eventType,
       propertyId: analytics.propertyId,
       timestamp: analytics.timestamp,
-      clientName: analytics.timeline?.client ? 
-        `${analytics.timeline.client.firstName} ${analytics.timeline.client.lastName}` : 
-        'Unknown Client',
+      clientName: analytics.timeline?.client
+        ? `${analytics.timeline.client.firstName} ${analytics.timeline.client.lastName}`
+        : 'Unknown Client',
       metadata: analytics.metadata,
     };
   };

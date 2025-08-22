@@ -43,7 +43,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }, [isOpen, profile, loadProfile]);
 
   useEffect(() => {
-  if (isOpen && profile && !formData.firstName) { // Only if form is empty
+  if (isOpen && profile) {
     setFormData({
       firstName: profile.firstName,
       lastName: profile.lastName,

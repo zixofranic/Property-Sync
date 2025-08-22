@@ -1,15 +1,15 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Delete, 
-  Body, 
-  Param, 
-  Query, 
-  UseGuards, 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
   Request,
-  NotFoundException 
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
@@ -21,14 +21,14 @@ export class TimelinesController {
   constructor(private readonly timelinesService: TimelinesService) {}
 
   // CRITICAL FIX: Move all specific routes BEFORE parameterized routes
-  
+
   // Check MLS duplicate - MOVED TO TOP
   @UseGuards(JwtAuthGuard)
   @Get('check-duplicate')
   async checkMLSDuplicate(
     @Request() req,
     @Query('clientId') clientId: string,
-    @Query('mlsLink') mlsLink: string
+    @Query('mlsLink') mlsLink: string,
   ) {
     if (!clientId || !mlsLink) {
       return {
@@ -38,7 +38,11 @@ export class TimelinesController {
 
     try {
       const agentId = req.user.id;
-      const isDuplicate = await this.timelinesService.checkMLSDuplicate(agentId, clientId, mlsLink);
+      const isDuplicate = await this.timelinesService.checkMLSDuplicate(
+        agentId,
+        clientId,
+        mlsLink,
+      );
       return { isDuplicate };
     } catch (error) {
       console.error('MLS duplicate check error:', error);
@@ -48,13 +52,98 @@ export class TimelinesController {
     }
   }
 
+  // Create batch and parse MLS URLs
+  @UseGuards(JwtAuthGuard)
+  // NEW: Instant batch creation - properties appear immediately
+  @Post('batch/create-instant')
+  async createInstantBatch(
+    @Request() req,
+    @Body()
+    batchData: {
+      clientId: string;
+      timelineId: string;
+      mlsUrls: string[];
+    },
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.createInstantBatch(
+      agentId,
+      batchData.clientId,
+      batchData.timelineId,
+      batchData.mlsUrls,
+    );
+  }
+
+  @Post('batch/create-and-parse')
+  async createAndParseBatch(
+    @Request() req,
+    @Body()
+    batchData: {
+      clientId: string;
+      timelineId: string;
+      mlsUrls: string[];
+    },
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.createAndParseBatch(
+      agentId,
+      batchData.clientId,
+      batchData.timelineId,
+      batchData.mlsUrls,
+    );
+  }
+
+  // Get batch status
+  @UseGuards(JwtAuthGuard)
+  @Get('batch/:batchId/status')
+  async getBatchStatus(@Request() req, @Param('batchId') batchId: string) {
+    const agentId = req.user.id;
+    return this.timelinesService.getBatchStatus(agentId, batchId);
+  }
+
+  // Import selected properties from batch
+  @UseGuards(JwtAuthGuard)
+  @Post('batch/:batchId/import')
+  async importBatchProperties(
+    @Request() req,
+    @Param('batchId') batchId: string,
+    @Body()
+    importData: {
+      properties: {
+        batchPropertyId: string;
+        customDescription?: string;
+        agentNotes?: string;
+      }[];
+    },
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.importBatchProperties(
+      agentId,
+      batchId,
+      importData.properties,
+    );
+  }
+
+  // Delete batch
+  @UseGuards(JwtAuthGuard)
+  @Delete('batch/:batchId')
+  async deleteBatch(@Request() req, @Param('batchId') batchId: string) {
+    const agentId = req.user.id;
+    return this.timelinesService.deleteBatch(agentId, batchId);
+  }
+
+  // Get agent's batches
+  @UseGuards(JwtAuthGuard)
+  @Get('batches')
+  async getAgentBatches(@Request() req) {
+    const agentId = req.user.id;
+    return this.timelinesService.getAgentBatches(agentId);
+  }
+
   // Get agent timeline for specific client - MOVED UP
   @UseGuards(JwtAuthGuard)
   @Get('agent/:clientId')
-  async getAgentTimeline(
-    @Request() req,
-    @Param('clientId') clientId: string
-  ) {
+  async getAgentTimeline(@Request() req, @Param('clientId') clientId: string) {
     const agentId = req.user.id;
     return this.timelinesService.getAgentTimeline(agentId, clientId);
   }
@@ -66,9 +155,12 @@ export class TimelinesController {
   @Get(':shareToken')
   async getTimelineByShareToken(
     @Param('shareToken') shareToken: string,
-    @Query('client') clientCode?: string
+    @Query('client') clientCode?: string,
   ) {
-    return this.timelinesService.getTimelineByShareToken(shareToken, clientCode);
+    return this.timelinesService.getTimelineByShareToken(
+      shareToken,
+      clientCode,
+    );
   }
 
   // Validate client access
@@ -76,7 +168,7 @@ export class TimelinesController {
   @Get(':shareToken/validate-client')
   async validateClientAccess(
     @Param('shareToken') shareToken: string,
-    @Query('client') clientCode: string
+    @Query('client') clientCode: string,
   ) {
     return this.timelinesService.validateClientAccess(shareToken, clientCode);
   }
@@ -88,9 +180,14 @@ export class TimelinesController {
     @Param('shareToken') shareToken: string,
     @Param('propertyId') propertyId: string,
     @Body() feedbackDto: PropertyFeedbackDto,
-    @Query('client') clientCode?: string
+    @Query('client') clientCode?: string,
   ) {
-    return this.timelinesService.submitPropertyFeedback(shareToken, propertyId, feedbackDto, clientCode);
+    return this.timelinesService.submitPropertyFeedback(
+      shareToken,
+      propertyId,
+      feedbackDto,
+      clientCode,
+    );
   }
 
   // Add property to timeline
@@ -99,10 +196,14 @@ export class TimelinesController {
   async addProperty(
     @Request() req,
     @Param('timelineId') timelineId: string,
-    @Body() propertyData: any
+    @Body() propertyData: any,
   ) {
     const agentId = req.user.id;
-    return this.timelinesService.addPropertyToTimeline(agentId, timelineId, propertyData);
+    return this.timelinesService.addPropertyToTimeline(
+      agentId,
+      timelineId,
+      propertyData,
+    );
   }
 
   // Update property
@@ -111,10 +212,14 @@ export class TimelinesController {
   async updateProperty(
     @Request() req,
     @Param('propertyId') propertyId: string,
-    @Body() updateData: any
+    @Body() updateData: any,
   ) {
     const agentId = req.user.id;
-    return this.timelinesService.updateProperty(agentId, propertyId, updateData);
+    return this.timelinesService.updateProperty(
+      agentId,
+      propertyId,
+      updateData,
+    );
   }
 
   // Delete property
@@ -122,7 +227,7 @@ export class TimelinesController {
   @Delete('properties/:propertyId')
   async deleteProperty(
     @Request() req,
-    @Param('propertyId') propertyId: string
+    @Param('propertyId') propertyId: string,
   ) {
     const agentId = req.user.id;
     return this.timelinesService.deleteProperty(agentId, propertyId);
@@ -134,10 +239,14 @@ export class TimelinesController {
   async sendTimelineEmail(
     @Request() req,
     @Param('timelineId') timelineId: string,
-    @Body() emailOptions?: { templateStyle?: 'modern' | 'classical' }
+    @Body() emailOptions?: { templateStyle?: 'modern' | 'classical' },
   ) {
     const agentId = req.user.id;
-    return this.timelinesService.sendTimelineEmail(agentId, timelineId, emailOptions);
+    return this.timelinesService.sendTimelineEmail(
+      agentId,
+      timelineId,
+      emailOptions,
+    );
   }
 
   // Send property notification
@@ -146,10 +255,14 @@ export class TimelinesController {
   async sendPropertyNotification(
     @Request() req,
     @Param('timelineId') timelineId: string,
-    @Body() notificationData: { propertyId: string }
+    @Body() notificationData: { propertyId: string },
   ) {
     const agentId = req.user.id;
-    return this.timelinesService.sendPropertyNotification(agentId, timelineId, notificationData.propertyId);
+    return this.timelinesService.sendPropertyNotification(
+      agentId,
+      timelineId,
+      notificationData.propertyId,
+    );
   }
 
   // Revoke timeline access
@@ -157,7 +270,7 @@ export class TimelinesController {
   @Post(':timelineId/revoke-access')
   async revokeTimelineAccess(
     @Request() req,
-    @Param('timelineId') timelineId: string
+    @Param('timelineId') timelineId: string,
   ) {
     const agentId = req.user.id;
     return this.timelinesService.revokeTimelineAccess(agentId, timelineId);

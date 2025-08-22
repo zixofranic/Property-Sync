@@ -26,7 +26,7 @@ import {
   Share2
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
-import { SimplifiedAddPropertyModal } from './modals/SimplifiedAddPropertyModal';
+import { BatchPropertyModal } from '../modals/BatchPropertyModal';
 import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
 import { Notifications } from '../ui/Notifications';
@@ -35,6 +35,7 @@ import { apiClient } from '@/lib/api-client';
 import { ProfileModal } from '@/components/profile/ProfileModal';
 import { SettingsModal } from '@/components/modals/settings/SettingsModal';
 import { ShareTimelineModal } from '@/components/modals/email/ShareTimelineModal';
+import { AnalyticsModal } from '@/components/modals/AnalyticsModal';
 
 
 export function MissionControl() {
@@ -48,6 +49,10 @@ export function MissionControl() {
     updatePropertyFeedback,
     setEditingProperty,
     addNotification,
+    notifications,
+    removeNotification,
+    markNotificationAsRead,
+    clearAllNotifications,
     deleteProperty,
     getPropertyById,
     bulkMode,
@@ -83,6 +88,8 @@ export function MissionControl() {
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -107,6 +114,19 @@ export function MissionControl() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []); // âœ… FIXED: Empty dependency array, no auth dependencies
+
+  // Close notifications dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showNotificationsDropdown && !target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotificationsDropdown]);
 
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
@@ -515,8 +535,88 @@ const testProfileAPI = async () => {
               {/* Basic Connection Status Indicator */}
               <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`} />
               
-              <Bell className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
-              <Search className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+              <div className="relative" data-notifications-dropdown>
+                <button
+                  onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                  className="relative p-1"
+                >
+                  <Bell className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
+                      {notifications.filter(n => !n.read).length}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Notifications Dropdown */}
+                {showNotificationsDropdown && (
+                  <div 
+                    data-notifications-dropdown
+                    className="absolute right-0 top-8 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50"
+                  >
+                    <div className="p-3 border-b border-slate-700 flex items-center justify-between">
+                      <h3 className="text-white font-semibold">Notifications</h3>
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={() => {
+                            clearAllNotifications();
+                            setShowNotificationsDropdown(false);
+                          }}
+                          className="text-xs text-slate-400 hover:text-white transition-colors"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400">
+                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No notifications</p>
+                        </div>
+                      ) : (
+                        notifications.slice(0, 10).map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`p-3 border-b border-slate-700 last:border-b-0 hover:bg-slate-700/30 transition-colors ${
+                              !notification.read ? 'bg-blue-500/5 border-l-4 border-l-blue-500' : ''
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-white text-sm font-medium">{notification.title}</p>
+                                <p className="text-slate-300 text-xs mt-1">{notification.message}</p>
+                                <p className="text-slate-500 text-xs mt-1">
+                                  {new Date(notification.timestamp).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-1 ml-2">
+                                {!notification.read && (
+                                  <button
+                                    onClick={() => markNotificationAsRead(notification.id)}
+                                    className="w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors"
+                                    title="Mark as read"
+                                  >
+                                    <span className="text-xs text-white">✓</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => removeNotification(notification.id)}
+                                  className="w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-colors"
+                                  title="Remove"
+                                >
+                                  <span className="text-xs text-white">×</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* <Search className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" /> */}
             </div>
           </div>
         </div>
@@ -552,7 +652,8 @@ const testProfileAPI = async () => {
       propertyCount: properties.length,
     }}
     agentName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
-    onSendEmail={() => sendTimelineEmail(currentTimeline?.id || '')}
+    onSendEmail={(templateOverride) => sendTimelineEmail(currentTimeline?.id || '', templateOverride)}
+    initialTemplate={userPreferences?.emailTemplateStyle || 'modern'}
   />
 )}
 
@@ -778,7 +879,7 @@ const testProfileAPI = async () => {
       { 
         icon: BarChart3, 
         label: 'Analytics', 
-        action: () => setActiveModal('analytics'), 
+        action: () => setShowAnalyticsModal(true), 
         color: 'from-purple-500 to-violet-600',
         disabled: false 
       },
@@ -824,11 +925,10 @@ const testProfileAPI = async () => {
 </div>
 
       {/* Modals */}
-      <SimplifiedAddPropertyModal 
+      <BatchPropertyModal 
         isOpen={activeModal === 'add-property'} 
         onClose={() => {
           setActiveModal(null);
-          setEditingProperty(null);
         }} 
       />
 
@@ -868,6 +968,14 @@ const testProfileAPI = async () => {
     onSavePreferences={updateUserPreferences}
   />
 )}
+
+      {/* Analytics Modal */}
+      {showAnalyticsModal && (
+        <AnalyticsModal
+          isOpen={showAnalyticsModal}
+          onClose={() => setShowAnalyticsModal(false)}
+        />
+      )}
 
       <MLSViewModal
         isOpen={mlsModal.isOpen}

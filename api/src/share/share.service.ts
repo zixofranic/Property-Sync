@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ClientLoginDto } from './dto/client-login.dto';
@@ -12,7 +17,11 @@ export class ShareService {
   ) {}
 
   // Client authentication with firstName + last 4 phone digits
-  async authenticateClient(shareToken: string, clientLoginDto: ClientLoginDto, request?: any): Promise<ClientSessionDto> {
+  async authenticateClient(
+    shareToken: string,
+    clientLoginDto: ClientLoginDto,
+    request?: any,
+  ): Promise<ClientSessionDto> {
     // Find timeline by share token
     const timeline = await this.prisma.timeline.findUnique({
       where: { shareToken },
@@ -32,18 +41,28 @@ export class ShareService {
 
     // Validate client credentials
     const client = timeline.client;
-    const isValidName = this.validateClientName(clientLoginDto.clientName, client.firstName);
-    const isValidPhone = this.validatePhoneLastFour(clientLoginDto.phoneLastFour, client.phone || undefined);
+    const isValidName = this.validateClientName(
+      clientLoginDto.clientName,
+      client.firstName,
+    );
+    const isValidPhone = this.validatePhoneLastFour(
+      clientLoginDto.phoneLastFour,
+      client.phone || undefined,
+    );
 
     if (!isValidName || !isValidPhone) {
       // Track failed login attempt
-      await this.analyticsService.trackEvent(shareToken, {
-        eventType: 'auth_failed',
-        metadata: {
-          attemptedName: clientLoginDto.clientName,
-          reason: !isValidName ? 'invalid_name' : 'invalid_phone',
+      await this.analyticsService.trackEvent(
+        shareToken,
+        {
+          eventType: 'auth_failed',
+          metadata: {
+            attemptedName: clientLoginDto.clientName,
+            reason: !isValidName ? 'invalid_name' : 'invalid_phone',
+          },
         },
-      }, request);
+        request,
+      );
 
       throw new UnauthorizedException('Invalid client credentials');
     }
@@ -77,13 +96,17 @@ export class ShareService {
     }
 
     // Track successful login
-    await this.analyticsService.trackEvent(shareToken, {
-      eventType: 'client_login',
-      metadata: {
-        clientName: clientLoginDto.clientName,
-        sessionId: finalAuth.sessionToken,
+    await this.analyticsService.trackEvent(
+      shareToken,
+      {
+        eventType: 'client_login',
+        metadata: {
+          clientName: clientLoginDto.clientName,
+          sessionId: finalAuth.sessionToken,
+        },
       },
-    }, request);
+      request,
+    );
 
     return {
       sessionToken: finalAuth.sessionToken,
@@ -157,16 +180,16 @@ export class ShareService {
         email: timeline.client.email,
       },
       agent: {
-        name: timeline.agent.profile ? 
-          `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}` : 
-          'Your Agent',
+        name: timeline.agent.profile
+          ? `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`
+          : 'Your Agent',
         company: timeline.agent.profile?.company || 'Real Estate Professional',
         phone: timeline.agent.profile?.phone,
         email: timeline.agent.email,
         logo: timeline.agent.profile?.logo,
         brandColor: timeline.agent.profile?.brandColor || '#3b82f6',
       },
-      properties: timeline.properties.map(property => ({
+      properties: timeline.properties.map((property) => ({
         id: property.id,
         mlsId: property.mlsId,
         address: property.address,
@@ -184,7 +207,7 @@ export class ShareService {
         isViewed: property.isViewed,
         viewedAt: property.viewedAt,
         createdAt: property.createdAt,
-        feedback: property.feedback.map(fb => ({
+        feedback: property.feedback.map((fb) => ({
           id: fb.id,
           feedback: fb.feedback,
           notes: fb.notes,
@@ -198,10 +221,15 @@ export class ShareService {
 
   // Submit property feedback
   async submitPropertyFeedback(
-    shareToken: string, 
-    propertyId: string, 
-    feedbackData: { feedback: 'love' | 'like' | 'dislike'; notes?: string; clientName: string; clientEmail: string },
-    request?: any
+    shareToken: string,
+    propertyId: string,
+    feedbackData: {
+      feedback: 'love' | 'like' | 'dislike';
+      notes?: string;
+      clientName: string;
+      clientEmail: string;
+    },
+    request?: any,
   ) {
     // Verify timeline and property exist
     const timeline = await this.prisma.timeline.findUnique({
@@ -233,21 +261,28 @@ export class ShareService {
     });
 
     // Track feedback submission
-    await this.analyticsService.trackEvent(shareToken, {
-  eventType: 'feedback_submit',
-  propertyId: property.id,
-  metadata: {
-    feedbackType: feedbackData.feedback,  // ✅ CORRECT - use 'feedback' field
-    hasNotes: !!feedbackData.notes,
-    clientName: feedbackData.clientName,
-  },
-}, request);
+    await this.analyticsService.trackEvent(
+      shareToken,
+      {
+        eventType: 'feedback_submit',
+        propertyId: property.id,
+        metadata: {
+          feedbackType: feedbackData.feedback, // ✅ CORRECT - use 'feedback' field
+          hasNotes: !!feedbackData.notes,
+          clientName: feedbackData.clientName,
+        },
+      },
+      request,
+    );
 
     return feedback;
   }
 
   // Revoke timeline access (Agent only)
-  async revokeAccess(agentId: string, shareToken: string): Promise<{ message: string }> {
+  async revokeAccess(
+    agentId: string,
+    shareToken: string,
+  ): Promise<{ message: string }> {
     // Verify agent owns this timeline
     const timeline = await this.prisma.timeline.findFirst({
       where: {
@@ -333,12 +368,18 @@ export class ShareService {
         totalEvents: timeline._count.analytics,
         recentActivity: recentActivity.length,
         feedbackSummary: {
-          love: feedbackSummary.find(f => f.feedback === 'love')?._count.feedback || 0,
-           like: feedbackSummary.find(f => f.feedback === 'like')?._count.feedback || 0,
-            dislike: feedbackSummary.find(f => f.feedback === 'dislike')?._count.feedback || 0,
+          love:
+            feedbackSummary.find((f) => f.feedback === 'love')?._count
+              .feedback || 0,
+          like:
+            feedbackSummary.find((f) => f.feedback === 'like')?._count
+              .feedback || 0,
+          dislike:
+            feedbackSummary.find((f) => f.feedback === 'dislike')?._count
+              .feedback || 0,
         },
       },
-      recentActivity: recentActivity.map(activity => ({
+      recentActivity: recentActivity.map((activity) => ({
         eventType: activity.eventType,
         timestamp: activity.timestamp,
         metadata: activity.metadata,
@@ -371,16 +412,30 @@ export class ShareService {
   }
 
   // Helper methods
-  private validateClientName(inputName: string, actualFirstName: string): boolean {
-    const cleanInput = inputName.toLowerCase().trim().replace(/[^a-z]/g, '');
-    const cleanActual = actualFirstName.toLowerCase().trim().replace(/[^a-z]/g, '');
-    
+  private validateClientName(
+    inputName: string,
+    actualFirstName: string,
+  ): boolean {
+    const cleanInput = inputName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z]/g, '');
+    const cleanActual = actualFirstName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z]/g, '');
+
     // Allow exact match or partial match (minimum 3 characters)
-    return cleanInput === cleanActual || 
-           (cleanInput.length >= 3 && cleanActual.startsWith(cleanInput));
+    return (
+      cleanInput === cleanActual ||
+      (cleanInput.length >= 3 && cleanActual.startsWith(cleanInput))
+    );
   }
 
-  private validatePhoneLastFour(inputDigits: string, actualPhone?: string): boolean {
+  private validatePhoneLastFour(
+    inputDigits: string,
+    actualPhone?: string,
+  ): boolean {
     if (!actualPhone) {
       // If no phone number stored, be more lenient
       return inputDigits.length === 4 && /^\d{4}$/.test(inputDigits);
@@ -388,7 +443,7 @@ export class ShareService {
 
     const phoneDigits = actualPhone.replace(/[^\d]/g, '');
     const lastFour = phoneDigits.slice(-4);
-    
+
     return inputDigits === lastFour;
   }
 

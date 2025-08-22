@@ -10,10 +10,10 @@ datasource db {
 }
 
 enum Plan {
-  FREE
-  PRO
-  PREMIUM
-  ENTERPRISE
+  FREE         // 1 client, 20 properties
+  TIER_1       // $15 - 3 clients, 45 properties  
+  TIER_2       // $25 - 5 clients, 70 properties
+  ENTERPRISE   // Custom pricing
 }
 
 enum FeedbackType {
@@ -52,6 +52,7 @@ model User {
   profile     Profile?
   clients     Client[]
   timelines   Timeline[]
+  propertyBatches PropertyBatch[]
   
   @@map("users")
 }
@@ -93,8 +94,8 @@ model Profile {
   // Subscription management
   plan         Plan    @default(FREE)
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
-  clientLimit  Int     @default(5) // Based on plan
-  propertyLimit Int    @default(25) // Properties per month
+  clientLimit  Int     @default(1) // Based on plan: FREE=1, TIER_1=3, TIER_2=5
+  propertyLimit Int    @default(20) // Properties total: FREE=20, TIER_1=45, TIER_2=70
   
   // Stripe integration
   stripeCustomerId   String?
@@ -141,6 +142,7 @@ model Client {
   agent       User       @relation(fields: [agentId], references: [id], onDelete: Cascade)
   timelines   Timeline[]
   feedback    Feedback[]
+  propertyBatches PropertyBatch[]
   
   @@map("clients")
 }
@@ -172,6 +174,7 @@ model Timeline {
   properties  Property[]
   clientAuth  ClientAuth[]
   analytics   ClientAnalytics[]
+  propertyBatches PropertyBatch[]
   
   @@map("timelines")
 }
@@ -191,6 +194,27 @@ model Property {
   description     String?  // Property description
   imageUrls       String[] // Array of image URLs
   listingUrl      String?  // MLS link
+  
+  // NEW: MLS Parser Integration Fields
+  mlsSource       String?   // 'flexmls', 'mls_pin', etc.
+  originalMlsUrl  String?   // Original URL used for parsing
+  parsedData      Json?     // Raw parsed data from MLS parser
+  parseTimestamp  DateTime? // When this property was parsed
+  imageCount      Int       @default(0) // Number of images parsed
+  parseErrors     String[]  // Any errors during parsing
+  
+  // NEW: Enhanced Duplicate Detection
+  addressNormalized String? // Normalized address for similarity matching
+  priceRange       String?  // Price category for grouping
+  
+  // NEW: Batch Processing Fields
+  batchId         String?   // Links to PropertyBatch
+  importStatus    String    @default("completed") // 'pending', 'completed', 'failed'
+  
+  // NEW: Progressive Loading Fields
+  isQuickParsed   Boolean   @default(false) // Basic info loaded quickly
+  isFullyParsed   Boolean   @default(true) // All details loaded
+  loadingProgress Int       @default(100) // Percentage of data loaded (0-100)
   
   // Agent management
   agentNotes      String?
@@ -214,6 +238,7 @@ model Property {
   timelineId      String
   timeline        Timeline   @relation(fields: [timelineId], references: [id], onDelete: Cascade)
   feedback        Feedback[]
+  batchProperty   BatchProperty? // Link to batch queue item
   
   @@map("properties")
 }
@@ -320,4 +345,54 @@ model ClientAnalytics {
   @@index([timelineId, eventType])
   @@index([timestamp])
   @@map("client_analytics")
+}
+
+// NEW: PropertyBatch model for queue management
+model PropertyBatch {
+  id            String   @id @default(cuid())
+  agentId       String
+  clientId      String  
+  timelineId    String
+  status        String   @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  totalProperties Int    @default(0)
+  successCount  Int      @default(0)
+  failureCount  Int      @default(0)
+  errors        Json?    // Array of error objects
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  agent         User       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  client        Client     @relation(fields: [clientId], references: [id], onDelete: Cascade) 
+  timeline      Timeline   @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  batchProperties BatchProperty[]
+  
+  @@index([agentId, status])
+  @@index([timelineId])
+  @@map("property_batches")
+}
+
+// NEW: BatchProperty model for individual queue items
+model BatchProperty {
+  id          String   @id @default(cuid())
+  batchId     String
+  mlsUrl      String
+  parseStatus String   @default("pending") // 'pending', 'quick_parsing', 'quick_parsed', 'full_parsing', 'parsed', 'failed', 'imported'
+  parsedData  Json?    // Parsed property data
+  quickData   Json?    // Quick parsed data (basic info)
+  parseError  String?
+  propertyId  String?  @unique // Links to created Property
+  position    Int      @default(0)
+  loadingProgress Int  @default(0) // Percentage of parsing completed (0-100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  batch       PropertyBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  property    Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  
+  @@index([batchId, position])
+  @@map("batch_properties")
 }

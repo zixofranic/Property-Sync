@@ -6,10 +6,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Settings, User, Mail, Bell, Shield, 
   CreditCard, HelpCircle, Palette, Save,
-  MapPin, Camera, Eye, EyeOff, Lock,
-  Upload, Check, AlertTriangle
+  MapPin, Eye, EyeOff, Lock,
+  Check, AlertTriangle
 } from 'lucide-react';
 import { PasswordChangeModal } from '@/components/profile/PasswordChangeModal';
+import { ImageUrlInput } from '@/components/ui/ImageUrlInput';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -64,8 +65,6 @@ export function SettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(preferences.logo || null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const tabs = [
     { id: 'branding', label: 'Branding', icon: Palette },
@@ -90,35 +89,8 @@ export function SettingsModal({
     setHasChanges(true);
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // File validation
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
-    
-    if (file.size > maxSize) {
-      alert('Please select an image under 2MB.');
-      return;
-    }
-
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please select a JPEG, PNG, WebP, or SVG image.');
-      return;
-    }
-
-    // Store file for upload
-    setLogoFile(file);
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setLogoPreview(result);
-      updatePreference(['logo'], result);
-    };
-    reader.readAsDataURL(file);
+  const handleLogoChange = (url: string) => {
+    updatePreference(['logo'], url);
   };
 
   const handleSave = async () => {
@@ -144,41 +116,16 @@ export function SettingsModal({
               {/* Logo Upload */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Company Logo</label>
-                  <div className="flex items-start space-x-6">
-                    {/* Logo Preview */}
-                    <div className="w-24 h-24 bg-slate-700 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center overflow-hidden">
-                      {logoPreview ? (
-                        <img
-                          src={logoPreview}
-                          alt="Logo preview"
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <Camera className="w-8 h-8 text-slate-400" />
-                      )}
-                    </div>
-                    
-                    {/* Upload Controls */}
-                    <div className="flex-1">
-                      <label className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors">
-                        <Upload className="w-4 h-4" />
-                        <span>Upload Logo</span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                          onChange={handleLogoUpload}
-                          className="hidden"
-                        />
-                      </label>
-                      <p className="text-xs text-slate-400 mt-2">
-                        Recommended: 200x200px or larger, under 2MB
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Supports JPEG, PNG, WebP, and SVG formats
-                      </p>
-                    </div>
-                  </div>
+                  <ImageUrlInput
+                    value={preferences.logo || ''}
+                    onChange={handleLogoChange}
+                    placeholder="https://yourcompany.com/logo.png"
+                    label="Company Logo URL"
+                    preview={true}
+                  />
+                  <p className="text-xs text-slate-400 mt-2">
+                    Enter a URL to your company logo. Recommended: Square format, 200x200px or larger.
+                  </p>
                 </div>
 
                 {/* Brand Color */}
@@ -256,8 +203,8 @@ export function SettingsModal({
               <h4 className="font-medium text-white mb-3">Brand Preview</h4>
               <div className="bg-white rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-3">
-                  {logoPreview && (
-                    <img src={logoPreview} alt="Logo" className="w-8 h-8 object-contain" />
+                  {preferences.logo && (
+                    <img src={preferences.logo} alt="Logo" className="w-8 h-8 object-contain" />
                   )}
                   <div className="text-gray-800">
                     <div className="font-semibold">{user.firstName} {user.lastName}</div>

@@ -18,6 +18,7 @@ export default function LoginPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [loginError, setLoginError] = useState<string>('');
 
   // Redirect if already authenticated
 useEffect(() => {
@@ -51,6 +52,8 @@ useEffect(() => {
     
     if (!validateForm()) return;
 
+    setLoginError(''); // Clear any previous login errors
+
     const success = await login(formData.email, formData.password);
     
     if (success) {
@@ -60,17 +63,22 @@ useEffect(() => {
         message: 'Successfully logged in to Mission Control.'
       });
       router.push('/dashboard');
+    } else {
+      // Display error immediately on login page
+      setLoginError('Invalid email or password. Please try again.');
     }
-    // Error notification is handled in the store
   };
 
   const handleInputChange = (field: keyof typeof formData) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
-    // Clear error when user starts typing
+    // Clear errors when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+    if (loginError) {
+      setLoginError('');
     }
   };
 
@@ -179,6 +187,20 @@ useEffect(() => {
                 </motion.p>
               )}
             </div>
+
+            {/* Login Error Display */}
+            {loginError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/20 border border-red-500/30 rounded-lg p-3"
+              >
+                <p className="text-red-400 text-sm flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  {loginError}
+                </p>
+              </motion.div>
+            )}
 
             {/* Submit Button */}
             <motion.button

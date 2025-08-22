@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Settings, Save, Loader, User, Mail } from 'lucide-react';
 import { withAuth } from '@/providers/AuthProvider';
 import { useMissionControlStore } from '@/stores/missionControlStore';
-import { EmailTemplateSelector } from '@/components/modals/EmailTemplateSelector';
+import { EmailTemplateSelector } from '@/components/modals/email/EmailTemplateSelector';
 
 function SettingsPage() {
   const { 
@@ -221,10 +221,10 @@ function SettingsPage() {
           >
             <h2 className="text-lg font-semibold text-white mb-4">Coming Soon</h2>
             <div className="space-y-3 text-sm text-slate-400">
-              <p>• Notification preferences</p>
-              <p>• Custom email signatures</p>
-              <p>• Automated follow-up settings</p>
-              <p>• Client portal customization</p>
+              <p>â€¢ Notification preferences</p>
+              <p>â€¢ Custom email signatures</p>
+              <p>â€¢ Automated follow-up settings</p>
+              <p>â€¢ Client portal customization</p>
             </div>
           </motion.div>
         </div>

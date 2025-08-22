@@ -446,7 +446,7 @@ export function EnhancedAddPropertyModal({ isOpen, onClose }: EnhancedAddPropert
                 {formData.images.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4">
                     {formData.images.map((image, index) => (
-                      <div key={index} className="relative group">
+                      <div key={image} className="relative group">
                         <img
                           src={image}
                           alt={`Property image ${index + 1}`}

@@ -151,6 +151,52 @@ export interface AnalyticsDashboard {
   activeTimelines: number;
 }
 
+// MLS Batch Import Interfaces
+export interface BatchProperty {
+  id: string;
+  mlsUrl: string;
+  parseStatus: 'pending' | 'parsing' | 'parsed' | 'failed' | 'imported';
+  parseError?: string;
+  position: number;
+  parsedData?: {
+    address: string;
+    price: string;
+    priceNumeric: number;
+    beds?: string;
+    baths?: string;
+    sqft?: string;
+    imageCount: number;
+    images: string[];
+  };
+}
+
+export interface PropertyBatch {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  totalProperties: number;
+  successCount: number;
+  failureCount: number;
+  startedAt?: string;
+  completedAt?: string;
+  properties: BatchProperty[];
+}
+
+export interface BatchImportResult {
+  batchId: string;
+  importResults: {
+    batchPropertyId: string;
+    success: boolean;
+    propertyId?: string;
+    address?: string;
+    error?: string;
+  }[];
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+  };
+}
+
 // Token Management Types
 interface TokenData {
   accessToken: string;
@@ -181,7 +227,7 @@ class ApiClient {
   private lastActivityTime: number = Date.now();
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
     
     // Initialize with stored tokens
     if (typeof window !== 'undefined') {
@@ -423,6 +469,10 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    // Add timeout and better error handling for mobile devices
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
     try {
       const url = `${this.baseUrl}${endpoint}`;
       
@@ -437,11 +487,16 @@ class ApiClient {
       }
 
       console.log(`API Client: ${options.method || 'GET'} ${endpoint}`);
-
+      
       const response = await fetch(url, {
         ...options,
         headers,
+        signal: controller.signal,
+        // Add mobile-friendly options
+        mode: 'cors',
+        cache: 'no-cache',
       });
+      clearTimeout(timeoutId);
 
       // Handle different response types
       if (response.status === 204) {
@@ -467,6 +522,11 @@ class ApiClient {
       console.log(`API Client: Request successful`);
       return { data };
     } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log('API Client: Request timeout');
+        return { error: 'Request timeout - please check your connection' };
+      }
       console.error('API Client: Network error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Network error';
       return { error: errorMessage };
@@ -808,6 +868,15 @@ async updateEmailPreferences(preferences: {
     return this.request('/api/v1/analytics/dashboard');
   }
 
+  async getClientActivity(clientId: string, limit = 50): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/v1/analytics/client/${clientId}/activity?limit=${limit}`);
+  }
+
+  async getAgentRecentActivity(since?: string): Promise<ApiResponse<any[]>> {
+    const params = since ? `?since=${since}` : '';
+    return this.request(`/api/v1/analytics/agent/recent${params}`);
+  }
+
   // Utility Methods
  async checkMLSDuplicate(clientId: string, mlsLink: string): Promise<ApiResponse<{ isDuplicate: boolean }>> {
   const params = new URLSearchParams({
@@ -851,10 +920,87 @@ async updateEmailPreferences(preferences: {
   }>> {
     return this.request(`/api/v1/timelines/${shareToken}/validate-client?client=${clientCode}`, {}, true);
   }
+
+  // MLS Batch Import Methods
+  async createAndParseBatch(
+    clientId: string,
+    timelineId: string,
+    mlsUrls: string[]
+  ): Promise<ApiResponse<{ batchId: string; message: string; totalUrls: number }>> {
+    return this.request('/api/v1/timelines/batch/create-and-parse', {
+      method: 'POST',
+      body: JSON.stringify({
+        clientId,
+        timelineId,
+        mlsUrls
+      }),
+    });
+  }
+
+  // Instant batch creation - creates properties immediately, parses in background
+  async createInstantBatch(
+    clientId: string,
+    timelineId: string,
+    mlsUrls: string[]
+  ): Promise<ApiResponse<{ batchId: string; message: string; totalUrls: number; importedCount: number }>> {
+    return this.request('/api/v1/timelines/batch/create-instant', {
+      method: 'POST',
+      body: JSON.stringify({
+        clientId,
+        timelineId,
+        mlsUrls
+      }),
+    });
+  }
+
+  async getBatchStatus(batchId: string): Promise<ApiResponse<PropertyBatch>> {
+    return this.request(`/api/v1/timelines/batch/${batchId}/status`);
+  }
+
+  async importBatchProperties(
+    batchId: string,
+    properties: {
+      batchPropertyId: string;
+      customDescription?: string;
+      agentNotes?: string;
+    }[]
+  ): Promise<ApiResponse<BatchImportResult>> {
+    return this.request(`/api/v1/timelines/batch/${batchId}/import`, {
+      method: 'POST',
+      body: JSON.stringify({ properties }),
+    });
+  }
+
+  async deleteBatch(batchId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/api/v1/timelines/batch/${batchId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getAgentBatches(): Promise<ApiResponse<PropertyBatch[]>> {
+    return this.request('/api/v1/timelines/batches');
+  }
+
+  async parseSingleMLS(
+    mlsUrl: string,
+    clientId?: string
+  ): Promise<ApiResponse<{
+    success: boolean;
+    data?: any;
+    error?: string;
+    isDuplicate?: boolean;
+    mlsUrl: string;
+  }>> {
+    const params = clientId ? `?clientId=${clientId}` : '';
+    return this.request(`/api/v1/mls/parse-single${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ mlsUrl }),
+    });
+  }
 }
 
 // Export singleton instance
 export const apiClient = new ApiClient();
 
 // Export types for use in store
-export type { ClientResponse, TimelineResponse, AnalyticsDashboard };
+export type { ClientResponse, TimelineResponse, AnalyticsDashboard, BatchProperty, PropertyBatch, BatchImportResult };

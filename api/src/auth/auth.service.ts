@@ -11,7 +11,12 @@ TODO: Email Authentication Roadmap
 - [ ] Real estate company email domain verification (future)
 */
 
-import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
@@ -29,7 +34,9 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
+  async register(
+    registerDto: RegisterDto,
+  ): Promise<{ message: string; userId: string }> {
     // Check if user already exists
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     if (existingUser) {
@@ -50,23 +57,25 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(
       user.email,
       user.profile?.firstName || registerDto.firstName, // Fix: handle null profile
-      verificationToken
+      verificationToken,
     );
 
     return {
-      message: 'Registration successful! Please check your email to verify your account.',
+      message:
+        'Registration successful! Please check your email to verify your account.',
       userId: user.id,
     };
   }
 
   async verifyEmail(token: string): Promise<AuthResponseDto> {
     const user = await this.usersService.findByVerificationToken(token);
-    
+
     if (!user) {
       throw new BadRequestException('Invalid verification token');
     }
 
-    if (!user.verificationExpiry || user.verificationExpiry < new Date()) { // Fix: handle null
+    if (!user.verificationExpiry || user.verificationExpiry < new Date()) {
+      // Fix: handle null
       throw new BadRequestException('Verification token has expired');
     }
 
@@ -80,7 +89,7 @@ export class AuthService {
     // Send welcome email
     await this.emailService.sendWelcomeEmail(
       verifiedUser.email,
-      verifiedUser.profile?.firstName || 'Agent' // Fix: handle null profile
+      verifiedUser.profile?.firstName || 'Agent', // Fix: handle null profile
     );
 
     // Return auth tokens for immediate login
@@ -89,7 +98,9 @@ export class AuthService {
 
   async login(user: any): Promise<AuthResponseDto> {
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Please verify your email before logging in');
+      throw new UnauthorizedException(
+        'Please verify your email before logging in',
+      );
     }
 
     return this.generateTokens(user);
@@ -97,7 +108,7 @@ export class AuthService {
 
   async resendVerification(email: string): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
-    
+
     if (!user) {
       throw new BadRequestException('User not found');
     }
@@ -119,7 +130,7 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(
       user.email,
       user.profile?.firstName || 'Agent', // Fix: handle null profile
-      verificationToken
+      verificationToken,
     );
 
     return {
@@ -129,12 +140,15 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
-    
-    if (user && await this.usersService.validatePassword(password, user.password)) {
+
+    if (
+      user &&
+      (await this.usersService.validatePassword(password, user.password))
+    ) {
       const { password, ...result } = user;
       return result;
     }
-    
+
     return null;
   }
 
@@ -149,8 +163,8 @@ export class AuthService {
   }
 
   private async generateTokens(user: any): Promise<AuthResponseDto> {
-    const payload = { 
-      email: user.email, 
+    const payload = {
+      email: user.email,
       sub: user.id,
       firstName: user.profile?.firstName,
       lastName: user.profile?.lastName,
@@ -169,7 +183,8 @@ export class AuthService {
       accessToken,
       refreshToken,
       tokenType: 'Bearer',
-      expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m', // Fix: handle undefined
+      expiresIn:
+        this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m', // Fix: handle undefined
       user: {
         id: user.id,
         email: user.email,

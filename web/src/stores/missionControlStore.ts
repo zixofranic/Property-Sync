@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { devtools, persist, subscribeWithSelector } from 'zustand/middleware';
 import { apiClient, type ClientResponse, type TimelineResponse, type AnalyticsDashboard } from '@/lib/api-client';
+import { generateUUID } from '@/lib/uuid';
 
 // Store Types
 export interface User {
@@ -58,11 +59,50 @@ export interface Property {
   price: number;
   description: string;
   imageUrl: string;
+  imageUrls?: string[];
   mlsLink?: string;
   addedAt: string;
   clientFeedback?: 'love' | 'like' | 'dislike';
   notes?: string;
   isActive: boolean;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFootage?: number;
+  beds?: number;  // Computed property for backward compatibility
+  baths?: number; // Computed property for backward compatibility  
+  sqft?: number;  // Computed property for backward compatibility
+  loadingProgress?: number;
+  isFullyParsed?: boolean;
+}
+
+// MLS Batch Import Interfaces
+export interface BatchProperty {
+  id: string;
+  mlsUrl: string;
+  parseStatus: 'pending' | 'parsing' | 'parsed' | 'failed' | 'imported';
+  parseError?: string;
+  position: number;
+  parsedData?: {
+    address: string;
+    price: string;
+    priceNumeric: number;
+    beds?: string;
+    baths?: string;
+    sqft?: string;
+    imageCount: number;
+    images: string[];
+  };
+}
+
+export interface PropertyBatch {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  totalProperties: number;
+  successCount: number;
+  failureCount: number;
+  startedAt?: string;
+  completedAt?: string;
+  properties: BatchProperty[];
 }
 
 export interface Timeline {
@@ -139,6 +179,11 @@ interface MissionControlState extends EmailState {
   retryCount: number;
   lastDataLoadAttempt: number;
   isRetrying: boolean;
+
+  // Batch Property State
+  currentBatch: PropertyBatch | null;
+  batchLoading: boolean;
+  batchError: string | null;
 }
 
 // Email Actions Interface
@@ -187,6 +232,12 @@ interface MissionControlActions extends EmailActions {
 
   // Analytics Actions
   loadAnalytics: () => Promise<void>;
+
+  // Batch Property Actions
+  createAndParseBatch: (clientId: string, timelineId: string, mlsUrls: string[]) => Promise<void>;
+  getBatchStatus: (batchId: string) => Promise<void>;
+  importBatchProperties: (batchId: string, properties: any[]) => Promise<any>;
+  clearCurrentBatch: () => void;
   loadDashboardAnalytics: () => Promise<void>;
 
   // Notification Actions
@@ -217,7 +268,7 @@ interface MissionControlActions extends EmailActions {
   sendBulkProperties: (clientId: string) => void;
   setBulkMode: (enabled: boolean) => void;
   shareTimeline: (clientId: string) => string;
-  checkMLSDuplicate: (clientId: string, mlsLink: string) => boolean;
+  checkMLSDuplicate: (clientId: string, mlsLink: string) => Promise<boolean>;
   addClient: (clientData: any) => Promise<Client | null>;
 }
 
@@ -309,6 +360,11 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         retryCount: 0,
         lastDataLoadAttempt: 0,
         isRetrying: false,
+
+        // Initial Batch State
+        currentBatch: null,
+        batchLoading: false,
+        batchError: null,
 
         // Authentication Actions
         login: async (email: string, password: string): Promise<boolean> => {
@@ -1487,7 +1543,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         addNotification: (notificationData: Omit<Notification, 'id' | 'timestamp'>) => {
           const notification: Notification = {
             ...notificationData,
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             timestamp: new Date().toISOString(),
           };
 
@@ -1667,6 +1723,147 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           timelineError: null, 
           analyticsError: null 
         }),
+
+        // Batch Property Actions
+        createAndParseBatch: async (clientId: string, timelineId: string, mlsUrls: string[]) => {
+          set({ batchLoading: true, batchError: null });
+
+          try {
+            console.log('Store: Creating batch with URLs:', mlsUrls.length);
+            const response = await apiClient.createInstantBatch(clientId, timelineId, mlsUrls);
+            
+            if (response.error) {
+              set({ batchError: response.error, batchLoading: false });
+              
+              get().addNotification({
+                type: 'error',
+                title: 'Batch Creation Failed',
+                message: response.error,
+                read: false,
+              });
+              
+              return;
+            }
+
+            if (response.data) {
+              console.log('Store: Batch created successfully:', response.data.batchId);
+              
+              // Get initial batch status
+              const batchResponse = await apiClient.getBatchStatus(response.data.batchId);
+              
+              if (batchResponse.data) {
+                set({
+                  currentBatch: batchResponse.data,
+                  batchLoading: false,
+                  batchError: null,
+                });
+              }
+
+              get().addNotification({
+                type: 'success',
+                title: 'Batch Processing Started',
+                message: `Started parsing ${response.data.totalUrls} properties`,
+                read: false,
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create batch';
+            console.error('Store: Batch creation error:', errorMessage);
+            set({ batchError: errorMessage, batchLoading: false });
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Batch Error',
+              message: errorMessage,
+              read: false,
+            });
+          }
+        },
+
+        getBatchStatus: async (batchId: string) => {
+          try {
+            console.log('Store: Getting batch status:', batchId);
+            const response = await apiClient.getBatchStatus(batchId);
+            
+            if (response.error) {
+              set({ batchError: response.error });
+              return;
+            }
+
+            if (response.data) {
+              set({
+                currentBatch: response.data,
+                batchError: null,
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to get batch status';
+            console.error('Store: Batch status error:', errorMessage);
+            set({ batchError: errorMessage });
+          }
+        },
+
+        importBatchProperties: async (batchId: string, properties: any[]) => {
+          set({ batchLoading: true, batchError: null });
+
+          try {
+            console.log('Store: Importing batch properties:', properties.length);
+            const response = await apiClient.importBatchProperties(batchId, properties);
+            
+            if (response.error) {
+              set({ batchError: response.error, batchLoading: false });
+              
+              get().addNotification({
+                type: 'error',
+                title: 'Import Failed',
+                message: response.error,
+                read: false,
+              });
+              
+              return;
+            }
+
+            if (response.data) {
+              console.log('Store: Properties imported successfully');
+              
+              set({ batchLoading: false, batchError: null });
+
+              get().addNotification({
+                type: 'success',
+                title: 'Import Successful',
+                message: `Imported ${response.data.summary.successful} properties`,
+                read: false,
+              });
+
+              // Refresh the timeline to show new properties
+              const state = get();
+              if (state.selectedClient) {
+                await get().loadTimeline(state.selectedClient.id);
+              }
+
+              return response.data;
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to import properties';
+            console.error('Store: Import error:', errorMessage);
+            set({ batchError: errorMessage, batchLoading: false });
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Import Error',
+              message: errorMessage,
+              read: false,
+            });
+          }
+        },
+
+        clearCurrentBatch: () => {
+          set({
+            currentBatch: null,
+            batchLoading: false,
+            batchError: null,
+          });
+        },
       })),
       {
         name: 'mission-control-store',
