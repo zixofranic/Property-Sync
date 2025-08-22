@@ -19,12 +19,12 @@ const nextConfig = {
     // This helps suppress hydration warnings caused by browser extensions
     suppressHydrationWarning: true,
   },
-  // ESLint configuration for production
+  // ESLint configuration for production - FORCE DEPLOYMENT
   eslint: {
     // Disable ESLint during production builds (only for deployment)
     ignoreDuringBuilds: true,
   },
-  // TypeScript configuration for production
+  // TypeScript configuration for production - FORCE DEPLOYMENT  
   typescript: {
     // Disable type checking during production builds (only for deployment)
     ignoreBuildErrors: true,
