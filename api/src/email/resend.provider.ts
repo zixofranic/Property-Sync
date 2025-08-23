@@ -60,8 +60,10 @@ export class ResendProvider {
     this.isDevelopment = process.env.NODE_ENV === 'development';
 
     if (!apiKey) {
-      this.logger.error('RESEND_API_KEY not found in environment variables');
-      throw new Error('RESEND_API_KEY is required');
+      this.logger.warn('RESEND_API_KEY not found - email functionality disabled');
+      this.resend = null;
+      this.fromEmail = '';
+      return;
     }
 
     this.resend = new Resend(apiKey);
@@ -100,6 +102,10 @@ export class ResendProvider {
   }
 
   async sendTimelineEmail(data: TimelineEmailData) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured - skipping timeline email');
+      return { success: false, error: 'Email service not configured' };
+    }
     // Redirect emails in development mode
     const redirectedTo = this.redirectEmailForDevelopment(data.to, 'delivered');
     const redirectedSpouseEmail = data.spouseEmail
@@ -329,6 +335,10 @@ export class ResendProvider {
     firstName: string,
     verificationToken: string,
   ) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured - skipping verification email');
+      return { success: false, error: 'Email service not configured' };
+    }
     const redirectedEmail = this.redirectEmailForDevelopment(
       email,
       'delivered',
@@ -374,6 +384,10 @@ export class ResendProvider {
   }
 
   async sendWelcomeEmail(email: string, firstName: string) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured - skipping welcome email');
+      return { success: false, error: 'Email service not configured' };
+    }
     const redirectedEmail = this.redirectEmailForDevelopment(
       email,
       'delivered',
