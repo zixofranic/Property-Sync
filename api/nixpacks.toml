@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ['nodejs-18_x', 'npm-9_x', 'chromium', 'nss', 'freetype', 'freetype-dev', 'harfbuzz', 'ca-certificates', 'ttf-freefont']
+nixPkgs = ['nodejs-18_x', 'npm-9_x', 'chromium', 'nss', 'freetype', 'harfbuzz', 'cacert', 'liberation_ttf']
 
 [phases.install] 
 cmds = ['PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install']
