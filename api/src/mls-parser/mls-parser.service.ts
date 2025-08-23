@@ -16,11 +16,6 @@ export class MLSParserService {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Skip browser initialization on Railway if chromium isn't available
-    if (process.env.RAILWAY_ENVIRONMENT && !process.env.CHROMIUM_PATH) {
-      this.logger.warn('Skipping browser initialization on Railway - MLS parsing disabled');
-      return;
-    }
     await this.initBrowser();
   }
 
@@ -32,9 +27,13 @@ export class MLSParserService {
 
   private async initBrowser(): Promise<void> {
     try {
+      const isRailway = process.env.RAILWAY_ENVIRONMENT;
+      
       this.browser = await puppeteer.launch({
         headless: true,
-        executablePath: process.env.CHROMIUM_PATH || undefined,
+        executablePath: isRailway 
+          ? process.env.PUPPETEER_EXECUTABLE_PATH || 'chromium'
+          : undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -46,6 +45,15 @@ export class MLSParserService {
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-default-apps',
+          '--disable-sync',
+          '--disable-translate',
+          '--hide-scrollbars',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--no-pings',
         ],
       });
       this.logger.log('Browser initialized successfully');
@@ -60,14 +68,6 @@ export class MLSParserService {
     try {
       this.logger.log(`Parsing MLS URL: ${mlsUrl}`);
 
-      // Check if browser is available
-      if (!this.browser) {
-        return {
-          success: false,
-          error: 'MLS parsing temporarily unavailable on this deployment.',
-          mlsUrl,
-        };
-      }
 
       // Validate URL format
       if (!this.isValidMLSUrl(mlsUrl)) {
@@ -101,14 +101,6 @@ export class MLSParserService {
     try {
       this.logger.log(`Quick parsing MLS URL: ${mlsUrl}`);
 
-      // Check if browser is available
-      if (!this.browser) {
-        return {
-          success: false,
-          error: 'MLS parsing temporarily unavailable on this deployment.',
-          mlsUrl,
-        };
-      }
 
       // Validate URL format
       if (!this.isValidMLSUrl(mlsUrl)) {

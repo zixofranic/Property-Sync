@@ -1,11 +1,15 @@
 [phases.setup]
-nixPkgs = ['nodejs-18_x', 'npm-9_x']
+nixPkgs = ['nodejs-18_x', 'npm-9_x', 'chromium', 'nss', 'freetype', 'freetype-dev', 'harfbuzz', 'ca-certificates', 'ttf-freefont']
 
 [phases.install] 
-cmds = ['PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --only=production']
+cmds = ['PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install']
 
 [phases.build]
 cmds = ['npx prisma generate', 'npm run build']
+
+[variables]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true'
+PUPPETEER_EXECUTABLE_PATH = '/nix/store/*-chromium-*/bin/chromium'
 
 [start]
 cmd = 'npm run start:prod'
