@@ -16,6 +16,11 @@ export class MLSParserService {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
+    // Skip browser initialization on Railway for now - get core API live first
+    if (process.env.RAILWAY_ENVIRONMENT) {
+      this.logger.warn('MLS parsing disabled on Railway - core API functionality available');
+      return;
+    }
     await this.initBrowser();
   }
 
@@ -49,6 +54,14 @@ export class MLSParserService {
     try {
       this.logger.log(`Parsing MLS URL: ${mlsUrl}`);
 
+      // Check if browser is available
+      if (!this.browser) {
+        return {
+          success: false,
+          error: 'MLS parsing temporarily unavailable - browser not initialized',
+          mlsUrl,
+        };
+      }
 
       // Validate URL format
       if (!this.isValidMLSUrl(mlsUrl)) {
