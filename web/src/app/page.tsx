@@ -87,8 +87,8 @@ export default function LandingPage() {
               <Home className="h-12 w-12 text-blue-400 mb-4" />
               <h3 className="text-2xl font-bold text-white mb-4">Property Timelines</h3>
               <p className="text-gray-300">
-                Create beautiful, organized timelines for each property. Add photos, 
-                descriptions, and MLS links.
+                Create beautiful, organized timelines for your clients. Add photo, 
+                description, and MLS link for each timeline.
               </p>
             </div>
 
