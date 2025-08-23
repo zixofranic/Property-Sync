@@ -23,7 +23,10 @@
       "Bash(npm install)",
       "Bash(railway logs:*)",
       "WebSearch",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(railway --version)",
+      "Bash(railway status:*)",
+      "Bash(railway login:*)"
     ],
     "deny": [],
     "ask": [],
