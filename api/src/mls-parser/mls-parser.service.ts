@@ -27,34 +27,15 @@ export class MLSParserService {
 
   private async initBrowser(): Promise<void> {
     try {
-      const isRailway = process.env.RAILWAY_ENVIRONMENT;
-      
       this.browser = await puppeteer.launch({
         headless: true,
-        executablePath: isRailway 
-          ? process.env.PUPPETEER_EXECUTABLE_PATH || 'chromium'
-          : undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
           '--disable-gpu',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-extensions',
-          '--disable-plugins',
-          '--disable-default-apps',
-          '--disable-sync',
-          '--disable-translate',
-          '--hide-scrollbars',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--no-pings',
         ],
+        ignoreDefaultArgs: ['--disable-extensions'],
       });
       this.logger.log('Browser initialized successfully');
     } catch (error) {
