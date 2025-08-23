@@ -1,0 +1,26 @@
+{
+  "name": "property-sync",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:clean": "node scripts/dev-server.js",
+    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev-win.ps1",
+    "dev:win-clean": "powershell -ExecutionPolicy Bypass -File scripts/dev-win-clean.ps1",
+    "kill-ports": "node scripts/kill-ports.js",
+    "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "start": "npm run start --workspace=apps/api",
+    "db:generate": "npm run db:generate --workspace=apps/api",
+    "db:push": "npm run db:push --workspace=apps/api", 
+    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "db:studio": "npm run db:studio --workspace=apps/api",
+    "lint": "npm run lint --workspace=apps/api && npm run lint --workspace=apps/web",
+    "test": "npm run test --workspace=apps/api",
+    "test:e2e": "npm run test:e2e --workspace=apps/api"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

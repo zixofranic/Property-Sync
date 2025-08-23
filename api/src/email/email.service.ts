@@ -113,11 +113,11 @@ export class EmailService {
         templateStyle: data.templateStyle || 'modern',
       });
 
-      if (resendResult.success === false) {
-        this.logger.error(`Resend email failed: ${resendResult.error}`);
+      if (resendResult.error) {
+        this.logger.error(`Resend email failed: ${JSON.stringify(resendResult.error)}`);
         return {
           success: false,
-          error: resendResult.error,
+          error: JSON.stringify(resendResult.error),
         };
       }
 
@@ -259,7 +259,7 @@ export class EmailService {
     email: string,
     firstName: string,
     verificationToken: string,
-  ): Promise<{ success: boolean; messageId?: string; provider?: string }> {
+  ): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
     this.logger.log(`Sending verification email to ${email}`);
 
     // Try Resend first
@@ -270,11 +270,11 @@ export class EmailService {
         verificationToken,
       );
 
-      if (resendResult.success === false) {
-        this.logger.error(`Resend verification email failed: ${resendResult.error}`);
+      if (resendResult.error) {
+        this.logger.error(`Resend verification email failed: ${JSON.stringify(resendResult.error)}`);
         return {
           success: false,
-          error: resendResult.error,
+          error: JSON.stringify(resendResult.error),
         };
       }
 
@@ -309,7 +309,7 @@ export class EmailService {
   async sendWelcomeEmail(
     email: string,
     firstName: string,
-  ): Promise<{ success: boolean; messageId?: string; provider?: string }> {
+  ): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
     this.logger.log(`Sending welcome email to ${email}`);
 
     // Try Resend first
@@ -319,11 +319,11 @@ export class EmailService {
         firstName,
       );
 
-      if (resendResult.success === false) {
-        this.logger.error(`Resend welcome email failed: ${resendResult.error}`);
+      if (resendResult.error) {
+        this.logger.error(`Resend welcome email failed: ${JSON.stringify(resendResult.error)}`);
         return {
           success: false,
-          error: resendResult.error,
+          error: JSON.stringify(resendResult.error),
         };
       }
 

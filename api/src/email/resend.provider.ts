@@ -51,7 +51,7 @@ export interface BatchImportNotificationData {
 @Injectable()
 export class ResendProvider {
   private readonly logger = new Logger(ResendProvider.name);
-  private resend: Resend;
+  private resend: Resend | null;
   private fromEmail: string;
   private isDevelopment: boolean;
 
@@ -134,6 +134,9 @@ export class ResendProvider {
     });
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedTo,
@@ -165,6 +168,9 @@ export class ResendProvider {
 
         // Send to spouse if provided
         if (redirectedSpouseEmail) {
+          if (!this.resend) {
+            throw new Error('Resend service not configured');
+          }
           const spouseResult = await this.resend.emails.send({
             from: this.fromEmail,
             to: redirectedSpouseEmail,
@@ -229,6 +235,9 @@ export class ResendProvider {
     const textContent = `New Property Added!\n\n${data.agentName} has added a new property to your timeline:\n\n${data.propertyAddress}\nPrice: $${data.propertyPrice.toLocaleString()}\n\n${data.propertyDescription}\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedEmail,
@@ -248,7 +257,7 @@ export class ResendProvider {
       );
 
       // Send to spouse if provided
-      if (redirectedSpouseEmail) {
+      if (redirectedSpouseEmail && this.resend) {
         await this.resend.emails.send({
           from: this.fromEmail,
           to: redirectedSpouseEmail,
@@ -301,6 +310,9 @@ export class ResendProvider {
     const textContent = `Hi ${data.clientName}!\n\nYou have ${data.pendingPropertiesCount} properties waiting for your feedback from ${data.agentName}.\n\nIt's been ${data.daysSinceLastActivity} days since your last activity. Your input helps us find you the perfect home!\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedEmail,
@@ -356,6 +368,9 @@ export class ResendProvider {
     const textContent = `Hi ${firstName},\n\nWelcome to Property Sync! Please verify your email address by clicking the link below:\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nBest regards,\nThe Property Sync Team`;
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedEmail,
@@ -400,6 +415,9 @@ export class ResendProvider {
     const textContent = `Hi ${firstName},\n\nYour Property Sync account is now verified and ready to use!\n\nGet started: ${dashboardUrl}\n\nBest regards,\nThe Property Sync Team`;
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedEmail,
@@ -570,6 +588,9 @@ Powered by Property Sync
     const textContent = `New Properties Added!\n\n${data.agentName} has added ${data.propertyCount} new properties to your timeline:\n\n${data.propertyAddresses.join('\n')}\n\nView your timeline: ${data.timelineUrl}`;
 
     try {
+      if (!this.resend) {
+        throw new Error('Resend service not configured');
+      }
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedEmail,
@@ -589,7 +610,7 @@ Powered by Property Sync
       );
 
       // Send to spouse if provided
-      if (redirectedSpouseEmail) {
+      if (redirectedSpouseEmail && this.resend) {
         await this.resend.emails.send({
           from: this.fromEmail,
           to: redirectedSpouseEmail,
