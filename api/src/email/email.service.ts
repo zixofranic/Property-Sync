@@ -113,7 +113,15 @@ export class EmailService {
         templateStyle: data.templateStyle || 'modern',
       });
 
-      if (resendResult.data?.id) {
+      if (resendResult.success === false) {
+        this.logger.error(`Resend email failed: ${resendResult.error}`);
+        return {
+          success: false,
+          error: resendResult.error,
+        };
+      }
+
+      if ('data' in resendResult && resendResult.data?.id) {
         this.logger.log(
           `Timeline email sent successfully via Resend: ${resendResult.data.id}`,
         );
@@ -262,7 +270,15 @@ export class EmailService {
         verificationToken,
       );
 
-      if (resendResult.data?.id) {
+      if (resendResult.success === false) {
+        this.logger.error(`Resend verification email failed: ${resendResult.error}`);
+        return {
+          success: false,
+          error: resendResult.error,
+        };
+      }
+
+      if ('data' in resendResult && resendResult.data?.id) {
         this.logger.log(
           `Verification email sent via Resend: ${resendResult.data.id}`,
         );
@@ -303,7 +319,15 @@ export class EmailService {
         firstName,
       );
 
-      if (resendResult.data?.id) {
+      if (resendResult.success === false) {
+        this.logger.error(`Resend welcome email failed: ${resendResult.error}`);
+        return {
+          success: false,
+          error: resendResult.error,
+        };
+      }
+
+      if ('data' in resendResult && resendResult.data?.id) {
         this.logger.log(
           `Welcome email sent via Resend: ${resendResult.data.id}`,
         );
