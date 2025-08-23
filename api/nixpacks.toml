@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ['nodejs-18_x', 'npm-9_x']
+nixPkgs = ['nodejs-18_x', 'npm-9_x', 'chromium']
 
 [phases.install]
 cmds = ['npm install']
+
+[variables]
+CHROMIUM_PATH = 'chromium'
 
 [phases.build]
 cmds = ['npx prisma generate', 'npm run build']

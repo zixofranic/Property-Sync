@@ -29,6 +29,7 @@ export class MLSParserService {
     try {
       this.browser = await puppeteer.launch({
         headless: true,
+        executablePath: process.env.CHROMIUM_PATH || undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -37,6 +38,9 @@ export class MLSParserService {
           '--no-first-run',
           '--no-zygote',
           '--disable-gpu',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
         ],
       });
       this.logger.log('Browser initialized successfully');
