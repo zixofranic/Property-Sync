@@ -20,7 +20,8 @@
       "Bash(node:*)",
       "Bash(cat:*)",
       "Bash(git ls-tree:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(railway logs:*)"
     ],
     "deny": [],
     "ask": [],

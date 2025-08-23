@@ -20,6 +20,8 @@ async function bootstrap() {
       'http://192.168.1.209:3001',
       'http://192.168.1.209:3002',
       'http://192.168.1.209:3004',
+      /https:\/\/.*\.vercel\.app$/,
+      /https:\/\/.*\.up\.railway\.app$/,
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
