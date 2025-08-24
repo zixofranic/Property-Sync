@@ -227,7 +227,7 @@ class ApiClient {
   private lastActivityTime: number = Date.now();
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://grateful-laughter-production-b148.up.railway.app';
     
     // Initialize with stored tokens
     if (typeof window !== 'undefined') {
