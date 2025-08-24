@@ -583,20 +583,31 @@ export class UsersService {
       0
     );
 
-    const validation = this.planLimitsService.validateUsageAgainstPlan(
-      user.profile.plan,
-      user.clients.length,
-      totalProperties
-    );
+    // Use database limits instead of hardcoded plan limits
+    const clientExceeded = user.clients.length > user.profile.clientLimit;
+    const propertyExceeded = totalProperties > user.profile.propertyLimit;
+    
+    const validation = {
+      isValid: !clientExceeded && !propertyExceeded,
+      clientExceeded,
+      propertyExceeded,
+      limits: {
+        clientLimit: user.profile.clientLimit,
+        propertyLimit: user.profile.propertyLimit,
+        name: this.planLimitsService.getLimitsForPlan(user.profile.plan).name,
+        price: this.planLimitsService.getLimitsForPlan(user.profile.plan).price,
+        description: this.planLimitsService.getLimitsForPlan(user.profile.plan).description
+      },
+      usage: {
+        clients: user.clients.length,
+        properties: totalProperties
+      }
+    };
 
     return {
       ...validation,
       upgradeMessage: !validation.isValid 
-        ? this.planLimitsService.getUpgradeMessage(
-            user.profile.plan,
-            validation.clientExceeded,
-            validation.propertyExceeded
-          )
+        ? `You've reached your limits. Current: ${user.clients.length}/${user.profile.clientLimit} clients, ${totalProperties}/${user.profile.propertyLimit} properties.`
         : null,
     };
   }
@@ -604,18 +615,14 @@ export class UsersService {
   async checkCanAddClients(userId: string, clientCount = 1): Promise<{ canAdd: boolean; reason?: string }> {
     const validation = await this.validateCurrentUsage(userId);
     
-    const newValidation = this.planLimitsService.validateUsageAgainstPlan(
-      validation.limits.clientLimit >= validation.usage.clients ? 'FREE' : 'TIER_1', // This is a simplified check
-      validation.usage.clients,
-      validation.usage.properties,
-      clientCount,
-      0
-    );
+    // Check against database limits directly
+    const newClientTotal = validation.usage.clients + clientCount;
+    const canAdd = newClientTotal <= validation.limits.clientLimit;
 
     return {
-      canAdd: newValidation.isValid,
-      reason: !newValidation.isValid 
-        ? `Adding ${clientCount} client(s) would exceed your plan limit of ${newValidation.limits.clientLimit} clients.`
+      canAdd,
+      reason: !canAdd 
+        ? `Adding ${clientCount} client(s) would exceed your limit of ${validation.limits.clientLimit} clients. Current: ${validation.usage.clients}/${validation.limits.clientLimit}`
         : undefined,
     };
   }
@@ -623,18 +630,14 @@ export class UsersService {
   async checkCanAddProperties(userId: string, propertyCount = 1): Promise<{ canAdd: boolean; reason?: string }> {
     const validation = await this.validateCurrentUsage(userId);
     
-    const newValidation = this.planLimitsService.validateUsageAgainstPlan(
-      validation.limits.propertyLimit >= validation.usage.properties ? 'FREE' : 'TIER_1', // This is a simplified check
-      validation.usage.clients,
-      validation.usage.properties,
-      0,
-      propertyCount
-    );
+    // Check against database limits directly
+    const newPropertyTotal = validation.usage.properties + propertyCount;
+    const canAdd = newPropertyTotal <= validation.limits.propertyLimit;
 
     return {
-      canAdd: newValidation.isValid,
-      reason: !newValidation.isValid 
-        ? `Adding ${propertyCount} property(ies) would exceed your plan limit of ${newValidation.limits.propertyLimit} properties.`
+      canAdd,
+      reason: !canAdd 
+        ? `Adding ${propertyCount} property(ies) would exceed your limit of ${validation.limits.propertyLimit} properties. Current: ${validation.usage.properties}/${validation.limits.propertyLimit}`
         : undefined,
     };
   }
