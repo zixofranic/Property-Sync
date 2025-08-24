@@ -89,7 +89,14 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   const handleSave = async () => {
   try {
-    const success = await updateProfile(formData);
+    // Clean up URL fields - convert empty strings to undefined
+    const cleanedData = {
+      ...formData,
+      website: formData.website?.trim() || undefined,
+      avatar: formData.avatar?.trim() || undefined,
+    };
+    
+    const success = await updateProfile(cleanedData);
     
     if (success) {
       setIsEditing(false);
