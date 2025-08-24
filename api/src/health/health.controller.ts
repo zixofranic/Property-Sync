@@ -61,7 +61,7 @@ export class HealthController {
     try {
       console.log('Initializing database with Prisma migrations...');
       
-      // Use Prisma's programmatic API to push the schema
+      // Create Users table
       await this.prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "users" (
           "id" TEXT NOT NULL,
@@ -75,11 +75,78 @@ export class HealthController {
           "resetExpiry" TIMESTAMP(3),
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL,
-          
           CONSTRAINT "users_pkey" PRIMARY KEY ("id")
         );
       `);
 
+      // Create Profiles table
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "profiles" (
+          "id" TEXT NOT NULL,
+          "firstName" TEXT NOT NULL,
+          "lastName" TEXT NOT NULL,
+          "company" TEXT,
+          "phone" TEXT,
+          "website" TEXT,
+          "licenseNumber" TEXT,
+          "avatar" TEXT,
+          "bio" TEXT,
+          "timezone" TEXT,
+          "specialties" TEXT[],
+          "yearsExperience" INTEGER,
+          "notifications" JSONB,
+          "onboardingComplete" BOOLEAN NOT NULL DEFAULT false,
+          "emailTemplateStyle" TEXT DEFAULT 'modern',
+          "notificationEmail" BOOLEAN NOT NULL DEFAULT true,
+          "notificationDesktop" BOOLEAN NOT NULL DEFAULT true,
+          "notificationFeedback" BOOLEAN NOT NULL DEFAULT true,
+          "notificationNewProperties" BOOLEAN NOT NULL DEFAULT true,
+          "theme" TEXT NOT NULL DEFAULT 'dark',
+          "soundEnabled" BOOLEAN NOT NULL DEFAULT true,
+          "logo" TEXT,
+          "brandColor" TEXT DEFAULT '#0ea5e9',
+          "preferredEmailTemplate" TEXT DEFAULT 'modern',
+          "plan" TEXT NOT NULL DEFAULT 'FREE',
+          "subscriptionStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+          "clientLimit" INTEGER NOT NULL DEFAULT 1,
+          "propertyLimit" INTEGER NOT NULL DEFAULT 20,
+          "stripeCustomerId" TEXT,
+          "subscriptionId" TEXT,
+          "subscriptionItemId" TEXT,
+          "billingCycleStart" TIMESTAMP(3),
+          "billingCycleEnd" TIMESTAMP(3),
+          "currentMonthProperties" INTEGER NOT NULL DEFAULT 0,
+          "lastUsageReset" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          "userId" TEXT NOT NULL,
+          CONSTRAINT "profiles_pkey" PRIMARY KEY ("id")
+        );
+      `);
+
+      // Create Clients table  
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "clients" (
+          "id" TEXT NOT NULL,
+          "firstName" TEXT NOT NULL,
+          "lastName" TEXT NOT NULL,
+          "email" TEXT NOT NULL,
+          "spouseEmail" TEXT,
+          "phone" TEXT,
+          "notes" TEXT,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "totalViews" INTEGER NOT NULL DEFAULT 0,
+          "avgResponseTime" INTEGER NOT NULL DEFAULT 0,
+          "feedbackRate" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+          "lastActivity" TIMESTAMP(3),
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          "agentId" TEXT NOT NULL,
+          CONSTRAINT "clients_pkey" PRIMARY KEY ("id")
+        );
+      `);
+
+      // Create indexes
       await this.prisma.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
       `);
@@ -92,9 +159,24 @@ export class HealthController {
         CREATE UNIQUE INDEX IF NOT EXISTS "users_resetToken_key" ON "users"("resetToken");
       `);
 
+      await this.prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "profiles_userId_key" ON "profiles"("userId");
+      `);
+
+      // Create foreign key constraints
+      await this.prisma.$executeRawUnsafe(`
+        ALTER TABLE "profiles" DROP CONSTRAINT IF EXISTS "profiles_userId_fkey";
+        ALTER TABLE "profiles" ADD CONSTRAINT "profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      `);
+
+      await this.prisma.$executeRawUnsafe(`
+        ALTER TABLE "clients" DROP CONSTRAINT IF EXISTS "clients_agentId_fkey";
+        ALTER TABLE "clients" ADD CONSTRAINT "clients_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      `);
+
       return {
         status: 'success',
-        message: 'Database tables created successfully',
+        message: 'Database tables created successfully (users, profiles, clients)',
         timestamp: new Date().toISOString()
       };
     } catch (error) {
