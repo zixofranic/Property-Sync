@@ -227,6 +227,7 @@ class ApiClient {
   private lastActivityTime: number = Date.now();
 
   constructor() {
+    // Force Railway API connection - Updated 2025-08-24 04:30 UTC
     this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://grateful-laughter-production-b148.up.railway.app';
     
     // Initialize with stored tokens
