@@ -1038,4 +1038,4 @@ async updateEmailPreferences(preferences: {
 export const apiClient = new ApiClient();
 
 // Export types for use in store
-export type { ClientResponse, TimelineResponse, AnalyticsDashboard, BatchProperty, PropertyBatch, BatchImportResult };
+export type { ClientResponse, TimelineResponse, AnalyticsDashboard, BatchProperty, PropertyBatch, BatchImportResult };// Force Vercel rebuild - Sat, Aug 23, 2025 10:41:11 PM
