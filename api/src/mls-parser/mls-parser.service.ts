@@ -30,7 +30,7 @@ export class MLSParserService {
     try {
       // Railway-optimized Puppeteer configuration
       this.browser = await puppeteer.launch({
-        headless: 'new',
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
