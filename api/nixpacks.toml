@@ -2,7 +2,7 @@
 cmds = ['PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --production']
 
 [phases.build]
-cmds = ['npx prisma generate', 'npm run build']
+cmds = ['npx prisma generate', 'npx prisma db push', 'npm run build']
 
 [start]
 cmd = 'npm run start:prod'

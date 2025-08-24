@@ -26,4 +26,32 @@ export class HealthController {
       };
     }
   }
+
+  @Public()
+  @Get('db-status')
+  async getDatabaseStatus(): Promise<any> {
+    try {
+      // Check if tables exist and get counts
+      const userCount = await this.prisma.user.count();
+      const profileCount = await this.prisma.profile.count();
+      const clientCount = await this.prisma.client.count();
+      
+      return {
+        status: 'ok',
+        tables: {
+          users: userCount,
+          profiles: profileCount,
+          clients: clientCount,
+        },
+        database: 'tables_exist'
+      };
+    } catch (error) {
+      console.error('Database status error:', error);
+      return {
+        status: 'error',
+        error: error.message,
+        database: 'tables_missing_or_error'
+      };
+    }
+  }
 }
