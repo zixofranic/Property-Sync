@@ -139,17 +139,26 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
+    try {
+      console.log('Validating user:', email);
+      const user = await this.usersService.findByEmail(email);
+      console.log('User found:', user ? 'Yes' : 'No');
 
-    if (
-      user &&
-      (await this.usersService.validatePassword(password, user.password))
-    ) {
-      const { password, ...result } = user;
-      return result;
+      if (user) {
+        const isValidPassword = await this.usersService.validatePassword(password, user.password);
+        console.log('Password valid:', isValidPassword);
+        
+        if (isValidPassword) {
+          const { password, ...result } = user;
+          return result;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in validateUser:', error);
+      return null;
     }
-
-    return null;
   }
 
   async updateProfile(userId: string, updateData: any) {
