@@ -165,13 +165,19 @@ export class HealthController {
 
       // Create foreign key constraints
       await this.prisma.$executeRawUnsafe(`
-        ALTER TABLE "profiles" DROP CONSTRAINT IF EXISTS "profiles_userId_fkey";
-        ALTER TABLE "profiles" ADD CONSTRAINT "profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        ALTER TABLE "profiles" DROP CONSTRAINT IF EXISTS "profiles_userId_fkey"
+      `);
+      
+      await this.prisma.$executeRawUnsafe(`
+        ALTER TABLE "profiles" ADD CONSTRAINT "profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
       `);
 
       await this.prisma.$executeRawUnsafe(`
-        ALTER TABLE "clients" DROP CONSTRAINT IF EXISTS "clients_agentId_fkey";
-        ALTER TABLE "clients" ADD CONSTRAINT "clients_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        ALTER TABLE "clients" DROP CONSTRAINT IF EXISTS "clients_agentId_fkey"
+      `);
+      
+      await this.prisma.$executeRawUnsafe(`
+        ALTER TABLE "clients" ADD CONSTRAINT "clients_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
       `);
 
       return {
