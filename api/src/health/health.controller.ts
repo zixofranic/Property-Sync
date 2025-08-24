@@ -54,4 +54,56 @@ export class HealthController {
       };
     }
   }
+
+  @Public()
+  @Get('db-init')
+  async initializeDatabase(): Promise<any> {
+    try {
+      console.log('Initializing database with Prisma migrations...');
+      
+      // Use Prisma's programmatic API to push the schema
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "users" (
+          "id" TEXT NOT NULL,
+          "email" TEXT NOT NULL,
+          "password" TEXT NOT NULL,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+          "verificationToken" TEXT,
+          "verificationExpiry" TIMESTAMP(3),
+          "resetToken" TEXT,
+          "resetExpiry" TIMESTAMP(3),
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          
+          CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+        );
+      `);
+
+      await this.prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
+      `);
+
+      await this.prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "users_verificationToken_key" ON "users"("verificationToken");
+      `);
+
+      await this.prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "users_resetToken_key" ON "users"("resetToken");
+      `);
+
+      return {
+        status: 'success',
+        message: 'Database tables created successfully',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Database initialization error:', error);
+      return {
+        status: 'error',
+        error: error.message,
+        message: 'Failed to initialize database'
+      };
+    }
+  }
 }
