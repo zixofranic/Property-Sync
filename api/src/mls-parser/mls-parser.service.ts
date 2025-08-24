@@ -16,11 +16,7 @@ export class MLSParserService {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Skip browser initialization on Railway for now - get core API live first
-    if (process.env.RAILWAY_ENVIRONMENT) {
-      this.logger.warn('MLS parsing disabled on Railway - core API functionality available');
-      return;
-    }
+    // Initialize browser on Railway - Railway handles Puppeteer better than Vercel
     await this.initBrowser();
   }
 
@@ -32,20 +28,31 @@ export class MLSParserService {
 
   private async initBrowser(): Promise<void> {
     try {
+      // Railway-optimized Puppeteer configuration
       this.browser = await puppeteer.launch({
-        headless: true,
+        headless: 'new',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--memory-pressure-off'
         ],
         ignoreDefaultArgs: ['--disable-extensions'],
+        timeout: 30000,
       });
-      this.logger.log('Browser initialized successfully');
+      this.logger.log('Browser initialized successfully for MLS parsing');
     } catch (error) {
       this.logger.error('Failed to initialize browser:', error);
-      throw error;
+      // Don't throw error - allow API to continue without MLS parsing
+      this.browser = null;
     }
   }
 
