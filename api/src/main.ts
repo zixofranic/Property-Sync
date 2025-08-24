@@ -5,39 +5,6 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Initialize database on startup
-  try {
-    const prisma = app.get('PrismaService');
-    console.log('🔄 Initializing database schema...');
-    
-    // Create users table if it doesn't exist
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "users" (
-        "id" TEXT NOT NULL,
-        "email" TEXT NOT NULL,
-        "password" TEXT NOT NULL,
-        "isActive" BOOLEAN NOT NULL DEFAULT true,
-        "emailVerified" BOOLEAN NOT NULL DEFAULT false,
-        "verificationToken" TEXT,
-        "verificationExpiry" TIMESTAMP(3),
-        "resetToken" TEXT,
-        "resetExpiry" TIMESTAMP(3),
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT now(),
-        
-        CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-      );
-    `);
-
-    await prisma.$executeRawUnsafe(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
-    `);
-    
-    console.log('✅ Database schema initialized');
-  } catch (error) {
-    console.warn('⚠️ Database initialization warning:', error.message);
-  }
-
   // Enable CORS
   app.enableCors({
     origin: [
