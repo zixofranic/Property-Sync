@@ -209,6 +209,16 @@ export class UsersService {
         emailVerified: false,
         verificationToken: verificationData.verificationToken,
         verificationExpiry: verificationData.verificationExpiry,
+        profile: {
+          create: {
+            firstName: registerDto.firstName,
+            lastName: registerDto.lastName,
+            company: registerDto.company,
+            phone: registerDto.phone,
+            licenseNumber: registerDto.licenseNumber,
+            plan: 'FREE',
+          },
+        },
       },
       include: {
         profile: true,
