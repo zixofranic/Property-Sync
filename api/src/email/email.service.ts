@@ -6,8 +6,11 @@ import * as nodemailer from 'nodemailer';
 export interface TimelineEmailData {
   clientEmail: string;
   clientName: string;
+  clientPhone?: string;
   agentName: string;
   agentCompany: string;
+  agentEmail?: string;
+  agentPhone?: string;
   timelineUrl: string;
   propertyCount: number;
   spouseEmail?: string;
@@ -103,8 +106,11 @@ export class EmailService {
       const resendResult = await this.resendProvider.sendTimelineEmail({
         to: data.clientEmail,
         clientName: data.clientName,
+        clientPhone: data.clientPhone,
         agentName: data.agentName,
         agentCompany: data.agentCompany,
+        agentEmail: data.agentEmail,
+        agentPhone: data.agentPhone,
         timelineUrl: data.timelineUrl,
         propertyCount: data.propertyCount,
         spouseEmail: data.spouseEmail,

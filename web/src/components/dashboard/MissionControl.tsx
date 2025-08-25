@@ -25,7 +25,8 @@ import {
   User,
   Share2,
   Mail,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { BatchPropertyModal } from '../modals/BatchPropertyModal';
@@ -94,6 +95,8 @@ export function MissionControl() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [emailState, setEmailState] = useState<any>(null);
   const [emailStateLoading, setEmailStateLoading] = useState(false);
+  const [dismissedInitialBanner, setDismissedInitialBanner] = useState(false);
+  const [dismissedReminderBanner, setDismissedReminderBanner] = useState(false);
 
   // âœ… SIMPLIFIED: Basic online/offline detection only
   const [isOnline, setIsOnline] = useState(true);
@@ -759,10 +762,11 @@ const testProfileAPI = async () => {
       )}
 
       {/* Initial Email Reminder Banner */}
-      {selectedClient && emailState?.canSendInitial && properties.length > 0 && (
+      {selectedClient && emailState?.canSendInitial && properties.length > 0 && !dismissedInitialBanner && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
           className={`fixed ${!isOnline ? 'top-32' : 'top-24'} left-6 right-6 z-30 bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-4 rounded-xl shadow-lg border border-green-500/30 max-w-4xl mx-auto`}
         >
           <div className="flex items-center justify-between">
@@ -775,21 +779,31 @@ const testProfileAPI = async () => {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setShowShareModal(true)}
-              className="px-6 py-2 bg-white text-green-700 hover:bg-green-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              Send Initial Email
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="px-6 py-2 bg-white text-green-700 hover:bg-green-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                Send Initial Email
+              </button>
+              <button
+                onClick={() => setDismissedInitialBanner(true)}
+                className="p-1 hover:bg-white/20 rounded-md transition-colors duration-200"
+                title="Dismiss reminder"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </motion.div>
       )}
 
       {/* Reminder Email Banner */}
-      {selectedClient && emailState?.canSendReminder && emailState.newPropertyCount > 0 && (
+      {selectedClient && emailState?.canSendReminder && emailState.newPropertyCount > 0 && !dismissedReminderBanner && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
           className={`fixed ${!isOnline ? 'top-32' : 'top-24'} left-6 right-6 z-30 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-4 rounded-xl shadow-lg border border-blue-500/30 max-w-4xl mx-auto`}
         >
           <div className="flex items-center justify-between">
@@ -802,12 +816,21 @@ const testProfileAPI = async () => {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setShowShareModal(true)}
-              className="px-6 py-2 bg-white text-blue-700 hover:bg-blue-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              Send Update Email
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="px-6 py-2 bg-white text-blue-700 hover:bg-blue-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                Send Update Email
+              </button>
+              <button
+                onClick={() => setDismissedReminderBanner(true)}
+                className="p-1 hover:bg-white/20 rounded-md transition-colors duration-200"
+                title="Dismiss reminder"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </motion.div>
       )}
@@ -1052,23 +1075,38 @@ const testProfileAPI = async () => {
         color: 'from-gray-500 to-slate-600',
         disabled: false 
       }
-    ].map(({ icon: Icon, label, action, color, disabled }) => (
-      <motion.button
-        key={label}
-        onClick={() => !disabled && action()}
-        disabled={disabled}
-        className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
-          disabled ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-        whileHover={{ scale: disabled ? 1 : 1.1 }}
-        whileTap={{ scale: disabled ? 1 : 0.95 }}
-      >
-        <Icon className="w-5 h-5 text-white" />
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          {label}
-        </div>
-      </motion.button>
-    ))}
+    ].map(({ icon: Icon, label, action, color, disabled }) => {
+      // Check if this is the Share Timeline button and has unsent properties
+      const isShareButton = Icon === Share2;
+      const hasUnsentProperties = emailState?.canSendInitial || emailState?.canSendReminder;
+      const unsentCount = emailState?.canSendInitial ? properties.length : emailState?.newPropertyCount || 0;
+      
+      return (
+        <motion.button
+          key={label}
+          onClick={() => !disabled && action()}
+          disabled={disabled}
+          className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
+            disabled ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          whileHover={{ scale: disabled ? 1 : 1.1 }}
+          whileTap={{ scale: disabled ? 1 : 0.95 }}
+        >
+          <Icon className="w-5 h-5 text-white" />
+          
+          {/* Notification Badge for Share Timeline Button - 1/4 inside, 3/4 outside */}
+          {isShareButton && hasUnsentProperties && unsentCount > 0 && (
+            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-white shadow-lg animate-pulse z-10">
+              {unsentCount > 99 ? '99+' : unsentCount}
+            </div>
+          )}
+          
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            {label}
+          </div>
+        </motion.button>
+      );
+    })}
   </motion.div>
 </div>
 

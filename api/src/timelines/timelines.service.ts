@@ -405,7 +405,7 @@ export class TimelinesService {
           'Your Agent',
         agentCompany: agentProfile?.company || 'Realtor',
         agentEmail: timeline.agent.email || undefined,
-        agentPhone: timeline.agent.phone || undefined,
+        agentPhone: timeline.agent.profile?.phone || undefined,
         timelineUrl: shareUrl,
         propertyCount: timeline.properties.length,
         spouseEmail: timeline.client.spouseEmail || undefined,
