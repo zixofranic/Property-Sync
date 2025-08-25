@@ -491,20 +491,6 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
     });
   };
 
-  // Format relative time
-  const formatRelativeTime = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    } else if (diffInMinutes < 1440) { // 24 hours
-      return `${Math.floor(diffInMinutes / 60)}h ago`;
-    } else {
-      return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    }
-  };
 
   // Check if this is the first property of the day
   const isFirstPropertyOfDay = (properties: any[], currentIndex: number) => {
