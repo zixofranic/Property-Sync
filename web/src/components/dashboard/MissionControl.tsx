@@ -147,7 +147,14 @@ export function MissionControl() {
     }
   }, []);
 
-  // Fetch email state when timeline changes or share modal opens
+  // Fetch email state when timeline changes (for banners) and when share modal opens
+  useEffect(() => {
+    if (currentTimeline) {
+      fetchEmailState(currentTimeline.id);
+    }
+  }, [currentTimeline?.id, fetchEmailState]);
+
+  // Also refresh email state when share modal opens (for latest data)
   useEffect(() => {
     if (showShareModal && currentTimeline) {
       fetchEmailState(currentTimeline.id);
@@ -1063,7 +1070,13 @@ const testProfileAPI = async () => {
         isOpen={activeModal === 'add-property'} 
         onClose={() => {
           setActiveModal(null);
-        }} 
+        }}
+        onImportSuccess={async () => {
+          // Refresh email state after successful batch import
+          if (currentTimeline) {
+            await fetchEmailState(currentTimeline.id);
+          }
+        }}
       />
 
       <ClientsModal 

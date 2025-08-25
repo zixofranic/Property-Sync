@@ -13,9 +13,10 @@ import { apiClient, BatchProperty, PropertyBatch } from '@/lib/api-client';
 interface BatchPropertyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onImportSuccess?: () => Promise<void>;
 }
 
-export function BatchPropertyModal({ isOpen, onClose }: BatchPropertyModalProps) {
+export function BatchPropertyModal({ isOpen, onClose, onImportSuccess }: BatchPropertyModalProps) {
   const { 
     selectedClient, 
     getClientTimeline,
@@ -243,6 +244,11 @@ export function BatchPropertyModal({ isOpen, onClose }: BatchPropertyModalProps)
         // Refresh timeline
         if (selectedClient) {
           await loadTimeline(selectedClient.id);
+        }
+
+        // Refresh email state for banner visibility
+        if (onImportSuccess) {
+          await onImportSuccess();
         }
 
         // Add email reminder notification after successful import
