@@ -137,8 +137,13 @@ export function MissionControl() {
   const fetchEmailState = useCallback(async (timelineId: string) => {
     setEmailStateLoading(true);
     try {
-      const response = await apiClient.get(`/timelines/${timelineId}/email-state`);
-      setEmailState(response.data);
+      const response = await apiClient.getTimelineEmailState(timelineId);
+      if (response.error) {
+        console.error('Email state API error:', response.error);
+        setEmailState(null);
+      } else {
+        setEmailState(response.data);
+      }
     } catch (error) {
       console.error('Failed to fetch email state:', error);
       setEmailState(null);

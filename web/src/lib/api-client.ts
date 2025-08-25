@@ -786,6 +786,18 @@ class ApiClient {
     });
   }
 
+  async getTimelineEmailState(timelineId: string): Promise<ApiResponse<{
+    canSendInitial: boolean;
+    canSendReminder: boolean;
+    propertyCount: number;
+    newPropertyCount: number;
+    lastEmailDate?: string;
+    lastEmailPropertyCount: number;
+    initialEmailSent: boolean;
+  }>> {
+    return this.request(`/api/v1/timelines/${timelineId}/email-state`);
+  }
+
   async sendTimelineEmail(
   timelineId: string, 
   templateOverride?: 'modern' | 'classical',
