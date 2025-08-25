@@ -32,7 +32,8 @@
       "Bash(tasklist:*)",
       "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)",
       "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": [],

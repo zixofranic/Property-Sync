@@ -66,7 +66,6 @@ export function MissionControl() {
     userPreferences,
     updateEmailTemplate,
     updateUserPreferences,
-    sendTimelineEmail,
   } = useMissionControlStore();
   
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -133,6 +132,20 @@ export function MissionControl() {
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
   const properties = currentTimeline?.properties || [];
+
+  // Fetch email state for timeline - moved before useEffect
+  const fetchEmailState = useCallback(async (timelineId: string) => {
+    setEmailStateLoading(true);
+    try {
+      const response = await apiClient.get(`/timelines/${timelineId}/email-state`);
+      setEmailState(response.data);
+    } catch (error) {
+      console.error('Failed to fetch email state:', error);
+      setEmailState(null);
+    } finally {
+      setEmailStateLoading(false);
+    }
+  }, []);
 
   // Fetch email state when timeline changes or share modal opens
   useEffect(() => {
@@ -250,19 +263,6 @@ export function MissionControl() {
       sendBulkProperties(selectedClient.id);
     }
   };
-  // Fetch email state for timeline - wrapped in useCallback to stabilize for useEffect
-  const fetchEmailState = useCallback(async (timelineId: string) => {
-    setEmailStateLoading(true);
-    try {
-      const response = await apiClient.get(`/timelines/${timelineId}/email-state`);
-      setEmailState(response.data);
-    } catch (error) {
-      console.error('Failed to fetch email state:', error);
-      setEmailState(null);
-    } finally {
-      setEmailStateLoading(false);
-    }
-  }, []);
 
   const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => {
     if (!selectedClient || !currentTimeline) {
@@ -276,11 +276,30 @@ export function MissionControl() {
     }
 
     try {
-      await sendTimelineEmail(currentTimeline.id, templateOverride, emailType);
+      // Use API client directly to avoid potential store initialization issues
+      const response = await apiClient.sendTimelineEmail(currentTimeline.id, templateOverride, emailType);
+      
+      if (response.error) {
+        addNotification({
+          type: 'error',
+          title: 'Email Failed',
+          message: response.error,
+          read: false,
+        });
+        throw new Error(response.error);
+      }
+
+      // Success notification
+      addNotification({
+        type: 'success',
+        title: 'Email Sent!',
+        message: `Timeline email sent successfully to ${selectedClient.name}`,
+        read: false,
+      });
+
       // Refresh email state after successful send
       await fetchEmailState(currentTimeline.id);
     } catch (error) {
-      // Error handling is done in the store action
       throw error; // Re-throw for modal handling
     }
   };
