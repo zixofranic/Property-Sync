@@ -8,6 +8,7 @@ import {
   Sparkles, Heart
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { apiClient } from '@/lib/api-client';
 
 interface AgentData {
   name: string;
@@ -32,15 +33,30 @@ interface AgentIdentityCardModalProps {
   agent: AgentData;
   isOpen: boolean;
   onClose: () => void;
+  shareToken?: string;
 }
 
-export function AgentIdentityCardModal({ agent, isOpen, onClose }: AgentIdentityCardModalProps) {
+export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: AgentIdentityCardModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
+
+    // Track the download action
+    if (shareToken) {
+      try {
+        await apiClient.trackAgentInteraction(shareToken, 'agent_card_download', {
+          agentName: agent.name,
+          agentCompany: agent.company,
+          action: 'download_agent_card',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to track agent card download:', error);
+      }
+    }
 
     setIsDownloading(true);
     try {
@@ -70,6 +86,21 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose }: AgentIdentity
 
   const handleShareCard = async () => {
     if (!cardRef.current) return;
+
+    // Track the share action
+    if (shareToken) {
+      try {
+        await apiClient.trackAgentInteraction(shareToken, 'agent_card_share', {
+          agentName: agent.name,
+          agentCompany: agent.company,
+          action: 'share_agent_card',
+          shareMethod: 'native_share',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to track agent card share:', error);
+      }
+    }
 
     try {
       const canvas = await html2canvas(cardRef.current, {
@@ -105,6 +136,21 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose }: AgentIdentity
   };
 
   const handleCopyShareText = async () => {
+    // Track the copy action
+    if (shareToken) {
+      try {
+        await apiClient.trackAgentInteraction(shareToken, 'agent_info_copy', {
+          agentName: agent.name,
+          agentCompany: agent.company,
+          action: 'copy_agent_info',
+          shareMethod: 'copy_text',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to track agent info copy:', error);
+      }
+    }
+
     const shareText = `🏠 Meet ${agent.name} - An amazing real estate agent!
 
 ${agent.company} • REALTOR®
@@ -232,27 +278,14 @@ Highly recommend reaching out if you're looking to buy or sell!
                       </div>
 
                       {/* Experience & Stats */}
-                      {(agent.yearsExperience || (agent.specialties && agent.specialties.length > 0)) && (
+                      {agent.yearsExperience && (
                         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
-                          <div className="grid grid-cols-2 gap-6">
-                            {agent.yearsExperience && (
-                              <div className="text-center">
-                                <div className="text-3xl font-bold" style={{ color: agent.brandColor }}>
-                                  {agent.yearsExperience}
-                                </div>
-                                <div className="text-sm text-slate-600">Years Experience</div>
-                                <div className="text-xs text-slate-500">{startYear} - {currentYear}</div>
-                              </div>
-                            )}
-                            {agent.specialties && agent.specialties.length > 0 && (
-                              <div className="text-center">
-                                <div className="text-3xl font-bold" style={{ color: agent.brandColor }}>
-                                  {agent.specialties.length}
-                                </div>
-                                <div className="text-sm text-slate-600">Specialties</div>
-                                <div className="text-xs text-slate-500">Areas of Expertise</div>
-                              </div>
-                            )}
+                          <div className="text-center">
+                            <div className="text-3xl font-bold" style={{ color: agent.brandColor }}>
+                              {agent.yearsExperience}
+                            </div>
+                            <div className="text-sm text-slate-600">Years Experience</div>
+                            <div className="text-xs text-slate-500">{startYear} - {currentYear}</div>
                           </div>
                         </div>
                       )}
@@ -289,26 +322,6 @@ Highly recommend reaching out if you're looking to buy or sell!
                         </div>
                       </div>
 
-                      {/* Specialties */}
-                      {agent.specialties && agent.specialties.length > 0 && (
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
-                          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                            <Sparkles className="w-5 h-5 mr-2" style={{ color: agent.brandColor }} />
-                            Areas of Expertise
-                          </h3>
-                          <div className="flex flex-wrap gap-2">
-                            {agent.specialties.map((specialty, index) => (
-                              <span
-                                key={index}
-                                className="px-3 py-1 rounded-full text-sm font-medium text-white"
-                                style={{ backgroundColor: agent.brandColor }}
-                              >
-                                {specialty}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
                       {/* Bio */}
                       {agent.bio && (

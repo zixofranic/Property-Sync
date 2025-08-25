@@ -8,6 +8,13 @@ export class TrackEventDto {
     'feedback_submit',
     'email_open',
     'email_click',
+    'agent_email_click',
+    'agent_phone_click',
+    'agent_website_click',
+    'agent_profile_view',
+    'agent_card_download',
+    'agent_card_share',
+    'agent_info_copy',
   ])
   eventType: string;
 

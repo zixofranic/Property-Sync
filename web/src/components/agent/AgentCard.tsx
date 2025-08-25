@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, MapPin, Share2, User, Building, Star, Award } from 'lucide-react';
+import { Phone, Mail, MapPin, Share2, User, Building, Star, Award, Globe } from 'lucide-react';
 import { AgentIdentityCardModal } from './AgentIdentityCardModal';
+import { apiClient } from '@/lib/api-client';
 
 interface AgentData {
   name: string;
@@ -30,17 +31,33 @@ interface AgentCardProps {
   isSticky?: boolean;
   variant?: 'dashboard' | 'email';
   className?: string;
+  shareToken?: string;
 }
 
 export function AgentCard({ 
   agent, 
   isSticky = false, 
   variant = 'dashboard',
-  className = '' 
+  className = '',
+  shareToken
 }: AgentCardProps) {
   const [showIdentityCard, setShowIdentityCard] = useState(false);
 
-  const handleSmartContact = async (type: 'email' | 'phone') => {
+  const handleSmartContact = async (type: 'email' | 'phone' | 'website') => {
+    // Track the agent interaction if shareToken is available
+    if (shareToken) {
+      try {
+        await apiClient.trackAgentInteraction(shareToken, `agent_${type}_click`, {
+          agentName: agent.name,
+          agentCompany: agent.company,
+          contactType: type,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to track agent interaction:', error);
+      }
+    }
+
     if (type === 'email' && agent.email) {
       const mailtoLink = `mailto:${agent.email}?subject=Question about my property timeline&body=Hi ${agent.name.split(' ')[0]},
 
@@ -58,6 +75,8 @@ Thank you!`;
       }
     } else if (type === 'phone' && agent.phone) {
       window.location.href = `tel:${agent.phone}`;
+    } else if (type === 'website' && agent.website) {
+      window.open(agent.website, '_blank');
     }
   };
 
@@ -174,9 +193,10 @@ Thank you!`;
   // Regular card variant (for email, etc.)
   const baseClasses = `
     bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 
-    border border-slate-700/50 backdrop-blur-xl rounded-2xl p-4
+    border border-slate-700/50 backdrop-blur-xl rounded-2xl 
+    p-3 sm:p-4 md:p-6
     shadow-2xl transition-all duration-300
-    ${variant === 'email' ? 'max-w-md mx-auto' : ''}
+    ${variant === 'email' ? 'max-w-md mx-auto' : 'max-w-sm sm:max-w-md lg:max-w-lg'}
     ${className}
   `;
 
@@ -190,94 +210,119 @@ Thank you!`;
         style={{ borderColor: `${agent.brandColor}20` }}
       >
         {/* Header */}
-        <div className="flex items-center space-x-3 mb-4">
+        <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
           {agent.logo ? (
             <img
               src={agent.logo}
               alt={agent.name}
-              className="w-12 h-12 rounded-full object-cover border-2 shadow-lg"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 shadow-lg"
               style={{ borderColor: agent.brandColor }}
             />
           ) : (
             <div 
-              className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-lg"
               style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor }}
             >
-              <User className="w-6 h-6" />
+              <User className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           )}
           
-          <div className="flex-1">
-            <h3 className="text-white font-bold text-lg leading-tight">{agent.name}</h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-bold text-base sm:text-lg leading-tight truncate">{agent.name}</h3>
             <div className="flex items-center space-x-1">
-              <Building className="w-3 h-3 text-slate-400" />
-              <p className="text-slate-300 text-sm">{agent.company}</p>
+              <Building className="w-3 h-3 text-slate-400 flex-shrink-0" />
+              <p className="text-slate-300 text-xs sm:text-sm truncate">{agent.company}</p>
             </div>
             <div className="flex items-center space-x-1 mt-1">
-              <Award className="w-3 h-3" style={{ color: agent.brandColor }} />
+              <Award className="w-3 h-3 flex-shrink-0" style={{ color: agent.brandColor }} />
               <p className="text-xs" style={{ color: agent.brandColor }}>REALTOR®</p>
             </div>
           </div>
         </div>
 
+        {/* Agent Bio */}
+        {agent.bio && (
+          <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-slate-800/20 rounded-lg">
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">{agent.bio}</p>
+          </div>
+        )}
+
         {/* Quick Stats (if available) */}
         {agent.yearsExperience && (
-          <div className="flex items-center justify-center space-x-4 mb-4 p-3 bg-slate-800/30 rounded-xl">
+          <div className="flex items-center justify-center mb-3 sm:mb-4 p-2 sm:p-3 bg-slate-800/30 rounded-xl">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">{agent.yearsExperience}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{agent.yearsExperience}</div>
               <div className="text-xs text-slate-400">Years Experience</div>
             </div>
-            {agent.specialties && agent.specialties.length > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold" style={{ color: agent.brandColor }}>
-                  {agent.specialties.length}
-                </div>
-                <div className="text-xs text-slate-400">Specialties</div>
-              </div>
-            )}
           </div>
         )}
 
         {/* Contact Actions */}
-        <div className="space-y-3 mb-4">
+        <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4">
           {agent.email && (
             <motion.button
               onClick={() => handleSmartContact('email')}
-              className="w-full flex items-center space-x-3 p-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all duration-200 shadow-lg"
+              className="w-full flex items-center justify-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Mail className="w-4 h-4" />
-              <span className="font-medium">Email {agent.name.split(' ')[0]}</span>
+              <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="font-medium text-sm sm:text-base">Email {agent.name.split(' ')[0]}</span>
             </motion.button>
           )}
 
           {agent.phone && (
             <motion.button
               onClick={() => handleSmartContact('phone')}
-              className="w-full flex items-center space-x-3 p-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl transition-all duration-200 shadow-lg"
+              className="w-full flex items-center justify-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Phone className="w-4 h-4" />
-              <span className="font-medium">Call Now</span>
+              <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="font-medium text-sm sm:text-base">Call Now</span>
+            </motion.button>
+          )}
+
+          {agent.website && (
+            <motion.button
+              onClick={() => handleSmartContact('website')}
+              className="w-full flex items-center justify-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="font-medium text-sm sm:text-base">Visit Website</span>
             </motion.button>
           )}
         </div>
 
         {/* Share Agent Button */}
         <motion.button
-          onClick={() => setShowIdentityCard(true)}
-          className="w-full flex items-center justify-center space-x-3 p-3 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 hover:from-purple-700 hover:via-pink-700 hover:to-red-700 text-white rounded-xl transition-all duration-200 shadow-lg border border-white/20"
+          onClick={() => {
+            if (shareToken) {
+              try {
+                apiClient.trackAgentInteraction(shareToken, 'agent_profile_view', {
+                  agentName: agent.name,
+                  agentCompany: agent.company,
+                  action: 'profile_modal_opened',
+                  timestamp: new Date().toISOString()
+                });
+              } catch (error) {
+                console.warn('Failed to track agent profile view:', error);
+              }
+            }
+            setShowIdentityCard(true);
+          }}
+          className="w-full flex items-center justify-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 hover:from-purple-700 hover:via-pink-700 hover:to-red-700 text-white rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg border border-white/20"
           whileHover={{ scale: 1.02, boxShadow: '0 20px 25px -5px rgba(168, 85, 247, 0.4)' }}
           whileTap={{ scale: 0.98 }}
         >
-          <Share2 className="w-4 h-4" />
-          <span className="font-medium text-sm">Share with someone you care about</span>
+          <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span className="font-medium text-xs sm:text-sm">Share with someone you care about</span>
         </motion.button>
 
         {/* Branding Footer */}
-        <div className="mt-4 pt-3 border-t border-slate-700/50 text-center">
+        <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-slate-700/50 text-center">
           <p className="text-xs text-slate-400">
             Powered by <span className="font-semibold" style={{ color: agent.brandColor }}>Property Sync</span>
           </p>
@@ -289,6 +334,7 @@ Thank you!`;
         agent={agent}
         isOpen={showIdentityCard}
         onClose={() => setShowIdentityCard(false)}
+        shareToken={shareToken}
       />
     </>
   );

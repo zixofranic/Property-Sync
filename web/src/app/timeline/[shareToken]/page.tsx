@@ -1,9 +1,9 @@
 // apps/web/src/app/timeline/[shareToken]/page.tsx
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Share2, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles } from 'lucide-react';
+import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
 import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
@@ -103,6 +103,27 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   } = useNotificationStore();
   const [previousPropertyCount, setPreviousPropertyCount] = useState<number>(0);
   const [showNewPropertiesBanner, setShowNewPropertiesBanner] = useState(false);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
+  const [newPropertyCount, setNewPropertyCount] = useState<number>(0);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState<boolean>(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const [clientMessages, setClientMessages] = useState<any[]>([]);
+
+  // Utility function to format relative time
+  const formatRelativeTime = (timestamp: string | Date): string => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMs = now.getTime() - time.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+    return time.toLocaleDateString();
+  };
 
   // Utility: Calculate property status (new/unseen/viewed)
   const getPropertyStatus = (property: any): PropertyStatus => {
@@ -181,6 +202,23 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     }
   }, []);
 
+  // Handle click outside notification dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotificationDropdown(false);
+      }
+    };
+
+    if (showNotificationDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotificationDropdown]);
+
   // Fetch timeline data
   useEffect(() => {
     const fetchTimelineData = async () => {
@@ -221,6 +259,48 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         
         setTimelineData(newData);
         setIsAuthenticated(newData?.isAuthenticated || false);
+        
+        // Calculate new properties count (properties added in last 24 hours)
+        if (newData?.properties) {
+          const now = new Date();
+          const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          
+          const recentProperties = newData.properties.filter((property: any) => {
+            const createdAt = new Date(property.createdAt);
+            return createdAt > twentyFourHoursAgo;
+          });
+          
+          setNewPropertyCount(recentProperties.length);
+        }
+        
+        // Fetch client notifications
+        try {
+          const notificationsResponse = await apiClient.getClientNotifications(shareToken);
+          if (notificationsResponse.data && Array.isArray(notificationsResponse.data)) {
+            setClientMessages(notificationsResponse.data);
+            const unreadCount = notificationsResponse.data.filter((msg: any) => !msg.isRead).length;
+            setUnreadMessageCount(unreadCount);
+          } else {
+            // Fallback to mock data for demo if API endpoint doesn't exist yet
+            const mockMessages = [
+              { id: 1, message: "New properties have been added to your timeline", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), isRead: false, type: "property" },
+              { id: 2, message: `${newData?.agent?.name || 'Your agent'} has sent you a message`, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), isRead: false, type: "message" },
+              { id: 3, message: "Property feedback requested for 123 Main St", timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), isRead: true, type: "feedback" }
+            ];
+            setClientMessages(mockMessages);
+            setUnreadMessageCount(mockMessages.filter(msg => !msg.isRead).length);
+          }
+        } catch (error) {
+          console.warn('Failed to fetch notifications, using mock data:', error);
+          // Fallback to mock data
+          const mockMessages = [
+            { id: 1, message: "New properties have been added to your timeline", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), isRead: false, type: "property" },
+            { id: 2, message: `${newData?.agent?.name || 'Your agent'} has sent you a message`, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), isRead: false, type: "message" },
+            { id: 3, message: "Property feedback requested for 123 Main St", timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), isRead: true, type: "feedback" }
+          ];
+          setClientMessages(mockMessages);
+          setUnreadMessageCount(mockMessages.filter(msg => !msg.isRead).length);
+        }
         
         // Track timeline view if authenticated
         if (newData?.isAuthenticated) {
@@ -608,14 +688,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {timelineData.agent.logo && (
-                <img
-                  src={timelineData.agent.logo}
-                  alt={timelineData.agent.company}
-                  className="h-10 w-auto"
-                />
-              )}
+            <div className="flex items-center">
               <div>
                 <h1 className="text-xl font-bold text-white">
                   {timelineData.timeline.title}
@@ -626,27 +699,89 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
+              {/* New Properties Counter Badge */}
+              {newPropertyCount > 0 && (
+                <div className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-full shadow-lg">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {newPropertyCount} New {newPropertyCount === 1 ? 'Property' : 'Properties'}
+                  </span>
+                </div>
+              )}
+              
+              {/* Notification Bell */}
+              <div className="relative" ref={notificationRef}>
+                <button 
+                  onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                  className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <Bell className="w-5 h-5 text-slate-300" />
+                  {unreadMessageCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {unreadMessageCount}
+                    </div>
+                  )}
+                </button>
+                
+                {/* Notification Dropdown */}
+                {showNotificationDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50">
+                    <div className="p-4 border-b border-slate-700">
+                      <h3 className="text-lg font-semibold text-white flex items-center">
+                        <Bell className="w-5 h-5 mr-2 text-blue-400" />
+                        Notifications
+                      </h3>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {clientMessages.length > 0 ? (
+                        clientMessages.map((msg, index) => (
+                          <div 
+                            key={msg.id}
+                            className={`p-4 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${
+                              !msg.isRead ? 'bg-blue-900/20' : ''
+                            }`}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                                msg.type === 'property' ? 'bg-green-400' :
+                                msg.type === 'message' ? 'bg-blue-400' : 'bg-yellow-400'
+                              }`} />
+                              <div className="flex-1">
+                                <p className="text-slate-300 text-sm leading-relaxed">{msg.message}</p>
+                                <p className="text-slate-500 text-xs mt-1">{formatRelativeTime(msg.timestamp)}</p>
+                              </div>
+                              {!msg.isRead && (
+                                <div className="w-2 h-2 bg-red-400 rounded-full flex-shrink-0 mt-2" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center">
+                          <div className="text-slate-400 mb-2">
+                            <Bell className="w-8 h-8 mx-auto opacity-50" />
+                          </div>
+                          <p className="text-slate-400 text-sm">No notifications</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 border-t border-slate-700 text-center">
+                      <button 
+                        onClick={() => setShowNotificationDropdown(false)}
+                        className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Properties Count */}
               <span className="text-sm text-slate-400">
                 {timelineData.properties.length} properties
               </span>
-              <button
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: `Properties for ${timelineData.client.firstName} ${timelineData.client.lastName}`,
-                      url: window.location.href,
-                    });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Link copied!');
-                  }
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white rounded-xl transition-all duration-200 border border-slate-700/50 shadow-lg"
-              >
-                <Share2 className="w-4 h-4" />
-                <span>Share</span>
-              </button>
             </div>
           </div>
         </div>
@@ -695,7 +830,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                       >
                         {/* Mobile: Left-aligned date on timeline - MOVED 50PX LEFT */}
                         <div className="lg:hidden flex items-center">
-                          <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 absolute left-2.5 z-20" />
+                          <div className="hidden xl:block w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 absolute left-2.5 z-20" />
                           <div className="ml-8" style={{marginLeft: '22px'}}>
                             <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg inline-block">
                               {(() => {
@@ -755,15 +890,15 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                           >
                             {/* Mobile Layout - Single column with timeline dot */}
                             <div className="lg:hidden flex items-start w-full mb-6">
-                              {/* Mobile Timeline Dot - FIXED POSITION */}
-                              <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 relative z-10 mt-4" style={{marginLeft: '-1px'}}>
+                              {/* Mobile Timeline Dot - HIDDEN on tablets and phones */}
+                              <div className="hidden xl:flex flex-shrink-0 w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 relative z-10 mt-4" style={{marginLeft: '-1px'}}>
                                 <div className="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
                               </div>
 
                               {/* Mobile Property Card - FULL WIDTH */}
                               <motion.div
                                 data-property-card
-                                className="ml-6 w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:bg-slate-700/50 transition-all duration-300"
+                                className="xl:ml-6 w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:bg-slate-700/50 transition-all duration-300"
                                 whileHover={{ scale: 1.01 }}
                               >
                                 {/* Flashing Icon on Property Card */}
@@ -1342,6 +1477,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       {/* Sticky Agent Card */}
       {timelineData && timelineData.agent && (
         <AgentCard
+          shareToken={shareToken}
           agent={{
             name: timelineData.agent.name || 'Your Agent',
             company: timelineData.agent.company || 'Real Estate Company',

@@ -943,6 +943,22 @@ async updateEmailPreferences(preferences: {
     }, true); // Skip auth for public tracking
   }
 
+  async trackAgentInteraction(shareToken: string, eventType: string, metadata?: any): Promise<ApiResponse<void>> {
+    return this.request(`/api/v1/analytics/track/${shareToken}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        eventType,
+        metadata: metadata || {}
+      }),
+    }, true); // Skip auth for public tracking
+  }
+
+  async getClientNotifications(shareToken: string): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/v1/timelines/${shareToken}/notifications`, {
+      method: 'GET',
+    }, true); // Skip auth for public access
+  }
+
   async submitPropertyFeedback(
     shareToken: string,
     propertyId: string,
