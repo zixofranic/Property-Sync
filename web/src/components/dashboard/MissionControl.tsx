@@ -99,10 +99,10 @@ export function MissionControl() {
 
   // Fetch email state when timeline changes or share modal opens
   useEffect(() => {
-    if (showShareModal && activeTimeline) {
-      fetchEmailState(activeTimeline.id);
+    if (showShareModal && currentTimeline) {
+      fetchEmailState(currentTimeline.id);
     }
-  }, [showShareModal, activeTimeline?.id]);
+  }, [showShareModal, currentTimeline?.id]);
 
   // âœ… SIMPLIFIED: Basic online/offline monitoring (no session management)
   useEffect(() => {
@@ -264,7 +264,7 @@ export function MissionControl() {
   };
 
   const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => {
-    if (!selectedClient || !activeTimeline) {
+    if (!selectedClient || !currentTimeline) {
       addNotification({
         type: 'error',
         title: 'Cannot Send Email',
@@ -275,9 +275,9 @@ export function MissionControl() {
     }
 
     try {
-      await sendTimelineEmail(activeTimeline.id, templateOverride, emailType);
+      await sendTimelineEmail(currentTimeline.id, templateOverride, emailType);
       // Refresh email state after successful send
-      await fetchEmailState(activeTimeline.id);
+      await fetchEmailState(currentTimeline.id);
     } catch (error) {
       // Error handling is done in the store action
       throw error; // Re-throw for modal handling
