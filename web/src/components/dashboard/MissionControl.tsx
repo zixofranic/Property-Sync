@@ -744,8 +744,66 @@ const testProfileAPI = async () => {
         </motion.div>
       )}
 
+      {/* Initial Email Reminder Banner */}
+      {selectedClient && emailState?.canSendInitial && properties.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`fixed ${!isOnline ? 'top-32' : 'top-24'} left-6 right-6 z-30 bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-4 rounded-xl shadow-lg border border-green-500/30 max-w-4xl mx-auto`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Mail className="w-5 h-5" />
+              <div>
+                <span className="font-semibold text-lg">Ready to share your timeline!</span>
+                <p className="text-green-100 text-sm mt-1">
+                  You have {properties.length} properties ready to share with {selectedClient.name}. Send their initial timeline email to get started.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="px-6 py-2 bg-white text-green-700 hover:bg-green-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              Send Initial Email
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Reminder Email Banner */}
+      {selectedClient && emailState?.canSendReminder && emailState.newPropertyCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`fixed ${!isOnline ? 'top-32' : 'top-24'} left-6 right-6 z-30 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-4 rounded-xl shadow-lg border border-blue-500/30 max-w-4xl mx-auto`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5" />
+              <div>
+                <span className="font-semibold text-lg">New properties added!</span>
+                <p className="text-blue-100 text-sm mt-1">
+                  {emailState.newPropertyCount} new properties have been added since your last email to {selectedClient.name}.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="px-6 py-2 bg-white text-blue-700 hover:bg-blue-50 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              Send Update Email
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Main Timeline Canvas */}
-      <div className={`${!isOnline ? 'pt-40' : 'pt-28'} px-6 pb-24`}>
+      <div className={`${
+        !isOnline ? 'pt-56' : 
+        (emailState?.canSendInitial || emailState?.canSendReminder) ? 'pt-44' : 
+        'pt-28'
+      } px-6 pb-24`}>
         <div className="max-w-6xl mx-auto">
           {selectedClient ? (
             <>

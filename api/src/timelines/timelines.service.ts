@@ -851,26 +851,9 @@ export class TimelinesService {
         (r) => r.success,
       );
 
-      if (successfulImports.length > 0) {
-        try {
-          // Get timeline for email sending
-          const timeline = await this.prisma.timeline.findUnique({
-            where: { id: batch.timelineId },
-            include: {
-              client: true,
-              agent: { include: { profile: true } },
-            },
-          });
-
-          if (timeline) {
-            // Send batch notification email
-            await this.sendBatchImportNotification(timeline, successfulImports);
-          }
-        } catch (emailError) {
-          console.warn('Failed to send import notification email:', emailError);
-          // Don't fail the import if email fails
-        }
-      }
+      // NOTE: Automatic email sending has been disabled for batch imports
+      // Agents must manually send emails via "Share Timeline" button
+      // This gives agents full control over when and what type of email to send to clients
 
       return {
         message: `Successfully imported ${successfulImports.length} properties`,
