@@ -21,6 +21,11 @@ export interface UserPreferences {
   notificationDesktop: boolean;
   notificationFeedback: boolean;
   notificationNewProperties: boolean;
+  // New client activity notification preferences
+  notificationClientViews: boolean; // Timeline and property views
+  notificationClientLogin: boolean; // Client authentication events
+  notificationEmailOpens: boolean; // Email engagement tracking
+  notificationInactiveClients: boolean; // Client hasn't visited in X days
   theme: 'dark' | 'light' | 'system';
   soundEnabled: boolean;
   timezone: string;
@@ -118,11 +123,19 @@ export interface Timeline {
 // Notification Interface
 export interface Notification {
   id: string;
-  type: 'success' | 'error' | 'warning' | 'info';
+  type: 'success' | 'error' | 'warning' | 'info' | 'activity';
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
+  clientId?: string; // For client activity notifications
+  propertyId?: string; // For property-specific notifications
+  metadata?: {
+    eventType?: 'timeline_view' | 'property_view' | 'feedback_submit' | 'email_open' | 'client_login';
+    clientName?: string;
+    propertyAddress?: string;
+    feedbackType?: 'love' | 'like' | 'dislike';
+  };
 }
 
 // Email State Interface
@@ -164,6 +177,10 @@ interface MissionControlState extends EmailState {
 
   // Notifications
   notifications: Notification[];
+
+  // Activity Polling
+  lastActivityCheck: string | null;
+  activityPollingInterval: NodeJS.Timeout | null;
 
   // UI State
   sidebarOpen: boolean;
@@ -245,6 +262,11 @@ interface MissionControlActions extends EmailActions {
   removeNotification: (id: string) => void;
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
+  
+  // Activity Polling Actions
+  startActivityPolling: () => void;
+  stopActivityPolling: () => void;
+  processRecentActivity: (activities: any[]) => void;
 
   // Polling Actions
   startPolling: () => void;
@@ -279,6 +301,11 @@ const defaultPreferences: UserPreferences = {
   notificationDesktop: true,
   notificationFeedback: true,
   notificationNewProperties: true,
+  // New activity notification defaults - enable the most important ones
+  notificationClientViews: true,    // Timeline and property views
+  notificationClientLogin: false,   // Less critical
+  notificationEmailOpens: true,     // Important for engagement
+  notificationInactiveClients: false, // Will implement separately
   theme: 'dark',
   soundEnabled: true,
   timezone: 'America/New_York',
@@ -345,6 +372,10 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         // Initial Notifications State
         notifications: [],
+
+        // Initial Activity Polling State
+        lastActivityCheck: null,
+        activityPollingInterval: null,
 
         // Initial UI State
         sidebarOpen: true,
@@ -436,6 +467,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           
           // Stop polling
           get().stopPolling();
+          get().stopActivityPolling();
 
           // Clear API client tokens
           apiClient.logout();
@@ -451,6 +483,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             activeTimeline: null,
             analytics: null,
             notifications: [],
+            lastActivityCheck: null,
+            activityPollingInterval: null,
             selectedView: 'clients',
             activeModal: null,
             editingProperty: null,
@@ -486,6 +520,10 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               get().loadDashboardAnalytics(),
               get().loadUserPreferences()
             ]);
+            
+            // Start activity polling after data is loaded
+            get().startActivityPolling();
+            
             console.log('Store: Initial data loading complete');
           } catch (error) {
             console.warn('Store: Some initial data failed to load:', error);
@@ -890,6 +928,153 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             clearInterval(pollingInterval);
             set({ pollingInterval: null });
           }
+        },
+
+        // Activity Polling Methods
+        startActivityPolling: () => {
+          console.log('Store: Starting activity polling...');
+          
+          get().stopActivityPolling();
+
+          const interval = setInterval(async () => {
+            const state = get();
+            if (state.isAuthenticated && state.userPreferences) {
+              try {
+                const since = state.lastActivityCheck || new Date(Date.now() - 30000).toISOString(); // Last 30 seconds
+                const response = await apiClient.getAgentRecentActivity(since);
+                
+                if (response.data && response.data.length > 0) {
+                  console.log('Store: Processing', response.data.length, 'new activities');
+                  state.processRecentActivity(response.data);
+                  set({ lastActivityCheck: new Date().toISOString() });
+                }
+              } catch (error) {
+                console.warn('Store: Activity polling failed:', error);
+              }
+            } else if (!state.isAuthenticated) {
+              console.log('Store: Not authenticated, stopping activity polling');
+              state.stopActivityPolling();
+            }
+          }, 30000); // Poll every 30 seconds
+
+          set({ activityPollingInterval: interval });
+        },
+
+        stopActivityPolling: () => {
+          console.log('Store: Stopping activity polling...');
+          const { activityPollingInterval } = get();
+          if (activityPollingInterval) {
+            clearInterval(activityPollingInterval);
+            set({ activityPollingInterval: null });
+          }
+        },
+
+        processRecentActivity: (activities: any[]) => {
+          const state = get();
+          const preferences = state.userPreferences;
+          
+          if (!preferences) return;
+
+          activities.forEach((activity) => {
+            const clientName = activity.timeline?.client?.firstName && activity.timeline?.client?.lastName 
+              ? `${activity.timeline.client.firstName} ${activity.timeline.client.lastName}` 
+              : 'Client';
+            
+            let notification: Omit<Notification, 'id' | 'timestamp'> | null = null;
+
+            switch (activity.eventType) {
+              case 'timeline_view':
+                if (preferences.notificationClientViews) {
+                  notification = {
+                    type: 'activity',
+                    title: '👁️ Client Timeline View',
+                    message: `${clientName} just viewed their timeline`,
+                    read: false,
+                    clientId: activity.timeline?.clientId,
+                    metadata: {
+                      eventType: 'timeline_view',
+                      clientName,
+                    }
+                  };
+                }
+                break;
+
+              case 'property_view':
+                if (preferences.notificationClientViews) {
+                  const propertyInfo = activity.metadata?.propertyAddress || 'a property';
+                  notification = {
+                    type: 'activity',
+                    title: '🏠 Property View',
+                    message: `${clientName} viewed ${propertyInfo}`,
+                    read: false,
+                    clientId: activity.timeline?.clientId,
+                    propertyId: activity.propertyId,
+                    metadata: {
+                      eventType: 'property_view',
+                      clientName,
+                      propertyAddress: propertyInfo,
+                    }
+                  };
+                }
+                break;
+
+              case 'feedback_submit':
+                if (preferences.notificationFeedback) {
+                  const feedbackType = activity.metadata?.feedbackType || 'feedback';
+                  const feedbackEmoji = feedbackType === 'love' ? '❤️' : feedbackType === 'like' ? '👍' : '👎';
+                  notification = {
+                    type: 'info',
+                    title: `${feedbackEmoji} Client Feedback`,
+                    message: `${clientName} ${feedbackType === 'love' ? 'loves' : feedbackType === 'like' ? 'likes' : 'dislikes'} a property`,
+                    read: false,
+                    clientId: activity.timeline?.clientId,
+                    propertyId: activity.propertyId,
+                    metadata: {
+                      eventType: 'feedback_submit',
+                      clientName,
+                      feedbackType,
+                    }
+                  };
+                }
+                break;
+
+              case 'email_open':
+                if (preferences.notificationEmailOpens) {
+                  notification = {
+                    type: 'activity',
+                    title: '📧 Email Opened',
+                    message: `${clientName} opened your timeline email`,
+                    read: false,
+                    clientId: activity.timeline?.clientId,
+                    metadata: {
+                      eventType: 'email_open',
+                      clientName,
+                    }
+                  };
+                }
+                break;
+
+              case 'client_login':
+                if (preferences.notificationClientLogin) {
+                  notification = {
+                    type: 'activity',
+                    title: '🔐 Client Login',
+                    message: `${clientName} logged into their timeline`,
+                    read: false,
+                    clientId: activity.timeline?.clientId,
+                    metadata: {
+                      eventType: 'client_login',
+                      clientName,
+                    }
+                  };
+                }
+                break;
+            }
+
+            if (notification) {
+              get().addNotification(notification);
+            }
+          });
         },
 
         // Client Management

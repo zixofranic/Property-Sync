@@ -24,4 +24,21 @@ export class NotificationPreferencesDto {
   @IsOptional()
   @IsBoolean()
   smsCriticalAlerts?: boolean;
+
+  // Client Activity Notifications
+  @IsOptional()
+  @IsBoolean()
+  notificationClientViews?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notificationClientLogin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notificationEmailOpens?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notificationInactiveClients?: boolean;
 }

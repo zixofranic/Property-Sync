@@ -80,6 +80,11 @@ model Profile {
   notificationDesktop Boolean @default(true) 
   notificationFeedback Boolean @default(true)
   notificationNewProperties Boolean @default(true)
+  // Client Activity Notifications
+  notificationClientViews Boolean @default(true) // Timeline and property views
+  notificationClientLogin Boolean @default(false) // Client login events
+  notificationEmailOpens Boolean @default(true) // Email engagement tracking
+  notificationInactiveClients Boolean @default(false) // Inactive client alerts
   theme String @default("dark") // "dark" | "light" | "system"
   soundEnabled Boolean @default(true)
   

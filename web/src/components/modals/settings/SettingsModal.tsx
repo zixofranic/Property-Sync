@@ -29,6 +29,11 @@ interface SettingsModalProps {
       desktop: boolean;
       feedback: boolean;
       newProperties: boolean;
+      // New activity notifications
+      clientViews?: boolean;
+      clientLogin?: boolean;
+      emailOpens?: boolean;
+      inactiveClients?: boolean;
     };
     theme: 'dark' | 'light' | 'system';
     soundEnabled: boolean;
@@ -398,6 +403,52 @@ export function SettingsModal({
                         <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
                       </label>
                     </div>
+                  </div>
+                </div>
+
+                {/* Client Activity Notifications */}
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <h4 className="font-medium text-white mb-4 flex items-center space-x-2">
+                    <Bell className="w-4 h-4 text-purple-400" />
+                    <span>Client Activity Notifications</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {[
+                      { 
+                        key: 'clientViews', 
+                        label: 'Timeline & property views', 
+                        description: 'When clients view their timeline or specific properties',
+                        enabled: preferences.notifications.clientViews ?? true
+                      },
+                      { 
+                        key: 'emailOpens', 
+                        label: 'Email opens', 
+                        description: 'When clients open timeline emails you send',
+                        enabled: preferences.notifications.emailOpens ?? true
+                      },
+                      { 
+                        key: 'clientLogin', 
+                        label: 'Client logins', 
+                        description: 'When clients authenticate to access their timeline',
+                        enabled: preferences.notifications.clientLogin ?? false
+                      }
+                    ].map(({ key, label, description, enabled }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-200">{label}</div>
+                          <div className="text-sm text-slate-400">{description}</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(e) => updatePreference(['notifications', key], e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
