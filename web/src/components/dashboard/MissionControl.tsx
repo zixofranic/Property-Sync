@@ -637,7 +637,7 @@ const testProfileAPI = async () => {
                 {showNotificationsDropdown && (
                   <div 
                     data-notifications-dropdown
-                    className="absolute right-0 top-8 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50"
+                    className="absolute right-0 top-8 w-72 sm:w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50"
                   >
                     <div className="p-3 border-b border-slate-700 flex items-center justify-between">
                       <h3 className="text-white font-semibold">Notifications</h3>
@@ -853,7 +853,7 @@ const testProfileAPI = async () => {
         !isOnline ? 'pt-56' : 
         (emailState?.canSendInitial || emailState?.canSendReminder) ? 'pt-44' : 
         'pt-28'
-      } px-6 pb-24`}>
+      } px-3 sm:px-6 pb-20 sm:pb-24`}>
         <div className="max-w-6xl mx-auto">
           {selectedClient ? (
             <>
@@ -909,22 +909,30 @@ const testProfileAPI = async () => {
                             transition={{ delay: globalIndex * 0.1 }}
                             className="flex items-center justify-center mb-8"
                           >
-                            <div className="relative">
-                              <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-8 py-4 rounded-2xl font-bold text-xl shadow-2xl border border-white/20 backdrop-blur-sm">
+                            <div className="relative w-full">
+                              <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-3 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg md:text-xl shadow-2xl border border-white/20 backdrop-blur-sm text-center">
                                 {(() => {
                                   try {
-                                    return new Date(dateString).toLocaleDateString('en-US', { 
-                                      weekday: 'long', 
-                                      year: 'numeric', 
-                                      month: 'long', 
-                                      day: 'numeric' 
-                                    });
+                                    const date = new Date(dateString);
+                                    // Mobile: Short format, Tablet+: Full format
+                                    return window.innerWidth < 640 
+                                      ? date.toLocaleDateString('en-US', { 
+                                          weekday: 'short', 
+                                          month: 'short', 
+                                          day: 'numeric' 
+                                        })
+                                      : date.toLocaleDateString('en-US', { 
+                                          weekday: 'long', 
+                                          year: 'numeric', 
+                                          month: 'long', 
+                                          day: 'numeric' 
+                                        });
                                   } catch (error) {
                                     return dateString;
                                   }
                                 })()}
                               </div>
-                              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 rounded-2xl blur opacity-30" />
+                              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 rounded-xl sm:rounded-2xl blur opacity-30" />
                             </div>
                           </motion.div>
                           
@@ -1043,11 +1051,11 @@ const testProfileAPI = async () => {
         </div>
       )}
 
-     <div className="fixed bottom-6 right-6">
+     <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6">
   <motion.div
     initial={{ opacity: 0, y: 50 }}
     animate={{ opacity: 1, y: 0 }}
-    className="flex items-center space-x-3 bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-3 shadow-2xl"
+    className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-2 sm:p-3 shadow-2xl"
   >
     {[
       { 
@@ -1100,13 +1108,13 @@ const testProfileAPI = async () => {
           key={label}
           onClick={() => !disabled && action()}
           disabled={disabled}
-          className={`p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
+          className={`p-2 sm:p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
             disabled ? 'opacity-50 cursor-not-allowed' : ''
           }`}
           whileHover={{ scale: disabled ? 1 : 1.1 }}
           whileTap={{ scale: disabled ? 1 : 0.95 }}
         >
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           
           {/* Notification Badge for Share Timeline Button - 1/4 inside, 3/4 outside */}
           {isShareButton && hasUnsentProperties && unsentCount > 0 && (
