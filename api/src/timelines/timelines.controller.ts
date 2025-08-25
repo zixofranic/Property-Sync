@@ -173,6 +173,16 @@ export class TimelinesController {
     return this.timelinesService.validateClientAccess(shareToken, clientCode);
   }
 
+  // Get client notifications (public)
+  @Public()
+  @Get(':shareToken/notifications')
+  async getClientNotifications(
+    @Param('shareToken') shareToken: string,
+    @Query('client') clientCode?: string,
+  ) {
+    return this.timelinesService.getClientNotifications(shareToken, clientCode);
+  }
+
   // Submit property feedback (public)
   @Public()
   @Post(':shareToken/properties/:propertyId/feedback')

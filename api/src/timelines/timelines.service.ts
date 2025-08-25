@@ -1089,6 +1089,49 @@ export class TimelinesService {
     return require('crypto').randomBytes(16).toString('hex');
   }
 
+  // Get client notifications for a timeline
+  async getClientNotifications(shareToken: string, clientCode?: string) {
+    // Verify timeline exists
+    const timeline = await this.prisma.timeline.findUnique({
+      where: { shareToken },
+      include: {
+        client: true,
+        agent: true,
+      },
+    });
+
+    if (!timeline || !timeline.isActive) {
+      throw new NotFoundException('Timeline not found or inactive');
+    }
+
+    // Generate mock notifications for now (in future, this would come from a notifications table)
+    const notifications = [
+      {
+        id: 1,
+        message: `New properties have been added to your timeline by ${timeline.agent.name}`,
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+        isRead: false,
+        type: 'property'
+      },
+      {
+        id: 2,
+        message: `${timeline.agent.name} has sent you a message about your property search`,
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+        isRead: false,
+        type: 'message'
+      },
+      {
+        id: 3,
+        message: `Feedback requested for properties in your timeline`,
+        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+        isRead: true,
+        type: 'feedback'
+      }
+    ];
+
+    return notifications;
+  }
+
   private async getLastPropertyPosition(timelineId: string): Promise<number> {
     const lastProperty = await this.prisma.property.findFirst({
       where: { timelineId },
