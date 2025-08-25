@@ -585,8 +585,96 @@ Powered by Property Sync
     firstName: string,
     verificationUrl: string,
   ): string {
-    // Your existing implementation
-    return `<!-- Your existing verification template HTML -->`;
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Property Sync - Verify Your Email</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+  <!-- Header -->
+  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 20px; margin-bottom: 30px; position: relative; overflow: hidden;">
+    <!-- Decorative elements -->
+    <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    <div style="position: absolute; bottom: -30px; left: -30px; width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    
+    <div style="position: relative; z-index: 10;">
+      <h1 style="color: white; margin: 0; font-size: 2.8em; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">🏠 Property Sync</h1>
+      <p style="color: rgba(255,255,255,0.95); margin: 15px 0 0 0; font-size: 1.3em; font-weight: 500;">Mission Control for Real Estate</p>
+    </div>
+  </div>
+  
+  <!-- Main Content -->
+  <div style="background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px;">
+    <div style="text-align: center; margin-bottom: 35px;">
+      <h2 style="color: #1e293b; font-size: 2.2em; margin: 0 0 20px 0;">Welcome aboard, ${firstName}! 🎉</h2>
+      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 25px; border-radius: 16px; margin: 25px 0;">
+        <p style="color: white; font-size: 1.3em; font-weight: 600; margin: 0; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+          🚀 Property Sync will revolutionize how your clients experience their home-buying journey. 
+          Turn every property search into an engaging, personalized story that converts browsers into buyers!
+        </p>
+      </div>
+    </div>
+    
+    <!-- Verification Section -->
+    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 30px; border-radius: 16px; border-left: 6px solid #f59e0b; margin: 30px 0; text-align: center;">
+      <div style="margin-bottom: 25px;">
+        <div style="width: 80px; height: 80px; background: #f59e0b; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);">
+          <span style="font-size: 36px; color: white;">📧</span>
+        </div>
+        <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 1.4em;">Let's Verify Your Email</h3>
+        <p style="color: #b45309; margin: 0 0 25px 0; font-size: 1.1em;">Click the button below to activate your account and start transforming your real estate business!</p>
+      </div>
+      
+      <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); color: white; padding: 18px 40px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 1.2em; box-shadow: 0 8px 25px rgba(249, 115, 22, 0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+        ✨ Verify My Email & Get Started
+      </a>
+      
+      <p style="color: #b45309; margin: 20px 0 0 0; font-size: 0.9em;">⏰ This verification link expires in 24 hours</p>
+    </div>
+    
+    <!-- What's Next Section -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 30px; border-radius: 16px; border-left: 6px solid #22c55e; margin: 30px 0;">
+      <h3 style="color: #166534; margin: 0 0 20px 0; font-size: 1.4em; display: flex; align-items: center; gap: 10px;">
+        <span>🎯</span> What's Next - Your Success Journey:
+      </h3>
+      <div style="display: grid; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">1</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Set up your profile</strong> with branding and company info</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">2</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Create your first client</strong> and their personalized timeline</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">3</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Add properties</strong> with stunning visuals and details</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">4</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Share the magic</strong> and watch client engagement soar!</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Troubleshooting -->
+    <div style="background: #f1f5f9; padding: 20px; border-radius: 12px; margin: 25px 0;">
+      <h4 style="color: #475569; margin: 0 0 10px 0; font-size: 1.1em;">Having trouble with the button?</h4>
+      <p style="color: #64748b; margin: 0; font-size: 0.95em;">Copy and paste this link in your browser:</p>
+      <p style="color: #3b82f6; font-family: monospace; word-break: break-all; background: white; padding: 10px; border-radius: 6px; margin: 8px 0 0 0; font-size: 0.9em;">${verificationUrl}</p>
+    </div>
+  </div>
+  
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.9em;">
+    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@propertysync.com" style="color: #3b82f6;">support@propertysync.com</a></p>
+    <p style="margin: 0;">Property Sync - Transforming Real Estate, One Client at a Time 🏡</p>
+  </div>
+</body>
+</html>`;
   }
 
   async sendBatchImportNotification(data: BatchImportNotificationData) {
@@ -720,8 +808,119 @@ Powered by Property Sync
     firstName: string,
     dashboardUrl: string,
   ): string {
-    // Your existing implementation
-    return `<!-- Your existing welcome template HTML -->`;
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎉 Welcome to Property Sync - You're Ready!</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+  <!-- Header -->
+  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; margin-bottom: 30px; position: relative; overflow: hidden;">
+    <!-- Decorative elements -->
+    <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    <div style="position: absolute; bottom: -40px; left: -40px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    
+    <div style="position: relative; z-index: 10;">
+      <div style="font-size: 4em; margin-bottom: 20px;">🎉</div>
+      <h1 style="color: white; margin: 0; font-size: 2.6em; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">You're All Set!</h1>
+      <p style="color: rgba(255,255,255,0.95); margin: 15px 0 0 0; font-size: 1.3em; font-weight: 500;">Welcome to the future of real estate</p>
+    </div>
+  </div>
+  
+  <!-- Main Content -->
+  <div style="background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px;">
+    <div style="text-align: center; margin-bottom: 35px;">
+      <h2 style="color: #1e293b; font-size: 2.2em; margin: 0 0 20px 0;">Welcome to Property Sync, ${firstName}! 🚀</h2>
+      
+      <!-- Success Message -->
+      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 16px; margin: 25px 0; text-align: center;">
+        <div style="margin-bottom: 20px;">
+          <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(0,0,0,0.2);">
+            <span style="font-size: 36px; color: white;">✅</span>
+          </div>
+          <h3 style="color: white; margin: 0; font-size: 1.6em; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Your Account is Verified & Ready!</h3>
+        </div>
+        <p style="color: rgba(255,255,255,0.95); font-size: 1.2em; margin: 0;">Time to revolutionize how you manage your real estate clients and transform their home-buying experience!</p>
+      </div>
+    </div>
+    
+    <!-- Call to Action -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="${dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px 45px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 1.3em; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.3s ease;">
+        🏡 Launch My Mission Control
+      </a>
+      
+      <p style="color: #64748b; margin: 20px 0 0 0; font-size: 1em;">Your personalized dashboard awaits ⚡</p>
+    </div>
+    
+    <!-- Quick Start Guide -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 30px; border-radius: 16px; border-left: 6px solid #22c55e; margin: 30px 0;">
+      <h3 style="color: #166534; margin: 0 0 25px 0; font-size: 1.5em; text-align: center;">🚀 Your 4-Step Success Journey</h3>
+      <div style="display: grid; gap: 20px;">
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="width: 40px; height: 40px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">1</span>
+            <div>
+              <h4 style="margin: 0 0 5px 0; color: #166534; font-size: 1.2em;">Customize Your Profile</h4>
+              <p style="margin: 0; color: #374151; font-size: 1em;">Add your branding, company info, and professional photo</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="width: 40px; height: 40px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">2</span>
+            <div>
+              <h4 style="margin: 0 0 5px 0; color: #166534; font-size: 1.2em;">Create Your First Client</h4>
+              <p style="margin: 0; color: #374151; font-size: 1em;">We'll automatically generate their personalized timeline</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="width: 40px; height: 40px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">3</span>
+            <div>
+              <h4 style="margin: 0 0 5px 0; color: #166534; font-size: 1.2em;">Add Properties</h4>
+              <p style="margin: 0; color: #374151; font-size: 1em;">Upload stunning property details and images</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="width: 40px; height: 40px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">4</span>
+            <div>
+              <h4 style="margin: 0 0 5px 0; color: #166534; font-size: 1.2em;">Share & Watch Magic Happen</h4>
+              <p style="margin: 0; color: #374151; font-size: 1em;">Send the timeline and watch client engagement soar!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Key Benefits -->
+    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 25px; border-radius: 16px; border-left: 6px solid #f59e0b; margin: 25px 0;">
+      <h4 style="color: #92400e; margin: 0 0 15px 0; font-size: 1.3em; text-align: center;">⭐ What Makes Property Sync Special</h4>
+      <div style="color: #b45309; font-size: 1.1em; text-align: center;">
+        <p style="margin: 10px 0;">🎯 <strong>Personalized client experiences</strong> that build trust</p>
+        <p style="margin: 10px 0;">📊 <strong>Instant feedback</strong> on every property you share</p>
+        <p style="margin: 10px 0;">⚡ <strong>Save hours</strong> of back-and-forth emails</p>
+        <p style="margin: 10px 0;">🏆 <strong>Close more deals</strong> with engaged clients</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.9em;">
+    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@propertysync.com" style="color: #10b981;">support@propertysync.com</a></p>
+    <p style="margin: 0;">Property Sync - Transforming Real Estate, One Client at a Time 🏡</p>
+  </div>
+</body>
+</html>`;
   }
 
   private getModernTimelineTemplate(data: TimelineEmailData, brandColor: string): string {
