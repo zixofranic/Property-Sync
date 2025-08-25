@@ -471,7 +471,7 @@ export class TimelinesService {
       where: { id: timelineId, agentId },
       include: { 
         properties: {
-          orderBy: { addedAt: 'desc' },
+          orderBy: { createdAt: 'desc' },
           take: 1
         }
       },
@@ -491,7 +491,7 @@ export class TimelinesService {
     
     // Get the most recent property addition date
     const latestProperty = timeline.properties[0];
-    const lastPropertyAddedDate = latestProperty?.addedAt;
+    const lastPropertyAddedDate = latestProperty?.createdAt;
     
     // Enhanced logic: Only suggest email if client hasn't viewed timeline since new properties were added
     const clientHasSeenNewProperties = timeline.lastViewed && 
