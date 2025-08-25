@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api-client';
 import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
 import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
 import { initializePushNotifications } from '@/lib/push-notifications';
+import { AgentCard } from '@/components/agent/AgentCard';
 
 // API Response Types
 interface ClientTimelineData {
@@ -1336,6 +1337,29 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Sticky Agent Card */}
+      {timelineData && (
+        <AgentCard
+          agent={{
+            name: timelineData.agent.name,
+            company: timelineData.agent.company,
+            phone: timelineData.agent.phone,
+            email: timelineData.agent.email,
+            logo: timelineData.agent.logo,
+            brandColor: timelineData.agent.brandColor,
+            firstName: timelineData.agent.firstName,
+            lastName: timelineData.agent.lastName,
+            // Add extended profile data when available
+            yearsExperience: 5, // This should come from agent profile
+            specialties: ['First-Time Buyers', 'Investment Properties', 'Luxury Homes'],
+            bio: `${timelineData.agent.name} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,
+            title: 'Senior Real Estate Agent',
+            license: 'RE License #123456',
+          }}
+          isSticky={true}
+        />
       )}
     </div>
   );

@@ -31,7 +31,8 @@
       "Bash(npm run build:*)",
       "Bash(tasklist:*)",
       "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)",
-      "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)"
+      "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": [],
