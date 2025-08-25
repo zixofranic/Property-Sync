@@ -59,15 +59,27 @@ export class ResendProvider {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     this.isDevelopment = process.env.NODE_ENV === 'development';
 
+    // Enhanced logging for debugging
+    this.logger.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
+    this.logger.log(`API Key present: ${!!apiKey}`);
+    this.logger.log(`API Key length: ${apiKey?.length || 0}`);
+
     if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not found - email functionality disabled');
+      this.logger.error('RESEND_API_KEY not found - email functionality disabled');
       this.resend = null;
       this.fromEmail = '';
       return;
     }
 
-    this.resend = new Resend(apiKey);
-    this.fromEmail = 'Property Sync <onboarding@resend.dev>';
+    try {
+      this.resend = new Resend(apiKey);
+      this.fromEmail = 'Property Sync <onboarding@resend.dev>';
+      this.logger.log('Resend client initialized successfully');
+    } catch (error) {
+      this.logger.error('Failed to initialize Resend client:', error);
+      this.resend = null;
+      this.fromEmail = '';
+    }
 
     if (this.isDevelopment) {
       this.logger.warn(
@@ -103,8 +115,12 @@ export class ResendProvider {
 
   async sendTimelineEmail(data: TimelineEmailData) {
     if (!this.resend) {
-      this.logger.warn('Email service not configured - skipping timeline email');
-      return { success: false, error: 'Email service not configured' };
+      this.logger.error('CRITICAL: RESEND_API_KEY not configured on Railway - cannot send emails');
+      this.logger.error('Please add RESEND_API_KEY environment variable to Railway deployment');
+      return { 
+        success: false, 
+        error: 'RESEND_API_KEY environment variable not configured on Railway deployment' 
+      };
     }
     // Redirect emails in development mode
     const redirectedTo = this.redirectEmailForDevelopment(data.to, 'delivered');
@@ -135,8 +151,14 @@ export class ResendProvider {
 
     try {
       if (!this.resend) {
+        this.logger.error('Resend service not configured - cannot send email');
         throw new Error('Resend service not configured');
       }
+
+      this.logger.log('Attempting to send email via Resend API...');
+      this.logger.log(`From: ${this.fromEmail}`);
+      this.logger.log(`To: ${redirectedTo}`);
+
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: redirectedTo,
@@ -149,8 +171,13 @@ export class ResendProvider {
         },
       });
 
+      this.logger.log('Resend API response received');
+      this.logger.log(`Result type: ${typeof result}`);
+      this.logger.log(`Has error: ${!!result.error}`);
+      this.logger.log(`Has data: ${!!result.data}`);
+
       if (result.error) {
-        this.logger.error('Resend API returned error:', result.error);
+        this.logger.error('Resend API returned error:', JSON.stringify(result.error, null, 2));
         throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
       }
 

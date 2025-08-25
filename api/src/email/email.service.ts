@@ -115,6 +115,15 @@ export class EmailService {
 
       if (resendResult.error) {
         this.logger.error(`Resend email failed: ${JSON.stringify(resendResult.error)}`);
+        
+        // Special handling for configuration errors
+        if (resendResult.error.includes('RESEND_API_KEY')) {
+          return {
+            success: false,
+            error: `Configuration Error: ${resendResult.error}`,
+          };
+        }
+        
         return {
           success: false,
           error: JSON.stringify(resendResult.error),

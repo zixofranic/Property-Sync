@@ -29,7 +29,9 @@
       "Bash(railway login:*)",
       "WebFetch(domain:property-sync-mu.vercel.app)",
       "Bash(npm run build:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)",
+      "Read(/G:\\My Drive\\RealEstate\\PropertySynch_app\\CodingPrompts/**)"
     ],
     "deny": [],
     "ask": [],
