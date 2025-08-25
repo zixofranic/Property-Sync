@@ -229,10 +229,14 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         const urlParams = new URLSearchParams(window.location.search);
         const clientCode = urlParams.get('client');
         
-        const response = await apiClient.getPublicTimeline(shareToken, clientCode, sessionToken);
+        const response = await apiClient.getPublicTimeline(shareToken, clientCode, sessionToken || undefined);
         
         if (response.error) {
           throw new Error(response.error);
+        }
+        
+        if (!response.data) {
+          throw new Error('No timeline data received');
         }
         
         const newData = response.data;
@@ -373,7 +377,7 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         propertyId,
         selectedFeedback[propertyId],
         feedbackNotes[propertyId] || '',
-        clientCode,
+        clientCode || undefined,
         `${timelineData.client.firstName} ${timelineData.client.lastName}`,
         timelineData.client.email
       );
@@ -1497,8 +1501,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             email: timelineData.agent.email || '',
             logo: timelineData.agent.logo || undefined,
             brandColor: timelineData.agent.brandColor || '#3b82f6',
-            firstName: timelineData.agent.firstName || timelineData.agent.name?.split(' ')[0] || '',
-            lastName: timelineData.agent.lastName || timelineData.agent.name?.split(' ')[1] || '',
+            firstName: (timelineData.agent as any).firstName || timelineData.agent.name?.split(' ')[0] || '',
+            lastName: (timelineData.agent as any).lastName || timelineData.agent.name?.split(' ')[1] || '',
             // Add extended profile data when available
             yearsExperience: 5, // This should come from agent profile
             specialties: ['First-Time Buyers', 'Investment Properties', 'Luxury Homes'],

@@ -13,12 +13,8 @@ const nextConfig = {
   env: {
     CUSTOM_KEY: 'my-value',
   },
-  // 🆕 ADD THESE TO FIX HYDRATION ISSUES
+  // React configuration
   reactStrictMode: true,
-  experimental: {
-    // This helps suppress hydration warnings caused by browser extensions
-    suppressHydrationWarning: true,
-  },
   // ESLint configuration for production - FORCE DEPLOYMENT
   eslint: {
     // Disable ESLint during production builds (only for deployment)
