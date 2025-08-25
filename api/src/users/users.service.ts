@@ -83,30 +83,22 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Filter out undefined values
+    // Handle field updates - undefined means clear the field (set to null)
     const profileUpdateData: any = {};
-    if (updateData.firstName !== undefined)
-      profileUpdateData.firstName = updateData.firstName;
-    if (updateData.lastName !== undefined)
-      profileUpdateData.lastName = updateData.lastName;
-    if (updateData.company !== undefined)
-      profileUpdateData.company = updateData.company;
-    if (updateData.phone !== undefined)
-      profileUpdateData.phone = updateData.phone;
-    if (updateData.website !== undefined)
-      profileUpdateData.website = updateData.website;
-    if (updateData.licenseNumber !== undefined)
-      profileUpdateData.licenseNumber = updateData.licenseNumber;
-    if (updateData.bio !== undefined) profileUpdateData.bio = updateData.bio;
-    if (updateData.yearsExperience !== undefined)
-      profileUpdateData.yearsExperience = updateData.yearsExperience;
-    if (updateData.specialties !== undefined)
-      profileUpdateData.specialties = updateData.specialties;
-    if (updateData.brandColor !== undefined)
-      profileUpdateData.brandColor = updateData.brandColor;
-    if (updateData.logo !== undefined) profileUpdateData.logo = updateData.logo;
-    if (updateData.avatar !== undefined)
-      profileUpdateData.avatar = updateData.avatar;
+    
+    // Always update fields that are present in updateData, including undefined (to clear them)
+    Object.keys(updateData).forEach(key => {
+      if (updateData.hasOwnProperty(key)) {
+        // Convert undefined to null for optional fields that can be cleared
+        if (key === 'company' || key === 'phone' || key === 'website' || key === 'licenseNumber' || 
+            key === 'bio' || key === 'avatar' || key === 'timezone' || key === 'logo') {
+          profileUpdateData[key] = updateData[key] || null;
+        } else {
+          // For required fields and special cases, keep the value as-is
+          profileUpdateData[key] = updateData[key];
+        }
+      }
+    });
 
     try {
       const updatedProfile = await this.prisma.profile.upsert({

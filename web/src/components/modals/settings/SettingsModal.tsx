@@ -1,13 +1,13 @@
 // apps/web/src/components/modals/settings/SettingsModal.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Settings, User, Mail, Bell, Shield, 
   CreditCard, HelpCircle, Palette, Save,
   MapPin, Eye, EyeOff, Lock,
-  Check, AlertTriangle
+  Check, AlertTriangle, Loader, Image as ImageIcon
 } from 'lucide-react';
 import { PasswordChangeModal } from '@/components/profile/PasswordChangeModal';
 import { ImageUrlInput } from '@/components/ui/ImageUrlInput';
@@ -65,6 +65,9 @@ export function SettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [logoLoading, setLogoLoading] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+  const [logoTimestamp, setLogoTimestamp] = useState(0);
 
   const tabs = [
     { id: 'branding', label: 'Branding', icon: Palette },
@@ -91,6 +94,45 @@ export function SettingsModal({
 
   const handleLogoChange = (url: string) => {
     updatePreference(['logo'], url);
+    if (url.trim()) {
+      setLogoLoading(true);
+      setLogoError(false);
+    } else {
+      setLogoLoading(false);
+      setLogoError(false);
+    }
+  };
+
+  const handleLogoLoad = () => {
+    setLogoLoading(false);
+    setLogoError(false);
+  };
+
+  const handleLogoError = () => {
+    setLogoLoading(false);
+    setLogoError(true);
+  };
+
+  // Reset logo states when preferences change
+  useEffect(() => {
+    if (preferences.logo && preferences.logo.trim()) {
+      setLogoLoading(true);
+      setLogoError(false);
+      setLogoTimestamp(Date.now()); // Force image reload
+    } else {
+      setLogoLoading(false);
+      setLogoError(false);
+      setLogoTimestamp(0);
+    }
+  }, [preferences.logo]);
+
+  // Create cache-busting URL for logo
+  const getLogoUrl = () => {
+    if (!preferences.logo || !preferences.logo.trim()) return '';
+    if (logoTimestamp === 0) return preferences.logo;
+    
+    const separator = preferences.logo.includes('?') ? '&' : '?';
+    return `${preferences.logo}${separator}_t=${logoTimestamp}`;
   };
 
   const handleSave = async () => {
@@ -131,25 +173,25 @@ export function SettingsModal({
                 {/* Brand Color */}
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-3">Brand Color</label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
                     <div className="flex items-center space-x-3">
                       <input
                         type="color"
                         value={preferences.brandColor}
                         onChange={(e) => updatePreference(['brandColor'], e.target.value)}
-                        className="w-12 h-10 rounded-lg border border-slate-600 bg-slate-700 cursor-pointer"
+                        className="w-12 h-10 rounded-lg border border-slate-600 bg-slate-700 cursor-pointer flex-shrink-0"
                       />
                       <input
                         type="text"
                         value={preferences.brandColor}
                         onChange={(e) => updatePreference(['brandColor'], e.target.value)}
-                        className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono text-sm"
+                        className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono text-sm"
                         placeholder="#3b82f6"
                       />
                     </div>
                     
                     {/* Color Preview */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div 
                         className="h-10 rounded-lg border border-slate-600"
                         style={{ backgroundColor: preferences.brandColor }}
@@ -166,7 +208,7 @@ export function SettingsModal({
             {/* Email Template Styles */}
             <div>
               <h4 className="text-base font-semibold text-white mb-4">Email Template Style</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { 
                     id: 'modern', 
@@ -204,11 +246,30 @@ export function SettingsModal({
               <div className="bg-white rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-3">
                   {preferences.logo && (
-                    <img src={preferences.logo} alt="Logo" className="w-8 h-8 object-contain" />
+                    <div className="h-12 flex items-center">
+                      {logoLoading ? (
+                        <div className="w-8 h-8 flex items-center justify-center">
+                          <Loader className="w-4 h-4 text-gray-400 animate-spin" />
+                        </div>
+                      ) : logoError ? (
+                        <div className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded border">
+                          <ImageIcon className="w-4 h-4 text-gray-400" />
+                        </div>
+                      ) : (
+                        <img 
+                          key={`${preferences.logo}-${logoTimestamp}`} 
+                          src={getLogoUrl()} 
+                          alt="Logo" 
+                          className="h-12 w-auto object-contain"
+                          onLoad={handleLogoLoad}
+                          onError={handleLogoError}
+                        />
+                      )}
+                    </div>
                   )}
                   <div className="text-gray-800">
                     <div className="font-semibold">{user.firstName} {user.lastName}</div>
-                    <div className="text-sm text-gray-600">Real Estate Professional</div>
+                    <div className="text-sm text-gray-600">Realtor</div>
                   </div>
                 </div>
                 <div 
@@ -434,34 +495,34 @@ export function SettingsModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-start lg:items-center justify-center p-2 lg:p-4"
           onClick={onClose}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden"
+            className="bg-slate-800 border border-slate-700 rounded-lg lg:rounded-2xl w-full max-w-6xl h-[100vh] lg:max-h-[95vh] lg:h-auto overflow-hidden mt-0 lg:mt-0"
             onClick={e => e.stopPropagation()}
           >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-slate-700">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-white" />
+              {/* Mobile-Responsive Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 lg:p-6 border-b border-slate-700 gap-4 sm:gap-3">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Settings className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Settings</h2>
-                    <p className="text-sm text-slate-400">Manage your preferences and account</p>
+                  <div className="min-w-0">
+                    <h2 className="text-lg lg:text-xl font-bold text-white">Settings</h2>
+                    <p className="text-xs lg:text-sm text-slate-400 truncate">Manage your preferences and account</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3 sm:flex-shrink-0">
                   {hasChanges && (
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors flex items-center space-x-2"
+                      className="px-3 lg:px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors flex items-center space-x-2 text-sm lg:text-base"
                     >
                       {isSaving ? (
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -474,39 +535,42 @@ export function SettingsModal({
                   
                   <button
                     onClick={onClose}
-                    className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                    className="p-2 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
                   >
                     <X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex h-[calc(95vh-120px)]">
-                {/* Sidebar */}
-                <div className="w-64 border-r border-slate-700 p-4 overflow-y-auto">
-                  <nav className="space-y-2">
-                    {tabs.map((tab) => {
-                      const Icon = tab.icon;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
-                          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
-                            activeTab === tab.id
-                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                              : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                          <span className="font-medium">{tab.label}</span>
-                        </button>
-                      );
-                    })}
+              <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] lg:h-[calc(95vh-120px)]">
+                {/* Mobile Tab Bar / Desktop Sidebar */}
+                <div className="lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-700 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto">
+                  {/* Mobile: Horizontal scrolling tabs */}
+                  <nav className="flex lg:flex-col lg:space-y-2 lg:p-4">
+                    <div className="flex lg:flex-col space-x-1 lg:space-x-0 lg:space-y-2 p-2 lg:p-0 min-w-max lg:min-w-0">
+                      {tabs.map((tab) => {
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center space-x-2 lg:space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-lg transition-colors text-left whitespace-nowrap lg:w-full ${
+                              activeTab === tab.id
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium text-sm lg:text-base">{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </nav>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 p-6 overflow-y-auto">
+                <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
                   {renderTabContent()}
                 </div>
               </div>

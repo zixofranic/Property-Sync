@@ -6,6 +6,7 @@ import {
   IsObject,
   IsUrl,
   IsBoolean,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -27,7 +28,8 @@ export class UpdateProfileDto {
   phone?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === '' ? undefined : value)
+  @Transform(({ value }) => value === '' || value === null ? null : value)
+  @ValidateIf((o, value) => value !== null)
   @IsUrl({}, { message: 'Website must be a valid URL' })
   website?: string;
 
@@ -36,7 +38,8 @@ export class UpdateProfileDto {
   licenseNumber?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === '' ? undefined : value)
+  @Transform(({ value }) => value === '' || value === null ? null : value)
+  @ValidateIf((o, value) => value !== null)
   @IsUrl({}, { message: 'Avatar must be a valid URL' })
   avatar?: string;
 
@@ -67,7 +70,8 @@ export class UpdateProfileDto {
   };
 
   @IsOptional()
-  @Transform(({ value }) => value === '' ? undefined : value)
+  @Transform(({ value }) => value === '' || value === null ? null : value)
+  @ValidateIf((o, value) => value !== null)
   @IsUrl({}, { message: 'Logo must be a valid URL' })
   logo?: string;
 

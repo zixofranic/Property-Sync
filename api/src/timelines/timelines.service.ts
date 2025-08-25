@@ -390,7 +390,7 @@ export class TimelinesService {
         agentName:
           `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() ||
           'Your Agent',
-        agentCompany: agentProfile?.company || 'Real Estate Professional',
+        agentCompany: agentProfile?.company || 'Realtor',
         timelineUrl: shareUrl,
         propertyCount: timeline.properties.length,
         spouseEmail: timeline.client.spouseEmail || undefined,

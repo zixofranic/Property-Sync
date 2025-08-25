@@ -118,12 +118,8 @@ export function BatchPropertyModal({ isOpen, onClose }: BatchPropertyModalProps)
       read: false
     });
 
-    // Auto-process if this is the first URL (for single property flow)
-    if (mlsUrls.length === 0) {
-      setTimeout(() => {
-        handleStartProcessing();
-      }, 1000);
-    }
+    // Auto-processing disabled to prevent spurious error messages
+    // Users can manually click "Start Processing" when ready
   };
 
   // Remove URL from queue

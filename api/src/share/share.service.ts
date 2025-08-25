@@ -183,7 +183,7 @@ export class ShareService {
         name: timeline.agent.profile
           ? `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`
           : 'Your Agent',
-        company: timeline.agent.profile?.company || 'Real Estate Professional',
+        company: timeline.agent.profile?.company || 'Realtor',
         phone: timeline.agent.profile?.phone,
         email: timeline.agent.email,
         logo: timeline.agent.profile?.logo,

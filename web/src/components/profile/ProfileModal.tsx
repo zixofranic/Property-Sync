@@ -89,11 +89,15 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   const handleSave = async () => {
   try {
-    // Clean up URL fields - convert empty strings to undefined
+    // Clean up all fields - convert empty strings to null for proper field clearing
     const cleanedData = {
       ...formData,
-      website: formData.website?.trim() || undefined,
-      avatar: formData.avatar?.trim() || undefined,
+      company: formData.company?.trim() || null,
+      phone: formData.phone?.trim() || null, 
+      website: formData.website?.trim() || null,
+      licenseNumber: formData.licenseNumber?.trim() || null,
+      bio: formData.bio?.trim() || null,
+      avatar: formData.avatar?.trim() || null,
     };
     
     const success = await updateProfile(cleanedData);
@@ -322,7 +326,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <h3 className="text-xl font-bold text-white">
                             {profile.firstName} {profile.lastName}
                           </h3>
-                          <p className="text-slate-400">{profile.company || 'Real Estate Professional'}</p>
+                          <p className="text-slate-400">{profile.company || 'Realtor'}</p>
                           <div className="flex items-center justify-center space-x-2 mt-2">
                             <div className={`w-3 h-3 rounded-full ${profile.emailVerified ? 'bg-green-500' : 'bg-yellow-500'}`} />
                             <span className="text-sm text-slate-400">

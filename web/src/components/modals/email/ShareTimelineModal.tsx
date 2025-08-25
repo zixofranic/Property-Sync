@@ -369,25 +369,6 @@ export function ShareTimelineModal({
                   </div>
                 )}
 
-                {/* Just the Link */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-white flex items-center space-x-2">
-                      <LinkIcon className="w-4 h-4 text-purple-400" />
-                      <span>Direct Link</span>
-                    </h4>
-                    <button
-                      onClick={() => copyToClipboard(timeline.shareUrl, 'direct-link')}
-                      className="text-xs px-3 py-1 bg-slate-600/50 text-slate-300 rounded-md hover:bg-slate-600/70 transition-colors flex items-center space-x-1"
-                    >
-                      {copiedItem === 'direct-link' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedItem === 'direct-link' ? 'Copied' : 'Copy'}</span>
-                    </button>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
-                    <div className="text-sm text-slate-300 font-mono break-all">{timeline.shareUrl}</div>
-                  </div>
-                </div>
               </div>
 
               {/* Usage Instructions */}

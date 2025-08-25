@@ -238,7 +238,7 @@ export function ImageUrlInput({
               <img
                 src={value}
                 alt="Preview"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 onLoad={handleImageLoad}
                 onError={handleImageError}
               />

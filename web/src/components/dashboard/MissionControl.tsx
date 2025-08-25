@@ -393,25 +393,25 @@ const testProfileAPI = async () => {
 
       {/* Mission Control HUD */}
       <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-2 sm:p-4">
           {/* Enhanced Client Selector */}
           <div className="relative">
             <motion.button
               onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-              className="flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-6 py-3 rounded-xl shadow-lg transition-all duration-200"
+              className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Target className="w-5 h-5" />
-              <div className="text-left">
-                <div className="font-semibold text-sm">
+              <Target className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="text-left min-w-0">
+                <div className="font-semibold text-xs sm:text-sm truncate">
                   {selectedClient?.name || 'Select Client'}
                 </div>
-                <div className="text-xs opacity-75">
+                <div className="text-xs opacity-75 hidden sm:block">
                   {selectedClient ? `${properties.length} properties` : 'Active Mission'}
                 </div>
               </div>
-              <ChevronDown className={`w-4 h-4 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
             </motion.button>
 
             <AnimatePresence>
@@ -420,7 +420,7 @@ const testProfileAPI = async () => {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[60]"
+                  className="fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-0 sm:right-auto mt-2 sm:w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[60]"
                 >
                   {/* Search Bar */}
                   <div className="p-4 border-b border-slate-700">
@@ -499,31 +499,51 @@ const testProfileAPI = async () => {
           </div>
 
           {/* Enhanced Client Stats HUD with Basic Connection Status */}
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-2 sm:space-x-6">
             {selectedClient && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center space-x-4 bg-slate-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-slate-700/50"
-              >
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm text-slate-300">Engagement</span>
-                  <span className="font-bold text-yellow-400">{selectedClient.engagementScore || 0}%</span>
-                </div>
-                <div className="w-px h-4 bg-slate-600" />
-                <div className="flex items-center space-x-2">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  <span className="text-sm text-slate-300">Properties</span>
-                  <span className="font-bold text-green-400">{properties.length}</span>
-                </div>
-                <div className="w-px h-4 bg-slate-600" />
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm text-slate-300">Last Active</span>
-                  <span className="font-bold text-blue-400">{getRelativeTime(selectedClient.lastActive)}</span>
-                </div>
-              </motion.div>
+              <>
+                {/* Desktop Analytics */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="hidden sm:flex items-center space-x-4 bg-slate-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-slate-700/50"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm text-slate-300">Engagement</span>
+                    <span className="font-bold text-yellow-400">{selectedClient.engagementScore || 0}%</span>
+                  </div>
+                  <div className="w-px h-4 bg-slate-600" />
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <span className="text-sm text-slate-300">Properties</span>
+                    <span className="font-bold text-green-400">{properties.length}</span>
+                  </div>
+                  <div className="w-px h-4 bg-slate-600" />
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-blue-400" />
+                    <span className="text-sm text-slate-300">Last Active</span>
+                    <span className="font-bold text-blue-400">{getRelativeTime(selectedClient.lastActive)}</span>
+                  </div>
+                </motion.div>
+
+                {/* Mobile Analytics - Condensed */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex sm:hidden items-center space-x-2 bg-slate-800/50 backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-700/50"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span className="font-bold text-green-400 text-xs">{properties.length}</span>
+                    <span className="text-xs text-slate-400">props</span>
+                  </div>
+                  <div className="w-px h-3 bg-slate-600" />
+                  <div className="flex items-center space-x-1">
+                    <span className="font-bold text-yellow-400 text-xs">{selectedClient.engagementScore || 0}%</span>
+                    <span className="text-xs text-slate-400">eng</span>
+                  </div>
+                </motion.div>
+              </>
             )}
 
             <div className="flex items-center space-x-2">
@@ -788,10 +808,15 @@ const testProfileAPI = async () => {
                     className="max-w-lg mx-auto"
                   >
                     <div className="relative mb-8">
-                      <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
+                      <motion.button
+                        onClick={() => setActiveModal('add-property')}
+                        className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 rounded-full flex items-center justify-center mx-auto shadow-2xl transition-all duration-300 cursor-pointer"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
                         <Plus className="w-16 h-16 text-white" />
-                      </div>
-                      <div className="absolute -inset-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full blur opacity-20" />
+                      </motion.button>
+                      <div className="absolute -inset-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full blur opacity-20 pointer-events-none" />
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-4">Start Building the Timeline</h3>
                     <p className="text-slate-400 mb-8 text-lg leading-relaxed">
@@ -842,25 +867,28 @@ const testProfileAPI = async () => {
         </div>
       </div>
 
-      {/* Prominent Add Property Button */}
-      <div className="fixed bottom-32 right-20">
-        <motion.button
-          onClick={() => !selectedClient ? null : setActiveModal('add-property')}
-          disabled={!selectedClient || !isOnline}
-          className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
-            selectedClient && isOnline
-              ? 'hover:scale-110 cursor-pointer' 
-              : 'opacity-50 cursor-not-allowed'
-          }`}
-          whileHover={{ scale: selectedClient && isOnline ? 1.1 : 1 }}
-          whileTap={{ scale: selectedClient && isOnline ? 0.95 : 1 }}
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Plus className="w-8 h-8 text-white" />
-        </motion.button>
-      </div>
+      {/* Prominent Add Property Button - Only show when there are properties */}
+      {selectedClient && properties.length > 0 && (
+        <div className="fixed bottom-32 right-20">
+          <motion.button
+            onClick={() => setActiveModal('add-property')}
+            disabled={!isOnline}
+            className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
+              isOnline
+                ? 'hover:scale-110 cursor-pointer' 
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+            whileHover={{ scale: isOnline ? 1.1 : 1 }}
+            whileTap={{ scale: isOnline ? 0.95 : 1 }}
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Plus className="w-8 h-8 text-white" />
+          </motion.button>
+        </div>
+      )}
 
      <div className="fixed bottom-6 right-6">
   <motion.div
@@ -875,6 +903,13 @@ const testProfileAPI = async () => {
         action: () => setActiveModal('clients'), 
         color: 'from-blue-500 to-cyan-600',
         disabled: false 
+      },
+      { 
+        icon: Share2,
+        label: 'Share Timeline', 
+        action: () => setShowShareModal(true),
+        color: 'from-purple-500 to-pink-600',
+        disabled: !selectedClient 
       },
       { 
         icon: BarChart3, 
@@ -893,16 +928,9 @@ const testProfileAPI = async () => {
       { 
         icon: Settings, 
         label: 'Settings', 
-        action: () => setShowSettingsModal(true), // Changed this line
+        action: () => setShowSettingsModal(true),
         color: 'from-gray-500 to-slate-600',
         disabled: false 
-      },
-      { 
-        icon: Share2, // Add this import to your lucide-react imports
-        label: 'Share Timeline', 
-        action: () => setShowShareModal(true),
-        color: 'from-purple-500 to-pink-600',
-        disabled: !selectedClient 
       }
     ].map(({ icon: Icon, label, action, color, disabled }) => (
       <motion.button
