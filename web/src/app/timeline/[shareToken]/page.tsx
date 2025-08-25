@@ -1340,21 +1340,21 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       )}
 
       {/* Sticky Agent Card */}
-      {timelineData && (
+      {timelineData && timelineData.agent && (
         <AgentCard
           agent={{
-            name: timelineData.agent.name,
-            company: timelineData.agent.company,
-            phone: timelineData.agent.phone,
-            email: timelineData.agent.email,
-            logo: timelineData.agent.logo,
-            brandColor: timelineData.agent.brandColor,
-            firstName: timelineData.agent.firstName,
-            lastName: timelineData.agent.lastName,
+            name: timelineData.agent.name || 'Your Agent',
+            company: timelineData.agent.company || 'Real Estate Company',
+            phone: timelineData.agent.phone || undefined,
+            email: timelineData.agent.email || '',
+            logo: timelineData.agent.logo || undefined,
+            brandColor: timelineData.agent.brandColor || '#3b82f6',
+            firstName: timelineData.agent.firstName || timelineData.agent.name?.split(' ')[0] || '',
+            lastName: timelineData.agent.lastName || timelineData.agent.name?.split(' ')[1] || '',
             // Add extended profile data when available
             yearsExperience: 5, // This should come from agent profile
             specialties: ['First-Time Buyers', 'Investment Properties', 'Luxury Homes'],
-            bio: `${timelineData.agent.name} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,
+            bio: `${timelineData.agent.name || 'Your agent'} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,
             title: 'Senior Real Estate Agent',
             license: 'RE License #123456',
           }}
