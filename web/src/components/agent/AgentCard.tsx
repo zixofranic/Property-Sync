@@ -171,12 +171,7 @@ Thank you!`;
               </div>
             </div>
 
-            {/* Powered by line */}
-            <div className="text-center mt-2 pt-2 border-t border-slate-700/30">
-              <p className="text-xs text-slate-500">
-                Powered by <span className="font-medium" style={{ color: agent.brandColor }}>Property Sync</span>
-              </p>
-            </div>
+
           </div>
         </motion.div>
 

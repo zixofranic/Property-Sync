@@ -244,16 +244,26 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
           const newPropertiesAdded = newPropertyCount - oldPropertyCount;
           
           if (newPropertiesAdded > 0 && settings.bannerNotifications && settings.newProperties) {
-            // Create notification
-            addNotification(createNewPropertiesNotification(
-              newData.timeline.id,
-              newData.timeline.title,
-              newData.agent.name,
-              newPropertiesAdded,
-              newPropertyCount
-            ));
+            // Check if we already have a recent notification for this timeline
+            const existingNotification = getVisibleNotifications().find(n => 
+              n.type === 'new-properties' && 
+              n.timelineId === newData.timeline.id &&
+              n.isVisible &&
+              !n.isRead
+            );
             
-            setShowNewPropertiesBanner(true);
+            // Only create notification if no existing unread notification exists
+            if (!existingNotification) {
+              addNotification(createNewPropertiesNotification(
+                newData.timeline.id,
+                newData.timeline.title,
+                newData.agent.name,
+                newPropertiesAdded,
+                newPropertyCount
+              ));
+              
+              setShowNewPropertiesBanner(true);
+            }
           }
         }
         
@@ -674,7 +684,16 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
+              {/* Agent Company Logo */}
+              {timelineData.agent.logo && (
+                <img
+                  src={timelineData.agent.logo}
+                  alt={timelineData.agent.company}
+                  className="w-12 h-12 object-cover"
+                />
+              )}
+              
               <div>
                 <h1 className="text-xl font-bold text-white">
                   {timelineData.timeline.title}
@@ -682,17 +701,24 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <p className="text-sm text-slate-400">
                   Curated just for you by {timelineData.agent.name} • REALTOR®
                 </p>
+                <div className="mt-1">
+                  <p className="text-xs text-slate-500">
+                    Powered by <span className="font-medium" style={{ color: timelineData.agent.brandColor }}>Property Sync</span>
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               {/* New Properties Counter Badge */}
               {newPropertyCount > 0 && (
-                <div className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-full shadow-lg">
-                  <Sparkles className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {newPropertyCount} New {newPropertyCount === 1 ? 'Property' : 'Properties'}
-                  </span>
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-xs font-bold">
+                      +{newPropertyCount}
+                    </span>
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                 </div>
               )}
               
@@ -964,8 +990,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               latestFeedback.feedback === 'like' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
                                               'bg-gradient-to-r from-red-500 to-rose-500'
                                             }`}>
-                                              {latestFeedback.feedback === 'love' ? 'Love It! ❤️' :
-                                               latestFeedback.feedback === 'like' ? 'Let\'s Talk 💬' : 'Not for Me ❌'}
+                                              {latestFeedback.feedback === 'love' ? 'Love it, Let\'s schedule a showing' :
+                                               latestFeedback.feedback === 'like' ? 'I like it, let\'s talk' : 'Not for Me, please keep searching'}
                                             </span>
                                             <span className="text-xs text-slate-400">
                                               {formatRelativeTime(latestFeedback.createdAt)}
@@ -1193,8 +1219,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                                 latestFeedback.feedback === 'like' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
                                                 'bg-gradient-to-r from-red-500 to-rose-500'
                                               }`}>
-                                                {latestFeedback.feedback === 'love' ? 'Love It! ❤️' :
-                                                 latestFeedback.feedback === 'like' ? 'Let\'s Talk 💬' : 'Not for Me ❌'}
+                                                {latestFeedback.feedback === 'love' ? 'Love it, Let\'s schedule a showing' :
+                                                 latestFeedback.feedback === 'like' ? 'I like it, let\'s talk' : 'Not for Me, please keep searching'}
                                               </span>
                                               <span className="text-xs text-slate-400">
                                                 {formatRelativeTime(latestFeedback.createdAt)}
@@ -1220,8 +1246,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               >
                                                 <Heart className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'love' ? 'currentColor' : 'none'} />
                                                 <div className="text-center">
-                                                  <div className="font-bold text-lg">Love It!</div>
-                                                  <div className="text-sm opacity-80">Perfect match</div>
+                                                  <div className="font-bold text-lg">Love it</div>
+                                                  <div className="text-sm opacity-80">Let's schedule a showing</div>
                                                 </div>
                                               </motion.button>
 
@@ -1237,8 +1263,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               >
                                                 <MessageSquare className="w-8 h-8 mx-auto mb-3" fill={selectedFeedback[property.id] === 'like' ? 'currentColor' : 'none'} />
                                                 <div className="text-center">
-                                                  <div className="font-bold text-lg">Let's Talk</div>
-                                                  <div className="text-sm opacity-80">Schedule a visit</div>
+                                                  <div className="font-bold text-lg">I like it</div>
+                                                  <div className="text-sm opacity-80">let's talk</div>
                                                 </div>
                                               </motion.button>
 
@@ -1255,7 +1281,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                                 <X className="w-8 h-8 mx-auto mb-3" />
                                                 <div className="text-center">
                                                   <div className="font-bold text-lg">Not for Me</div>
-                                                  <div className="text-sm opacity-80">Keep searching</div>
+                                                  <div className="text-sm opacity-80">please keep searching</div>
                                                 </div>
                                               </motion.button>
                                             </div>
