@@ -32,6 +32,12 @@ export class PushNotificationManager {
   }
 
   private checkSupport(): void {
+    // Check if we're in a browser environment (not SSR)
+    if (typeof window === 'undefined') {
+      this.isSupported = false;
+      return;
+    }
+    
     this.isSupported = 
       'Notification' in window && 
       'serviceWorker' in navigator && 
@@ -39,7 +45,7 @@ export class PushNotificationManager {
   }
 
   private updatePermission(): void {
-    if (this.isSupported) {
+    if (this.isSupported && typeof window !== 'undefined') {
       this.permission = Notification.permission;
     }
   }
@@ -57,7 +63,7 @@ export class PushNotificationManager {
 
   // Request permission for notifications
   async requestPermission(): Promise<NotificationPermission> {
-    if (!this.isSupported) {
+    if (!this.isSupported || typeof window === 'undefined') {
       throw new Error('Push notifications are not supported in this browser');
     }
 
@@ -106,10 +112,12 @@ export class PushNotificationManager {
 
         // Handle notification click
         notification.onclick = () => {
-          window.focus();
-          notification.close();
-          if (options.data?.url) {
-            window.location.href = options.data.url;
+          if (typeof window !== 'undefined') {
+            window.focus();
+            notification.close();
+            if (options.data?.url) {
+              window.location.href = options.data.url;
+            }
           }
         };
       }
@@ -121,7 +129,7 @@ export class PushNotificationManager {
 
   // Register service worker for push notifications
   async registerServiceWorker(): Promise<ServiceWorkerRegistration> {
-    if (!this.isSupported) {
+    if (!this.isSupported || typeof window === 'undefined') {
       throw new Error('Service workers are not supported');
     }
 
