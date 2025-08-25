@@ -344,11 +344,14 @@ export class TimelinesService {
     };
   }
 
-  // FIXED: Send Timeline Email with proper error handling
+  // ENHANCED: Send Timeline Email with email type detection and tracking
   async sendTimelineEmail(
     agentId: string,
     timelineId: string,
-    emailOptions?: { templateStyle?: 'modern' | 'classical' },
+    emailOptions?: { 
+      templateStyle?: 'modern' | 'classical';
+      emailType?: 'initial' | 'reminder';
+    },
   ) {
     const timeline = await this.prisma.timeline.findFirst({
       where: {
@@ -367,6 +370,15 @@ export class TimelinesService {
     if (!timeline) {
       throw new NotFoundException('Timeline not found');
     }
+
+    // ENHANCED: Validate properties exist before sending email
+    if (timeline.properties.length === 0) {
+      throw new Error('Cannot send email: Timeline has no properties');
+    }
+
+    // ENHANCED: Determine email type (initial or reminder)
+    const emailType = emailOptions?.emailType || (timeline.initialEmailSent ? 'reminder' : 'initial');
+    const newPropertyCount = timeline.properties.length - timeline.lastEmailPropertyCount;
 
     const agentProfile = timeline.agent.profile;
     const templateStyle: 'modern' | 'classical' =
@@ -406,20 +418,34 @@ export class TimelinesService {
         );
       }
 
-      // Track successful email send
+      // ENHANCED: Update email tracking fields
+      await this.prisma.timeline.update({
+        where: { id: timelineId },
+        data: {
+          initialEmailSent: true,
+          lastEmailSent: new Date(),
+          lastEmailPropertyCount: timeline.properties.length,
+        },
+      });
+
+      // Track successful email send with enhanced analytics
       await this.trackAnalyticsEvent(timeline.clientId, 'timeline_email_sent', {
         timelineId,
         propertyCount: timeline.properties.length,
+        emailType,
+        newPropertyCount: emailType === 'reminder' ? newPropertyCount : timeline.properties.length,
         hasSpouseEmail: !!timeline.client.spouseEmail,
         provider: emailResult.provider, // 'resend' or 'nodemailer'
         templateStyle,
       });
 
       return {
-        message: 'Timeline email sent successfully',
+        message: `${emailType === 'initial' ? 'Initial timeline' : 'Reminder'} email sent successfully`,
+        emailType,
         sentTo: timeline.client.email,
         spouseSentTo: timeline.client.spouseEmail,
         propertyCount: timeline.properties.length,
+        newPropertyCount: emailType === 'reminder' ? newPropertyCount : timeline.properties.length,
         shareUrl,
         provider: emailResult.provider,
         messageId: emailResult.messageId,
@@ -434,6 +460,31 @@ export class TimelinesService {
       // Re-throw with more context
       throw new Error(`Timeline email delivery failed: ${error.message}`);
     }
+  }
+
+  // NEW: Get timeline email state for UI
+  async getTimelineEmailState(agentId: string, timelineId: string) {
+    const timeline = await this.prisma.timeline.findFirst({
+      where: { id: timelineId, agentId },
+      include: { properties: true },
+    });
+
+    if (!timeline) {
+      throw new NotFoundException('Timeline not found');
+    }
+
+    const propertyCount = timeline.properties.length;
+    const newPropertyCount = propertyCount - timeline.lastEmailPropertyCount;
+    
+    return {
+      canSendInitial: propertyCount > 0 && !timeline.initialEmailSent,
+      canSendReminder: timeline.initialEmailSent && newPropertyCount > 0,
+      propertyCount,
+      newPropertyCount,
+      lastEmailDate: timeline.lastEmailSent,
+      lastEmailPropertyCount: timeline.lastEmailPropertyCount,
+      initialEmailSent: timeline.initialEmailSent,
+    };
   }
 
   // FIXED: Property notification with correct method signature

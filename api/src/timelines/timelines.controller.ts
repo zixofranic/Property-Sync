@@ -233,13 +233,27 @@ export class TimelinesController {
     return this.timelinesService.deleteProperty(agentId, propertyId);
   }
 
+  // Get email state
+  @UseGuards(JwtAuthGuard)
+  @Get(':timelineId/email-state')
+  async getTimelineEmailState(
+    @Request() req,
+    @Param('timelineId') timelineId: string,
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.getTimelineEmailState(agentId, timelineId);
+  }
+
   // Send timeline email
   @UseGuards(JwtAuthGuard)
   @Post(':timelineId/send-email')
   async sendTimelineEmail(
     @Request() req,
     @Param('timelineId') timelineId: string,
-    @Body() emailOptions?: { templateStyle?: 'modern' | 'classical' },
+    @Body() emailOptions?: { 
+      templateStyle?: 'modern' | 'classical';
+      emailType?: 'initial' | 'reminder';
+    },
   ) {
     const agentId = req.user.id;
     return this.timelinesService.sendTimelineEmail(

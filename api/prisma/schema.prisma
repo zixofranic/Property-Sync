@@ -158,6 +158,11 @@ model Timeline {
   lastViewed  DateTime?
   viewHistory Json?    // Track view timestamps
   
+  // Email tracking for enhanced email system
+  initialEmailSent       Boolean @default(false)
+  lastEmailSent          DateTime?
+  lastEmailPropertyCount Int @default(0)
+  
   // Agent access token
   agentToken  String?  @unique
   tokenExpiry DateTime?
