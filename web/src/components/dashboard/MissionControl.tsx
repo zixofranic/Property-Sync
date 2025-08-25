@@ -1,7 +1,7 @@
 // apps/web/src/components/dashboard/MissionControl.tsx - ADDED: Loading animations for data retrieval
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -97,12 +97,6 @@ export function MissionControl() {
   // âœ… SIMPLIFIED: Basic online/offline detection only
   const [isOnline, setIsOnline] = useState(true);
 
-  // Fetch email state when timeline changes or share modal opens
-  useEffect(() => {
-    if (showShareModal && currentTimeline) {
-      fetchEmailState(currentTimeline.id);
-    }
-  }, [showShareModal, currentTimeline?.id]);
 
   // âœ… SIMPLIFIED: Basic online/offline monitoring (no session management)
   useEffect(() => {
@@ -139,6 +133,13 @@ export function MissionControl() {
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
   const properties = currentTimeline?.properties || [];
+
+  // Fetch email state when timeline changes or share modal opens
+  useEffect(() => {
+    if (showShareModal && currentTimeline) {
+      fetchEmailState(currentTimeline.id);
+    }
+  }, [showShareModal, currentTimeline?.id, fetchEmailState]);
 
   // Check if there are properties queued for bulk sending
   const bulkQueueCount = properties.filter(p => !p.clientFeedback).length;
@@ -249,8 +250,8 @@ export function MissionControl() {
       sendBulkProperties(selectedClient.id);
     }
   };
-  // Fetch email state for timeline
-  const fetchEmailState = async (timelineId: string) => {
+  // Fetch email state for timeline - wrapped in useCallback to stabilize for useEffect
+  const fetchEmailState = useCallback(async (timelineId: string) => {
     setEmailStateLoading(true);
     try {
       const response = await apiClient.get(`/timelines/${timelineId}/email-state`);
@@ -261,7 +262,7 @@ export function MissionControl() {
     } finally {
       setEmailStateLoading(false);
     }
-  };
+  }, []);
 
   const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => {
     if (!selectedClient || !currentTimeline) {
