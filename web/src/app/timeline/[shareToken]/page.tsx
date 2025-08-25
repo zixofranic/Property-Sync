@@ -5,6 +5,9 @@ import { use, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Share2, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
+import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
+import { initializePushNotifications } from '@/lib/push-notifications';
 
 // API Response Types
 interface ClientTimelineData {
@@ -88,6 +91,17 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     show: false,
     message: ''
   });
+  
+  // Notification store
+  const { 
+    addNotification, 
+    getVisibleNotifications, 
+    hasNewPropertiesNotification,
+    dismissNotification,
+    settings 
+  } = useNotificationStore();
+  const [previousPropertyCount, setPreviousPropertyCount] = useState<number>(0);
+  const [showNewPropertiesBanner, setShowNewPropertiesBanner] = useState(false);
 
   // Utility: Calculate property status (new/unseen/viewed)
   const getPropertyStatus = (property: any): PropertyStatus => {
@@ -159,6 +173,13 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     );
   };
 
+  // Initialize push notifications
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      initializePushNotifications();
+    }
+  }, []);
+
   // Fetch timeline data
   useEffect(() => {
     const fetchTimelineData = async () => {
@@ -175,11 +196,33 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
           throw new Error(response.error);
         }
         
-        setTimelineData(response.data);
-        setIsAuthenticated(response.data?.isAuthenticated || false);
+        const newData = response.data;
+        
+        // Check for new properties if we have previous data
+        if (timelineData && newData && isAuthenticated) {
+          const newPropertyCount = newData.properties.length;
+          const oldPropertyCount = timelineData.properties.length;
+          const newPropertiesAdded = newPropertyCount - oldPropertyCount;
+          
+          if (newPropertiesAdded > 0 && settings.bannerNotifications && settings.newProperties) {
+            // Create notification
+            addNotification(createNewPropertiesNotification(
+              newData.timeline.id,
+              newData.timeline.title,
+              newData.agent.name,
+              newPropertiesAdded,
+              newPropertyCount
+            ));
+            
+            setShowNewPropertiesBanner(true);
+          }
+        }
+        
+        setTimelineData(newData);
+        setIsAuthenticated(newData?.isAuthenticated || false);
         
         // Track timeline view if authenticated
-        if (response.data?.isAuthenticated) {
+        if (newData?.isAuthenticated) {
           await apiClient.trackTimelineView(shareToken, { source: 'client_access' });
         }
         
@@ -529,8 +572,37 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
   const groupedProperties = groupPropertiesByDate(sortedProperties);
 
+  // Get current new properties notification
+  const visibleNotifications = getVisibleNotifications();
+  const newPropertiesNotification = visibleNotifications.find(n => 
+    n.type === 'new-properties' && 
+    n.timelineId === timelineData?.timeline.id &&
+    !n.isRead
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* New Properties Notification Banner */}
+      {newPropertiesNotification && (
+        <NewPropertiesNotification
+          count={newPropertiesNotification.count || 0}
+          timelineTitle={newPropertiesNotification.timelineTitle}
+          onDismiss={() => {
+            dismissNotification(newPropertiesNotification.id);
+            setShowNewPropertiesBanner(false);
+          }}
+          onViewClick={() => {
+            dismissNotification(newPropertiesNotification.id);
+            setShowNewPropertiesBanner(false);
+            // Scroll to the newest properties
+            const firstProperty = document.querySelector('[data-property-card]');
+            if (firstProperty) {
+              firstProperty.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -689,6 +761,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
                               {/* Mobile Property Card - FULL WIDTH */}
                               <motion.div
+                                data-property-card
                                 className="ml-6 w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:bg-slate-700/50 transition-all duration-300"
                                 whileHover={{ scale: 1.01 }}
                               >
@@ -911,6 +984,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
                                 {/* Desktop Property Card */}
                                 <motion.div
+                                  data-property-card
                                   className={`
                                     relative
                                     w-[calc(50%-2rem)] 

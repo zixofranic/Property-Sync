@@ -196,7 +196,7 @@ interface EmailActions {
   }) => Promise<void>;
   
   // Email Sending
-  sendTimelineEmail: (timelineId: string, templateOverride?: 'modern' | 'classical') => Promise<void>;
+  sendTimelineEmail: (timelineId: string, templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => Promise<void>;
   sendPropertyNotification: (timelineId: string, propertyId: string) => Promise<void>;
 }
 
@@ -1391,9 +1391,9 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
-        sendTimelineEmail: async (timelineId: string, templateOverride?: 'modern' | 'classical') => {
+        sendTimelineEmail: async (timelineId: string, templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => {
           try {
-            const response = await apiClient.sendTimelineEmail(timelineId, templateOverride);
+            const response = await apiClient.sendTimelineEmail(timelineId, templateOverride, emailType);
             
             if (response.error) {
               get().addNotification({

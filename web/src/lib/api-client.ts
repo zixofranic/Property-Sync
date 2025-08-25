@@ -788,20 +788,26 @@ class ApiClient {
 
   async sendTimelineEmail(
   timelineId: string, 
-  templateOverride?: 'modern' | 'classical'
+  templateOverride?: 'modern' | 'classical',
+  emailType?: 'initial' | 'reminder'
 ): Promise<ApiResponse<{
   message: string;
+  emailType: 'initial' | 'reminder';
   sentTo: string;
   spouseSentTo?: string;
   propertyCount: number;
+  newPropertyCount: number;
   shareUrl: string;
-  templateStyle: string;
+  templateStyle?: string;
   emailProvider?: string;
   messageId?: string;
 }>> {
   const body: any = {};
   if (templateOverride) {
     body.templateStyle = templateOverride;
+  }
+  if (emailType) {
+    body.emailType = emailType;
   }
 
   return this.request(`/api/v1/timelines/${timelineId}/send-email`, {

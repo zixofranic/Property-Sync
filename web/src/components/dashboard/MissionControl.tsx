@@ -90,11 +90,19 @@ export function MissionControl() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [emailState, setEmailState] = useState<any>(null);
+  const [emailStateLoading, setEmailStateLoading] = useState(false);
 
   // âœ… SIMPLIFIED: Basic online/offline detection only
   const [isOnline, setIsOnline] = useState(true);
+
+  // Fetch email state when timeline changes or share modal opens
+  useEffect(() => {
+    if (showShareModal && activeTimeline) {
+      fetchEmailState(activeTimeline.id);
+    }
+  }, [showShareModal, activeTimeline?.id]);
 
   // âœ… SIMPLIFIED: Basic online/offline monitoring (no session management)
   useEffect(() => {
@@ -241,24 +249,40 @@ export function MissionControl() {
       sendBulkProperties(selectedClient.id);
     }
   };
-  const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical') => {
-  if (!selectedClient || !activeTimeline) {
-    addNotification({
-      type: 'error',
-      title: 'Cannot Send Email',
-      message: 'No client or timeline selected',
-      read: false,
-    });
-    return;
-  }
+  // Fetch email state for timeline
+  const fetchEmailState = async (timelineId: string) => {
+    setEmailStateLoading(true);
+    try {
+      const response = await apiClient.get(`/timelines/${timelineId}/email-state`);
+      setEmailState(response.data);
+    } catch (error) {
+      console.error('Failed to fetch email state:', error);
+      setEmailState(null);
+    } finally {
+      setEmailStateLoading(false);
+    }
+  };
 
-  try {
-    await sendTimelineEmail(activeTimeline.id, templateOverride);
-  } catch (error) {
-    // Error handling is done in the store action
-    throw error; // Re-throw for modal handling
-  }
-};
+  const handleSendTimelineEmail = async (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => {
+    if (!selectedClient || !activeTimeline) {
+      addNotification({
+        type: 'error',
+        title: 'Cannot Send Email',
+        message: 'No client or timeline selected',
+        read: false,
+      });
+      return;
+    }
+
+    try {
+      await sendTimelineEmail(activeTimeline.id, templateOverride, emailType);
+      // Refresh email state after successful send
+      await fetchEmailState(activeTimeline.id);
+    } catch (error) {
+      // Error handling is done in the store action
+      throw error; // Re-throw for modal handling
+    }
+  };
   // âœ… FIXED: Enhanced client selector with search - NULL SAFETY APPLIED
   const [clientSearch, setClientSearch] = useState('');
   const filteredClients = clients.filter(client => {
@@ -672,8 +696,9 @@ const testProfileAPI = async () => {
       propertyCount: properties.length,
     }}
     agentName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
-    onSendEmail={(templateOverride) => sendTimelineEmail(currentTimeline?.id || '', templateOverride)}
+    onSendEmail={handleSendTimelineEmail}
     initialTemplate={userPreferences?.emailTemplateStyle || 'modern'}
+    emailState={emailState}
   />
 )}
 

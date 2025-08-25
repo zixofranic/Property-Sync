@@ -7,6 +7,16 @@ import {
 } from 'lucide-react';
 import { EmailTemplateSelector } from './EmailTemplateSelector';
 
+interface EmailState {
+  canSendInitial: boolean;
+  canSendReminder: boolean;
+  propertyCount: number;
+  newPropertyCount: number;
+  lastEmailDate?: string;
+  lastEmailPropertyCount: number;
+  initialEmailSent: boolean;
+}
+
 interface ShareTimelineModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,8 +33,9 @@ interface ShareTimelineModalProps {
     propertyCount: number;
   };
   agentName: string;
-  onSendEmail: (templateOverride?: 'modern' | 'classical') => Promise<void>;
+  onSendEmail: (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => Promise<void>;
   initialTemplate?: 'modern' | 'classical';
+  emailState?: EmailState;
 }
 
 export function ShareTimelineModal({ 
@@ -34,7 +45,8 @@ export function ShareTimelineModal({
   timeline, 
   agentName,
   onSendEmail,
-  initialTemplate = 'modern'
+  initialTemplate = 'modern',
+  emailState
 }: ShareTimelineModalProps) {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [isEmailSending, setIsEmailSending] = useState(false);
@@ -42,6 +54,40 @@ export function ShareTimelineModal({
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classical'>(initialTemplate);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+
+  // Smart email logic
+  const getEmailType = (): 'initial' | 'reminder' => {
+    if (!emailState) return 'initial';
+    return emailState.initialEmailSent ? 'reminder' : 'initial';
+  };
+
+  const getEmailButtonText = (): string => {
+    if (!emailState || timeline.propertyCount === 0) return 'Send Email';
+    
+    const emailType = getEmailType();
+    if (emailType === 'initial') {
+      return `Send Initial Email (${timeline.propertyCount} properties)`;
+    } else {
+      return `Send Reminder (${emailState.newPropertyCount} new properties)`;
+    }
+  };
+
+  const getEmailButtonDisabled = (): boolean => {
+    if (isEmailSending) return true;
+    if (!emailState) return timeline.propertyCount === 0;
+    return !emailState.canSendInitial && !emailState.canSendReminder;
+  };
+
+  const formatLastEmailDate = (dateString?: string): string => {
+    if (!dateString) return 'Never sent';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const shareMessages = {
     email: {
@@ -72,7 +118,8 @@ export function ShareTimelineModal({
     setEmailError(null);
     
     try {
-      await onSendEmail(selectedTemplate);
+      const emailType = getEmailType();
+      await onSendEmail(selectedTemplate, emailType);
       setCopiedItem('email-sent');
       setShowConfirmation(false);
       setTimeout(() => setCopiedItem(null), 3000);
@@ -222,13 +269,71 @@ export function ShareTimelineModal({
                     </button>
                   </motion.div>
                 )}
+
+                {/* Email Status Section */}
+                {emailState && (
+                  <div className="bg-slate-800/50 rounded-lg p-4 mb-4 border border-slate-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-slate-300">Email Status</h4>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        emailState.initialEmailSent 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-orange-500/20 text-orange-400'
+                      }`}>
+                        {emailState.initialEmailSent ? 'Email Sent' : 'Email Not Sent'}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-400">Properties:</span>
+                        <span className="ml-2 text-white font-medium">{emailState.propertyCount}</span>
+                      </div>
+                      
+                      {emailState.initialEmailSent && emailState.newPropertyCount > 0 && (
+                        <div>
+                          <span className="text-slate-400">New since last email:</span>
+                          <span className="ml-2 text-orange-400 font-medium">+{emailState.newPropertyCount}</span>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <span className="text-slate-400">Last sent:</span>
+                        <span className="ml-2 text-white font-medium">{formatLastEmailDate(emailState.lastEmailDate)}</span>
+                      </div>
+                      
+                      {emailState.initialEmailSent && (
+                        <div>
+                          <span className="text-slate-400">Properties sent:</span>
+                          <span className="ml-2 text-white font-medium">{emailState.lastEmailPropertyCount}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!emailState.canSendInitial && !emailState.canSendReminder && (
+                      <div className="mt-3 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                        <p className="text-xs text-orange-400">
+                          {timeline.propertyCount === 0 
+                            ? '⚠️ Add properties before sending email' 
+                            : '✅ No new properties to share since last email'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Send Email Button */}
+                  {/* Smart Send Email Button */}
                   <button
                     onClick={handleSendEmail}
-                    disabled={isEmailSending}
-                    className="flex items-center justify-center space-x-2 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-slate-600 disabled:to-slate-600 text-white rounded-xl transition-all duration-200 disabled:cursor-not-allowed"
+                    disabled={getEmailButtonDisabled()}
+                    className={`flex items-center justify-center space-x-2 p-4 rounded-xl transition-all duration-200 disabled:cursor-not-allowed ${
+                      getEmailButtonDisabled()
+                        ? 'bg-slate-600 text-slate-400'
+                        : getEmailType() === 'reminder' 
+                          ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white'
+                          : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white'
+                    }`}
                   >
                     {isEmailSending ? (
                       <>
@@ -240,10 +345,15 @@ export function ShareTimelineModal({
                         <Check className="w-4 h-4" />
                         <span>Email Sent!</span>
                       </>
+                    ) : getEmailButtonDisabled() ? (
+                      <>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>No Properties</span>
+                      </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>Send Email</span>
+                        <span className="text-sm sm:text-base">{getEmailButtonText()}</span>
                       </>
                     )}
                   </button>
@@ -421,10 +531,24 @@ export function ShareTimelineModal({
                   <Send className="w-6 h-6 text-white" />
                 </div>
                 
-                <h3 className="text-lg font-semibold text-white mb-2">Send Timeline Email?</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Send {getEmailType() === 'initial' ? 'Initial' : 'Reminder'} Email?
+                </h3>
                 <p className="text-slate-400 mb-6">
-                  Send {timeline.propertyCount} properties to {client.name} using the <span className="capitalize font-medium text-white">{selectedTemplate}</span> template.
+                  {getEmailType() === 'initial' 
+                    ? `Send ${timeline.propertyCount} properties to ${client.name} using the `
+                    : `Send ${emailState?.newPropertyCount || 0} new properties to ${client.name} using the `
+                  }
+                  <span className="capitalize font-medium text-white">{selectedTemplate}</span> template.
                 </p>
+                
+                {getEmailType() === 'reminder' && emailState && (
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-orange-300">
+                      📧 Last email sent {formatLastEmailDate(emailState.lastEmailDate)} with {emailState.lastEmailPropertyCount} properties
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex space-x-3">
                   <button
