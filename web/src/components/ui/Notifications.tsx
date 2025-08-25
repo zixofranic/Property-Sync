@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Activity } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 
 const icons = {
@@ -10,6 +10,7 @@ const icons = {
   error: AlertCircle,
   warning: AlertTriangle,
   info: Info,
+  activity: Activity,
 };
 
 const colors = {
@@ -17,17 +18,20 @@ const colors = {
   error: 'from-red-500 to-rose-600 border-red-500/20',
   warning: 'from-yellow-500 to-amber-600 border-yellow-500/20',
   info: 'from-blue-500 to-cyan-600 border-blue-500/20',
+  activity: 'from-purple-500 to-violet-600 border-purple-500/20',
 };
 
 export function Notifications() {
-  const { notifications, removeNotification } = useMissionControlStore();
+  const { notifications, removeNotification, markNotificationAsRead } = useMissionControlStore();
 
   useEffect(() => {
     const timers = (notifications || []).map(notification => {
       if (!notification.read) {
         return setTimeout(() => {
-          removeNotification(notification.id);
-        }, 4000); // ✅ CHANGED: 5000ms → 4000ms (4 seconds)
+          // Mark as read instead of removing completely
+          // This keeps them in the bell dropdown but removes the toast
+          markNotificationAsRead(notification.id);
+        }, 2000); // ✅ CHANGED: 4000ms → 2000ms (2 seconds)
       }
       return null;
     });
@@ -37,12 +41,12 @@ export function Notifications() {
         if (timer) clearTimeout(timer);
       });
     };
-  }, [notifications, removeNotification]);
+  }, [notifications, markNotificationAsRead]);
 
   return (
     <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
       <AnimatePresence>
-        {(notifications || []).slice(0, 5).map((notification) => {
+        {(notifications || []).filter(n => !n.read).slice(0, 5).map((notification) => {
           const Icon = icons[notification.type];
           const colorClass = colors[notification.type];
 
@@ -87,8 +91,8 @@ export function Notifications() {
                 className="absolute bottom-0 left-0 h-1 bg-white/30"
                 initial={{ width: '100%' }}
                 animate={{ width: '0%' }}
-                transition={{ duration: 4, ease: 'linear' }}
-                // ✅ CHANGED: duration: 5 → duration: 4 (matches the 4s auto-dismiss)
+                transition={{ duration: 2, ease: 'linear' }}
+                // ✅ CHANGED: duration: 4 → duration: 2 (matches the 2s auto-dismiss)
               />
             </motion.div>
           );
