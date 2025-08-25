@@ -794,6 +794,8 @@ class ApiClient {
     lastEmailDate?: string;
     lastEmailPropertyCount: number;
     initialEmailSent: boolean;
+    lastViewed?: string;
+    clientHasSeenNewProperties?: boolean;
   }>> {
     return this.request(`/api/v1/timelines/${timelineId}/email-state`);
   }

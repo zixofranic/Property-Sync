@@ -469,24 +469,47 @@ export class TimelinesService {
   async getTimelineEmailState(agentId: string, timelineId: string) {
     const timeline = await this.prisma.timeline.findFirst({
       where: { id: timelineId, agentId },
-      include: { properties: true },
+      include: { 
+        properties: {
+          orderBy: { addedAt: 'desc' },
+          take: 1
+        }
+      },
     });
 
     if (!timeline) {
       throw new NotFoundException('Timeline not found');
     }
 
-    const propertyCount = timeline.properties.length;
+    // Get total property count (we need all properties for count, not just the latest)
+    const totalProperties = await this.prisma.property.count({
+      where: { timelineId }
+    });
+
+    const propertyCount = totalProperties;
     const newPropertyCount = propertyCount - timeline.lastEmailPropertyCount;
+    
+    // Get the most recent property addition date
+    const latestProperty = timeline.properties[0];
+    const lastPropertyAddedDate = latestProperty?.addedAt;
+    
+    // Enhanced logic: Only suggest email if client hasn't viewed timeline since new properties were added
+    const clientHasSeenNewProperties = timeline.lastViewed && 
+                                      lastPropertyAddedDate && 
+                                      timeline.lastViewed >= lastPropertyAddedDate;
     
     return {
       canSendInitial: propertyCount > 0 && !timeline.initialEmailSent,
-      canSendReminder: timeline.initialEmailSent && newPropertyCount > 0,
+      canSendReminder: timeline.initialEmailSent && 
+                      newPropertyCount > 0 && 
+                      !clientHasSeenNewProperties,
       propertyCount,
       newPropertyCount,
       lastEmailDate: timeline.lastEmailSent,
       lastEmailPropertyCount: timeline.lastEmailPropertyCount,
       initialEmailSent: timeline.initialEmailSent,
+      lastViewed: timeline.lastViewed,
+      clientHasSeenNewProperties,
     };
   }
 

@@ -241,7 +241,17 @@ export function ShareTimelineModal({
                         <p className="text-xs text-orange-400">
                           {timeline.propertyCount === 0 
                             ? '⚠️ Add properties before sending email' 
-                            : '✅ No new properties to share since last email'}
+                            : emailState.clientHasSeenNewProperties
+                              ? '👁️ Client has already viewed new properties on timeline'
+                              : '✅ No new properties to share since last email'}
+                        </p>
+                      </div>
+                    )}
+
+                    {emailState.lastViewed && (
+                      <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-xs text-blue-400">
+                          🕐 Client last viewed timeline: {formatLastEmailDate(emailState.lastViewed)}
                         </p>
                       </div>
                     )}

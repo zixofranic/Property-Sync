@@ -1061,6 +1061,7 @@ const testProfileAPI = async () => {
         icon: Share2,
         label: emailState?.canSendReminder ? `Share Timeline (${emailState.newPropertyCount} new)` : 
                emailState?.canSendInitial && properties.length > 0 ? `Share Timeline (${properties.length} properties)` :
+               emailState?.clientHasSeenNewProperties ? 'Share Timeline (viewed)' :
                'Share Timeline', 
         action: () => setShowShareModal(true),
         color: (emailState?.canSendInitial || emailState?.canSendReminder) ? 'from-green-500 to-blue-600' : 'from-purple-500 to-pink-600',
