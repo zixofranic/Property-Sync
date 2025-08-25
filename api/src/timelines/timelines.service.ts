@@ -399,10 +399,13 @@ export class TimelinesService {
         clientEmail: timeline.client.email,
         clientName:
           `${timeline.client.firstName} ${timeline.client.lastName}`.trim(),
+        clientPhone: timeline.client.phone || undefined,
         agentName:
           `${agentProfile?.firstName || ''} ${agentProfile?.lastName || ''}`.trim() ||
           'Your Agent',
         agentCompany: agentProfile?.company || 'Realtor',
+        agentEmail: timeline.agent.email || undefined,
+        agentPhone: timeline.agent.phone || undefined,
         timelineUrl: shareUrl,
         propertyCount: timeline.properties.length,
         spouseEmail: timeline.client.spouseEmail || undefined,
