@@ -653,7 +653,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       </div>
 
       {/* Main Content - RESPONSIVE TIMELINE FIXED */}
-      <div className="pt-28 px-6 pb-24">
+      <div className="pt-28 px-6 pb-32">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
             <motion.div

@@ -61,21 +61,131 @@ Thank you!`;
     }
   };
 
+  // Footer variant for timeline pages
+  if (isSticky) {
+    return (
+      <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-t border-slate-700/50 backdrop-blur-xl"
+          style={{ borderTopColor: `${agent.brandColor}30` }}
+        >
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Agent Info Section */}
+              <div className="flex items-center space-x-4">
+                {agent.logo ? (
+                  <img
+                    src={agent.logo}
+                    alt={agent.name}
+                    className="w-10 h-10 rounded-full object-cover border-2"
+                    style={{ borderColor: agent.brandColor }}
+                  />
+                ) : (
+                  <div 
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor }}
+                  >
+                    <User className="w-5 h-5" />
+                  </div>
+                )}
+                
+                <div className="hidden sm:block">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-white font-semibold text-sm">{agent.name}</h3>
+                    <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor }}>
+                      REALTOR®
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Building className="w-3 h-3 text-slate-400" />
+                    <p className="text-slate-400 text-xs">{agent.company}</p>
+                  </div>
+                </div>
+
+                {/* Mobile: Name only */}
+                <div className="sm:hidden">
+                  <h3 className="text-white font-semibold text-sm">{agent.name}</h3>
+                  <p className="text-slate-400 text-xs">REALTOR®</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-2">
+                {/* Contact Buttons */}
+                {agent.email && (
+                  <motion.button
+                    onClick={() => handleSmartContact('email')}
+                    className="flex items-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Mail className="w-3 h-3" />
+                    <span className="hidden sm:inline">Email</span>
+                  </motion.button>
+                )}
+
+                {agent.phone && (
+                  <motion.button
+                    onClick={() => handleSmartContact('phone')}
+                    className="flex items-center space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span className="hidden sm:inline">Call</span>
+                  </motion.button>
+                )}
+
+                {/* Share Agent Button */}
+                <motion.button
+                  onClick={() => setShowIdentityCard(true)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Share2 className="w-3 h-3" />
+                  <span className="hidden md:inline">Share Agent</span>
+                  <span className="md:hidden">Share</span>
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Powered by line */}
+            <div className="text-center mt-2 pt-2 border-t border-slate-700/30">
+              <p className="text-xs text-slate-500">
+                Powered by <span className="font-medium" style={{ color: agent.brandColor }}>Property Sync</span>
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Agent Identity Card Modal */}
+        <AgentIdentityCardModal
+          agent={agent}
+          isOpen={showIdentityCard}
+          onClose={() => setShowIdentityCard(false)}
+        />
+      </>
+    );
+  }
+
+  // Regular card variant (for email, etc.)
   const baseClasses = `
     bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 
     border border-slate-700/50 backdrop-blur-xl rounded-2xl p-4
     shadow-2xl transition-all duration-300
     ${variant === 'email' ? 'max-w-md mx-auto' : ''}
-    ${isSticky ? 'fixed bottom-6 right-6 z-40 max-w-sm' : ''}
     ${className}
   `;
 
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: isSticky ? 100 : 20, scale: 0.95 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        whileHover={{ scale: isSticky ? 1.02 : 1.01, y: isSticky ? -2 : 0 }}
+        whileHover={{ scale: 1.01 }}
         className={baseClasses}
         style={{ borderColor: `${agent.brandColor}20` }}
       >

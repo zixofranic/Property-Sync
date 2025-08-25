@@ -245,6 +245,18 @@ export function BatchPropertyModal({ isOpen, onClose }: BatchPropertyModalProps)
           await loadTimeline(selectedClient.id);
         }
 
+        // Add email reminder notification after successful import
+        if (response.data.summary.successful > 0) {
+          setTimeout(() => {
+            addNotification({
+              type: 'info',
+              title: '📧 Email Reminder',
+              message: `Ready to share ${response.data.summary.successful} new properties with ${selectedClient?.name}? Click "Share Timeline" to send email.`,
+              read: false
+            });
+          }, 1000);
+        }
+
         // Close modal after successful import and timeline refresh
         setTimeout(() => {
           onClose();
