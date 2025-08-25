@@ -621,7 +621,11 @@ const testProfileAPI = async () => {
                   onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
                   className="relative p-1"
                 >
-                  <Bell className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+                  <Bell className={`w-5 h-5 cursor-pointer transition-all duration-300 ${
+                    notifications.filter(n => !n.read).length > 0 
+                      ? 'text-red-400 hover:text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse' 
+                      : 'text-slate-400 hover:text-white'
+                  }`} />
                   {notifications.filter(n => !n.read).length > 0 && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
                       {notifications.filter(n => !n.read).length}
@@ -708,7 +712,16 @@ const testProfileAPI = async () => {
   user={user || { id: '', email: '', firstName: '', lastName: '', plan: 'FREE' }}
   preferences={userPreferences || {
     emailTemplateStyle: 'modern',
-    notifications: { email: true, desktop: true, feedback: true, newProperties: true },
+    notifications: { 
+      email: true, 
+      desktop: true, 
+      feedback: true, 
+      newProperties: true,
+      clientViews: true,
+      clientLogin: false,
+      emailOpens: true,
+      inactiveClients: false
+    },
     theme: 'dark',
     soundEnabled: true
   }}
@@ -1150,7 +1163,16 @@ const testProfileAPI = async () => {
     user={user || { id: '', email: '', firstName: '', lastName: '', plan: 'FREE' }}
     preferences={userPreferences || {
       emailTemplateStyle: 'modern' as const,
-      notifications: { email: true, desktop: true, feedback: true, newProperties: true },
+      notifications: { 
+        email: true, 
+        desktop: true, 
+        feedback: true, 
+        newProperties: true,
+        clientViews: true,
+        clientLogin: false,
+        emailOpens: true,
+        inactiveClients: false
+      },
       theme: 'dark' as const,
       soundEnabled: true,
       timezone: 'America/New_York',
