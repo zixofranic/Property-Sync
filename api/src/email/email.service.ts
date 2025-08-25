@@ -738,29 +738,97 @@ export class EmailService {
 <html>
 <head><meta charset="utf-8"><title>Your Property Timeline</title></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; padding: 40px 0; background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); border-radius: 16px; margin-bottom: 30px;">
-    ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid white; margin-bottom: 20px;">` : ''}
-    <h1 style="color: white; margin: 0; font-size: 2.2em; font-weight: 900;">Your Property Timeline</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 1.1em;">Curated by ${data.agentName}</p>
+  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); border-radius: 20px; margin-bottom: 30px; position: relative; overflow: hidden;">
+    <!-- Decorative elements -->
+    <div style="position: absolute; top: -50px; right: -50px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    <div style="position: absolute; bottom: -30px; left: -30px; width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    
+    ${data.agentPhoto ? `
+    <div style="position: relative; display: inline-block; margin-bottom: 20px;">
+      <img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 50%; border: 4px solid white; object-fit: cover; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+      <div style="position: absolute; bottom: 5px; right: 5px; width: 24px; height: 24px; background: #10b981; border-radius: 50%; border: 3px solid white;">
+        <span style="color: white; font-size: 12px; line-height: 18px; display: block; text-align: center;">✓</span>
+      </div>
+    </div>
+    ` : `
+    <div style="width: 90px; height: 90px; background: rgba(255,255,255,0.2); border-radius: 50%; border: 4px solid white; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+      <span style="font-size: 36px; color: white;">🏠</span>
+    </div>
+    `}
+    
+    <h1 style="color: white; margin: 0; font-size: 2.4em; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">🏡 Your Property Timeline</h1>
+    <p style="color: rgba(255,255,255,0.95); margin: 15px 0 0 0; font-size: 1.2em; font-weight: 500;">Personally curated by ${data.agentName}</p>
+    <div style="display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 8px 20px; border-radius: 25px; margin-top: 15px; font-size: 0.9em; font-weight: 600;">
+      ${data.propertyCount} Properties Selected
+    </div>
   </div>
   
-  <div style="padding: 40px 20px;">
-    <h2 style="color: #1e293b;">Hi ${data.clientName}! 👋</h2>
-    <p>I've created a personalized property timeline just for you. I've carefully selected <strong>${data.propertyCount} properties</strong> that match your criteria and preferences.</p>
-    
-    <div style="background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); padding: 35px; border-radius: 16px; text-align: center; margin: 35px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-      <h3 style="color: white; margin: 0 0 25px 0; font-size: 1.4em;">View Your Properties</h3>
-      <a href="${data.timelineUrl}" style="display: inline-block; background: white; color: ${brandColor}; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 1.1em; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">Open Timeline →</a>
+  <div style="padding: 40px 30px;">
+    <div style="text-align: center; margin-bottom: 35px;">
+      <h2 style="color: #1e293b; font-size: 2.2em; margin: 0 0 15px 0;">Hi ${data.clientName}! 👋</h2>
+      <p style="font-size: 1.2em; color: #64748b; margin: 0;">I've handpicked <strong>${data.propertyCount} exceptional properties</strong> that align perfectly with your dream home criteria.</p>
     </div>
     
-    <div style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); padding: 30px; border-radius: 12px; border-left: 6px solid #22c55e;">
-      <h4 style="margin: 0 0 15px 0; color: #1e293b;">💡 How it works:</h4>
-      <ul style="margin: 0; padding-left: 20px; color: #475569;">
-        <li>Browse each property at your own pace</li>
-        <li>Leave feedback using the ❤️ Love, 💬 Let's Talk, or ❌ Not for Me buttons</li>
-        <li>Add your personal notes and questions</li>
-        <li>I'll get instant notifications of your preferences</li>
-      </ul>
+    <!-- Call to Action Button -->
+    <div style="background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); padding: 40px 30px; border-radius: 20px; text-align: center; margin: 40px 0; box-shadow: 0 15px 35px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
+      <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; transform: rotate(45deg);"></div>
+      
+      <div style="margin-bottom: 25px;">
+        <span style="font-size: 3em; display: block; margin-bottom: 10px;">🗝️</span>
+        <h3 style="color: white; margin: 0; font-size: 1.6em; font-weight: 800;">Your Property Keys Await</h3>
+        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 1.1em;">Access your personalized timeline now</p>
+      </div>
+      
+      <a href="${data.timelineUrl}" style="display: inline-block; background: white; color: ${brandColor}; padding: 18px 40px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 1.2em; box-shadow: 0 8px 25px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.3s ease;">
+        🏡 Open My Timeline
+      </a>
+      
+      <div style="margin-top: 20px; color: rgba(255,255,255,0.8); font-size: 0.9em;">
+        ⚡ Instant access • No downloads required
+      </div>
+    </div>
+    
+    <!-- Login Instructions -->
+    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 30px; border-radius: 16px; border-left: 6px solid #f59e0b; margin: 30px 0;">
+      <div style="display: flex; align-items: flex-start; gap: 15px;">
+        <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <span style="color: white; font-weight: bold; font-size: 18px;">🔐</span>
+        </div>
+        <div>
+          <h4 style="margin: 0 0 15px 0; color: #92400e; font-size: 1.3em;">Easy Login Instructions:</h4>
+          <div style="color: #b45309; font-size: 1.1em; line-height: 1.6;">
+            <p style="margin: 8px 0;"><strong>1.</strong> Click the timeline link above</p>
+            <p style="margin: 8px 0;"><strong>2.</strong> Enter your <strong>first name</strong></p>
+            <p style="margin: 8px 0;"><strong>3.</strong> Enter the <strong>last 4 digits of your phone number</strong></p>
+            <p style="margin: 8px 0;"><strong>4.</strong> Start exploring your properties! 🎉</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- How it Works -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 30px; border-radius: 16px; border-left: 6px solid #22c55e; margin: 30px 0;">
+      <h4 style="margin: 0 0 20px 0; color: #166534; font-size: 1.4em; display: flex; align-items: center; gap: 10px;">
+        <span>💡</span> How Your Timeline Works:
+      </h4>
+      <div style="display: grid; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">1</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Browse</strong> each property at your own pace</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">2</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Share feedback</strong> with ❤️ Love, 💬 Let's Talk, or ❌ Pass buttons</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">3</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>Add notes</strong> with your questions and thoughts</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 30px; height: 30px; background: #22c55e; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">4</span>
+          <span style="color: #166534; font-size: 1.1em;"><strong>I get notified</strong> instantly of your preferences!</span>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -787,7 +855,7 @@ export class EmailService {
 <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #2c3e50; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
   <div style="background: white; padding: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
     <div style="text-align: center; padding: 30px; background: #34495e; color: white;">
-      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid white; margin-bottom: 15px;">` : ''}
+      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid white; margin-bottom: 15px; object-fit: cover;">` : ''}
       <h1 style="margin: 0; font-size: 1.8em; font-weight: normal;">Property Selection</h1>
       <p style="margin: 8px 0 0 0; opacity: 0.9;">Presented by ${data.agentName}</p>
     </div>
