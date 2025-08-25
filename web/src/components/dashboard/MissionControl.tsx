@@ -23,7 +23,9 @@ import {
   Shield,
   Loader2,
   User,
-  Share2
+  Share2,
+  Mail,
+  AlertCircle
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { BatchPropertyModal } from '../modals/BatchPropertyModal';
