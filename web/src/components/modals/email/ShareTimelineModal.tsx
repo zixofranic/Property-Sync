@@ -195,24 +195,62 @@ export function ShareTimelineModal({
                   <Users className="w-5 h-5 text-blue-400" />
                   <h3 className="font-medium text-white">Timeline Details</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-400">Client:</span>
-                    <p className="text-white font-medium">{client.name}</p>
-                  </div>
+                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                   <div>
                     <span className="text-slate-400">Properties:</span>
                     <p className="text-white font-medium">{timeline.propertyCount}</p>
                   </div>
+                  {emailState && emailState.initialEmailSent && emailState.newPropertyCount > 0 && (
+                    <div>
+                      <span className="text-slate-400">New since last email:</span>
+                      <p className="text-orange-400 font-medium">+{emailState.newPropertyCount}</p>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Email Status Info */}
+                {emailState && (
+                  <div className="border-t border-slate-600/50 pt-3 mt-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-slate-300">Email Status</h4>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        emailState.initialEmailSent 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-orange-500/20 text-orange-400'
+                      }`}>
+                        {emailState.initialEmailSent ? 'Email Sent' : 'Email Not Sent'}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-400">Last sent:</span>
+                        <span className="ml-2 text-white font-medium">{formatLastEmailDate(emailState.lastEmailDate)}</span>
+                      </div>
+                      
+                      {emailState.initialEmailSent && (
+                        <div>
+                          <span className="text-slate-400">Properties sent:</span>
+                          <span className="ml-2 text-white font-medium">{emailState.lastEmailPropertyCount}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!emailState.canSendInitial && !emailState.canSendReminder && (
+                      <div className="mt-3 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                        <p className="text-xs text-orange-400">
+                          {timeline.propertyCount === 0 
+                            ? '⚠️ Add properties before sending email' 
+                            : '✅ No new properties to share since last email'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Quick Actions */}
               <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
-                  <Sparkles className="w-5 h-5 text-yellow-400" />
-                  <span>Quick Share</span>
-                </h3>
                 
                 {/* Email Template Selector Toggle */}
                 <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg border border-slate-600/30">
@@ -270,57 +308,6 @@ export function ShareTimelineModal({
                   </motion.div>
                 )}
 
-                {/* Email Status Section */}
-                {emailState && (
-                  <div className="bg-slate-800/50 rounded-lg p-4 mb-4 border border-slate-700">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-slate-300">Email Status</h4>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        emailState.initialEmailSent 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-orange-500/20 text-orange-400'
-                      }`}>
-                        {emailState.initialEmailSent ? 'Email Sent' : 'Email Not Sent'}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-slate-400">Properties:</span>
-                        <span className="ml-2 text-white font-medium">{emailState.propertyCount}</span>
-                      </div>
-                      
-                      {emailState.initialEmailSent && emailState.newPropertyCount > 0 && (
-                        <div>
-                          <span className="text-slate-400">New since last email:</span>
-                          <span className="ml-2 text-orange-400 font-medium">+{emailState.newPropertyCount}</span>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <span className="text-slate-400">Last sent:</span>
-                        <span className="ml-2 text-white font-medium">{formatLastEmailDate(emailState.lastEmailDate)}</span>
-                      </div>
-                      
-                      {emailState.initialEmailSent && (
-                        <div>
-                          <span className="text-slate-400">Properties sent:</span>
-                          <span className="ml-2 text-white font-medium">{emailState.lastEmailPropertyCount}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {!emailState.canSendInitial && !emailState.canSendReminder && (
-                      <div className="mt-3 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                        <p className="text-xs text-orange-400">
-                          {timeline.propertyCount === 0 
-                            ? '⚠️ Add properties before sending email' 
-                            : '✅ No new properties to share since last email'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Smart Send Email Button */}
