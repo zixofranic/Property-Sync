@@ -694,13 +694,13 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <img
                   src={timelineData.agent.logo}
                   alt={timelineData.agent.company}
-                  className="w-12 h-12 object-cover"
+                  className="w-12 h-12 object-cover rounded-none"
                 />
               )}
               
               <div>
                 <h1 className="text-xl font-bold text-white">
-                  {timelineData.timeline.title}
+                  {timelineData.timeline.title} [v51af32b-TEST]
                 </h1>
                 <p className="text-sm text-slate-400">
                   Curated just for you by {timelineData.agent.name} • REALTOR®
