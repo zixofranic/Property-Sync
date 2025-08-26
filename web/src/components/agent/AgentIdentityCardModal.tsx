@@ -358,9 +358,9 @@ Highly recommend reaching out if you're looking to buy or sell!
 
                     {/* Brand Header */}
                     <div className="relative">
-                      <div className="flex justify-between items-start mb-8">
+                      <div className="flex justify-center mb-8">
                         <div 
-                          className="px-4 py-2 rounded-2xl text-white font-bold text-sm"
+                          className="px-6 py-3 rounded-2xl text-white font-bold text-sm w-4/5 text-center"
                           style={{ backgroundColor: agent.brandColor }}
                         >
                           MEET YOUR REALTOR
