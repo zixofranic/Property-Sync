@@ -60,6 +60,9 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
 
     setIsDownloading(true);
     try {
+      // Wait a moment for any images to finish loading
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: null,
         scale: 2,
@@ -67,6 +70,42 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
         allowTaint: true,
         width: 600,
         height: 800,
+        logging: false,
+        ignoreElements: (element) => {
+          // Ignore elements that might cause issues
+          return element.classList.contains('ignore-in-canvas');
+        },
+        onclone: async (clonedDoc) => {
+          // Fix any styling issues in the cloned document
+          const clonedElement = clonedDoc.querySelector('[data-agent-card]');
+          if (clonedElement) {
+            // Ensure no text-decoration issues
+            const textElements = clonedElement.querySelectorAll('*');
+            textElements.forEach((el) => {
+              const style = (el as HTMLElement).style;
+              if (style.textDecoration && style.textDecoration.includes('line-through')) {
+                style.textDecoration = 'none';
+              }
+              // Force remove any computed strikethrough
+              const computedStyle = window.getComputedStyle(el as Element);
+              if (computedStyle.textDecoration.includes('line-through')) {
+                style.textDecoration = 'none !important';
+              }
+            });
+            
+            // Handle profile image
+            const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
+            if (profileImage && agent.logo) {
+              // Try to ensure the image is loaded for canvas
+              if (!profileImage.complete) {
+                await new Promise((resolve) => {
+                  profileImage.onload = resolve;
+                  profileImage.onerror = resolve;
+                });
+              }
+            }
+          }
+        }
       });
 
       // Create download link
@@ -103,11 +142,48 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
     }
 
     try {
+      // Wait a moment for any images to finish loading
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: null,
         scale: 2,
         useCORS: true,
         allowTaint: true,
+        logging: false,
+        ignoreElements: (element) => {
+          return element.classList.contains('ignore-in-canvas');
+        },
+        onclone: async (clonedDoc) => {
+          // Fix styling issues in the cloned document
+          const clonedElement = clonedDoc.querySelector('[data-agent-card]');
+          if (clonedElement) {
+            const textElements = clonedElement.querySelectorAll('*');
+            textElements.forEach((el) => {
+              const style = (el as HTMLElement).style;
+              if (style.textDecoration && style.textDecoration.includes('line-through')) {
+                style.textDecoration = 'none';
+              }
+              // Force remove any computed strikethrough
+              const computedStyle = window.getComputedStyle(el as Element);
+              if (computedStyle.textDecoration.includes('line-through')) {
+                style.textDecoration = 'none !important';
+              }
+            });
+            
+            // Handle profile image
+            const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
+            if (profileImage && agent.logo) {
+              // Try to ensure the image is loaded for canvas
+              if (!profileImage.complete) {
+                await new Promise((resolve) => {
+                  profileImage.onload = resolve;
+                  profileImage.onerror = resolve;
+                });
+              }
+            }
+          }
+        }
       });
 
       canvas.toBlob(async (blob) => {
@@ -269,6 +345,7 @@ Highly recommend reaching out if you're looking to buy or sell!
                 <div className="flex justify-center">
                   <div
                     ref={cardRef}
+                    data-agent-card="true"
                     className="w-full max-w-[600px] min-h-[800px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-4 sm:p-8 relative overflow-hidden"
                     style={{ fontFamily: 'Arial, sans-serif' }}
                   >
@@ -298,8 +375,13 @@ Highly recommend reaching out if you're looking to buy or sell!
                           <img
                             src={agent.logo}
                             alt={agent.name}
+                            crossOrigin="anonymous"
                             className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover mx-auto mb-6 border-4 shadow-xl"
                             style={{ borderColor: agent.brandColor }}
+                            onLoad={(e) => {
+                              // Ensure the image is ready for canvas rendering
+                              (e.target as HTMLImageElement).setAttribute('data-loaded', 'true');
+                            }}
                             onError={(e) => {
                               console.error('Agent profile image failed to load:', agent.logo);
                               (e.target as HTMLImageElement).style.display = 'none';
@@ -385,12 +467,12 @@ Highly recommend reaching out if you're looking to buy or sell!
                         <div className="space-y-3">
                           <div className="flex items-center space-x-3">
                             <Mail className="w-4 h-4 text-slate-600" />
-                            <span className="text-slate-700 font-medium">{agent.email}</span>
+                            <span className="text-slate-700 font-medium" style={{ textDecoration: 'none' }}>{agent.email}</span>
                           </div>
                           {agent.phone && (
                             <div className="flex items-center space-x-3">
                               <Phone className="w-4 h-4 text-slate-600" />
-                              <span className="text-slate-700 font-medium">{agent.phone}</span>
+                              <span className="text-slate-700 font-medium" style={{ textDecoration: 'none' }}>{agent.phone}</span>
                             </div>
                           )}
                           {agent.website && (
