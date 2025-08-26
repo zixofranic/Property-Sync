@@ -85,6 +85,11 @@ export class ClientsService {
             _count: {
               select: { properties: true },
             },
+            properties: {
+              include: {
+                feedback: true,
+              },
+            },
           },
         },
       },
@@ -202,15 +207,21 @@ export class ClientsService {
 
   // 🆕 UPDATED FORMAT METHOD - FRONTEND COMPATIBLE
   private formatClientResponse(client: any, timeline?: any): ClientResponseDto {
-    // Calculate engagement score (0-100)
+    // Calculate real engagement metrics
+    const totalProperties = timeline?._count?.properties || 0;
+    const propertiesWithFeedback = timeline?.properties?.filter(p => p.feedback && p.feedback.length > 0).length || 0;
+    const timelineViews = timeline?.totalViews || 0;
+    
+    // Calculate actual feedback rate as percentage
+    const realFeedbackRate = totalProperties > 0 ? (propertiesWithFeedback / totalProperties) * 100 : 0;
+    
+    // Calculate engagement score based on real metrics (0-100)
     const engagementScore = Math.min(
       100,
       Math.round(
-        client.feedbackRate * 0.4 +
-          Math.min(client.totalViews, 10) * 6 +
-          (client.avgResponseTime > 0
-            ? Math.max(0, 20 - client.avgResponseTime)
-            : 0),
+        realFeedbackRate * 0.6 +                    // 60% weight on feedback rate
+        Math.min(timelineViews, 20) * 2 +           // 40% weight on views (capped at 20 views = 40 points)
+        (client.lastActivity && client.lastActivity > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) ? 10 : 0) // 10 bonus points if active in last 7 days
       ),
     );
 
@@ -254,11 +265,11 @@ export class ClientsService {
       status,
       createdAt: client.createdAt.toISOString(),
 
-      // 🆕 ENHANCED FIELDS
+      // 🆕 ENHANCED FIELDS - Using real calculated values
       spouseEmail: client.spouseEmail || undefined,
-      totalViews: client.totalViews,
-      avgResponseTime: client.avgResponseTime,
-      feedbackRate: client.feedbackRate,
+      totalViews: timelineViews, // Use timeline views instead of client views
+      avgResponseTime: 0, // TODO: Calculate real avg response time
+      feedbackRate: realFeedbackRate, // Use calculated percentage
       lastActivity: client.lastActivity?.toISOString(),
 
       // 🆕 BACKEND FIELDS
