@@ -323,6 +323,26 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     fetchTimelineData();
   }, [shareToken, sessionToken]);
 
+  // Handle ESC key for MLS modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mlsModal.isOpen) {
+        setMlsModal({ isOpen: false, url: '', address: '' });
+      }
+    };
+
+    if (mlsModal.isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [mlsModal.isOpen]);
+
   // Handle client authentication
   const handleAuthentication = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1383,41 +1403,79 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       </div>
 
 
-      {/* MLS Modal */}
+      {/* MLS Modal - Fullscreen like Agent Timeline */}
       {mlsModal.isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col"
           onClick={() => setMlsModal({ isOpen: false, url: '', address: '' })}
         >
+          {/* Header Bar */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-slate-900 border border-slate-800 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="bg-slate-900/90 backdrop-blur-sm border-b border-slate-700 p-4 flex items-center justify-between"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-800">
-              <h3 className="text-lg font-semibold text-white">{mlsModal.address}</h3>
-              <button
-                onClick={() => setMlsModal({ isOpen: false, url: '', address: '' })}
-                className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-white font-medium ml-4">{mlsModal.address}</span>
             </div>
+            
+            <button
+              onClick={() => setMlsModal({ isOpen: false, url: '', address: '' })}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              <span>Close</span>
+            </button>
+          </motion.div>
 
-            {/* iFrame */}
-            <div className="relative h-[70vh]">
-              <iframe
-                src={mlsModal.url}
-                className="w-full h-full"
-                title={`MLS Details for ${mlsModal.address}`}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              />
+          {/* Iframe Container */}
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="flex-1 bg-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <iframe
+              src={mlsModal.url}
+              className="w-full h-full border-0"
+              title={`MLS Details - ${mlsModal.address}`}
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              loading="lazy"
+            />
+          </motion.div>
+
+          {/* Loading Overlay */}
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ delay: 1, duration: 0.5 }}
+            className="absolute inset-0 bg-slate-900 flex items-center justify-center pointer-events-none"
+          >
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-white">Loading MLS Details...</p>
             </div>
           </motion.div>
-        </div>
+
+          {/* Close Instructions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 2 }}
+            className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-sm pointer-events-none"
+          >
+            Press <kbd className="px-1 py-0.5 bg-slate-700 rounded text-xs">ESC</kbd> or click outside to close
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Smart Notification Toast */}
