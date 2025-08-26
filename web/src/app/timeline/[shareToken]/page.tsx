@@ -1510,7 +1510,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             company: timelineData.agent.company || 'Real Estate Company',
             phone: timelineData.agent.phone || undefined,
             email: timelineData.agent.email || '',
-            logo: timelineData.agent.profilePicture || timelineData.agent.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(timelineData.agent.name || 'Agent') + '&background=6366f1&color=fff',
+            logo: (timelineData.agent as any).profilePicture || (timelineData.agent as any).avatar || (timelineData.agent as any).logo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(timelineData.agent.name || 'Agent') + '&background=6366f1&color=fff',
             brandColor: timelineData.agent.brandColor || '#3b82f6',
             firstName: (timelineData.agent as any).firstName || timelineData.agent.name?.split(' ')[0] || '',
             lastName: (timelineData.agent as any).lastName || timelineData.agent.name?.split(' ')[1] || '',

@@ -185,10 +185,10 @@ Highly recommend reaching out if you're looking to buy or sell!
             initial={{ opacity: 0, scale: 0.9, y: 50 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 50 }}
-            className="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            className="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden mx-4"
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-700">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
                   <Share2 className="w-5 h-5 text-white" />
@@ -206,13 +206,13 @@ Highly recommend reaching out if you're looking to buy or sell!
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="grid lg:grid-cols-2 gap-8">
+            <div className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Agent Identity Card */}
                 <div className="flex justify-center">
                   <div
                     ref={cardRef}
-                    className="w-[600px] h-[800px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-8 relative overflow-hidden"
+                    className="w-full max-w-[600px] min-h-[800px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-4 sm:p-8 relative overflow-hidden"
                     style={{ fontFamily: 'Arial, sans-serif' }}
                   >
                     {/* Background Pattern */}
@@ -245,22 +245,26 @@ Highly recommend reaching out if you're looking to buy or sell!
                           <img
                             src={agent.logo}
                             alt={agent.name}
-                            className="w-32 h-32 rounded-full object-cover mx-auto mb-6 border-4 shadow-xl"
+                            className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover mx-auto mb-6 border-4 shadow-xl"
                             style={{ borderColor: agent.brandColor }}
+                            onError={(e) => {
+                              console.error('Agent profile image failed to load:', agent.logo);
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
                         ) : (
                           <div 
-                            className="w-32 h-32 rounded-full mx-auto mb-6 flex items-center justify-center shadow-xl border-4"
+                            className="w-24 h-24 sm:w-32 sm:h-32 rounded-full mx-auto mb-6 flex items-center justify-center shadow-xl border-4"
                             style={{ backgroundColor: `${agent.brandColor}20`, borderColor: agent.brandColor }}
                           >
-                            <User className="w-16 h-16" style={{ color: agent.brandColor }} />
+                            <User className="w-12 h-12 sm:w-16 sm:h-16" style={{ color: agent.brandColor }} />
                           </div>
                         )}
 
-                        <h1 className="text-4xl font-bold text-slate-800 mb-2">{agent.name}</h1>
+                        <h1 className="text-2xl sm:text-4xl font-bold text-slate-800 mb-2">{agent.name}</h1>
                         <div className="flex items-center justify-center space-x-2 mb-4">
-                          <Building2 className="w-5 h-5 text-slate-600" />
-                          <p className="text-xl text-slate-700 font-medium">{agent.company}</p>
+                          <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
+                          <p className="text-lg sm:text-xl text-slate-700 font-medium">{agent.company}</p>
                         </div>
                         
                         <div className="flex items-center justify-center space-x-4">
