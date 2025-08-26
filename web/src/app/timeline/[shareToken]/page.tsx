@@ -702,7 +702,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <img
                   src={timelineData.agent.logo}
                   alt={timelineData.agent.company}
-                  className="w-12 h-12 object-contain"
+                  className="w-24 h-24 object-contain"
                 />
               )}
               

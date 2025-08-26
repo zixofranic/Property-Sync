@@ -570,12 +570,12 @@ const testProfileAPI = async () => {
                     window.open(`/timeline/${timeline.shareToken}?client=${selectedClient.name.replace(/\s+/g, '')}`, '_blank');
                   }
                 }}
-                className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 hover:text-white rounded-lg sm:rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg"
+                className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] bg-green-600 hover:bg-green-700 text-white rounded-lg sm:rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg border border-green-500"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 title="Preview Client Timeline"
               >
-                <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ExternalLink className="w-5 h-5 sm:w-6 sm:h-6" />
               </motion.button>
             )}
           </div>
