@@ -62,6 +62,15 @@ export class TimelinesService {
       await this.trackTimelineView(timeline.id);
     }
 
+    // DEBUG: Check what profile data we have
+    console.log('=== BACKEND AGENT DEBUG ===');
+    console.log('timeline.agent:', timeline.agent);
+    console.log('timeline.agent.profile:', timeline.agent.profile);
+    console.log('Profile firstName:', timeline.agent.profile?.firstName);
+    console.log('Profile lastName:', timeline.agent.profile?.lastName);
+    console.log('Profile avatar:', timeline.agent.profile?.avatar);
+    console.log('============================');
+
     return {
       id: timeline.id,
       title: timeline.title,
@@ -81,11 +90,16 @@ export class TimelinesService {
       },
 
       agent: {
-        firstName: timeline.agent.profile?.firstName || '',
-        lastName: timeline.agent.profile?.lastName || '',
-        company: timeline.agent.profile?.company || '',
-        brandColor: timeline.agent.profile?.brandColor || '#0ea5e9',
+        firstName: timeline.agent.profile?.firstName,
+        lastName: timeline.agent.profile?.lastName,
+        company: timeline.agent.profile?.company,
+        brandColor: timeline.agent.profile?.brandColor,
         avatar: timeline.agent.profile?.avatar,
+        yearsExperience: timeline.agent.profile?.yearsExperience,
+        specialties: timeline.agent.profile?.specialties,
+        bio: timeline.agent.profile?.bio,
+        license: timeline.agent.profile?.licenseNumber,
+        website: timeline.agent.profile?.website,
       },
 
       properties: timeline.properties.map((property) =>

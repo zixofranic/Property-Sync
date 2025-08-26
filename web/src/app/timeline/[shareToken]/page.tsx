@@ -241,6 +241,16 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         
         const newData = response.data;
         
+        // DEBUG: Check what agent data we're getting from the backend
+        console.log('=== AGENT DATA DEBUG ===');
+        console.log('Raw response.data:', response.data);
+        console.log('Agent object:', response.data?.agent);
+        console.log('Agent firstName:', response.data?.agent?.firstName);
+        console.log('Agent lastName:', response.data?.agent?.lastName);
+        console.log('Agent avatar:', response.data?.agent?.avatar);
+        console.log('Agent logo (if exists):', response.data?.agent?.logo);
+        console.log('========================');
+        
         // Check for new properties if we have previous data
         if (timelineData && newData && isAuthenticated) {
           const newPropertyCount = newData.properties.length;
@@ -296,25 +306,15 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
             const unreadCount = notificationsResponse.data.filter((msg: any) => !msg.isRead).length;
             setUnreadMessageCount(unreadCount);
           } else {
-            // Fallback to mock data for demo if API endpoint doesn't exist yet
-            const mockMessages = [
-              { id: 1, message: "New properties have been added to your timeline", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), isRead: false, type: "property" },
-              { id: 2, message: `${newData?.agent?.name || 'Your agent'} has sent you a message`, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), isRead: false, type: "message" },
-              { id: 3, message: "Property feedback requested for 123 Main St", timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), isRead: true, type: "feedback" }
-            ];
-            setClientMessages(mockMessages);
-            setUnreadMessageCount(mockMessages.filter(msg => !msg.isRead).length);
+            // No notifications found
+            setClientMessages([]);
+            setUnreadMessageCount(0);
           }
         } catch (error) {
-          console.warn('Failed to fetch notifications, using mock data:', error);
-          // Fallback to mock data
-          const mockMessages = [
-            { id: 1, message: "New properties have been added to your timeline", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), isRead: false, type: "property" },
-            { id: 2, message: `${newData?.agent?.name || 'Your agent'} has sent you a message`, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), isRead: false, type: "message" },
-            { id: 3, message: "Property feedback requested for 123 Main St", timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), isRead: true, type: "feedback" }
-          ];
-          setClientMessages(mockMessages);
-          setUnreadMessageCount(mockMessages.filter(msg => !msg.isRead).length);
+          console.warn('Failed to fetch notifications:', error);
+          // Set empty notifications if API fails
+          setClientMessages([]);
+          setUnreadMessageCount(0);
         }
         
         // Track timeline view if authenticated
@@ -1392,53 +1392,6 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         </div>
       </div>
 
-      {/* Contact Agent Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="mt-16 max-w-4xl mx-auto px-6 pb-16"
-      >
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-xl p-8 text-center">
-          <div className="flex items-center justify-center space-x-4 mb-6">
-            {timelineData.agent.logo && (
-              <img
-                src={timelineData.agent.logo}
-                alt={timelineData.agent.name}
-                className="w-16 h-16 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <h3 className="text-xl font-bold text-white">{timelineData.agent.name} • REALTOR®</h3>
-              <p className="text-slate-400">{timelineData.agent.company}</p>
-            </div>
-          </div>
-          
-          <p className="text-slate-300 mb-6">
-            Ready to schedule a viewing or have questions about any properties? 
-            Send me an email or give me a call.
-          </p>
-          
-          <div className="flex items-center justify-center space-x-4">
-            <button
-              onClick={handleSmartEmail}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all duration-200 shadow-lg"
-            >
-              <Mail className="w-4 h-4" />
-              <span>Email {timelineData.agent.name.split(' ')[0]}</span>
-            </button>
-            {timelineData.agent.phone && (
-              <a
-                href={`tel:${timelineData.agent.phone}`}
-                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white rounded-xl transition-all duration-200 border border-slate-700/50 shadow-lg"
-              >
-                <Phone className="w-4 h-4" />
-                <span>Call Now</span>
-              </a>
-            )}
-          </div>
-        </div>
-      </motion.div>
 
       {/* MLS Modal */}
       {mlsModal.isOpen && (
@@ -1508,19 +1461,19 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <AgentCard
           shareToken={shareToken}
           agent={{
-            name: `${timelineData.agent.firstName} ${timelineData.agent.lastName}`.trim() || 'Your Agent',
-            company: timelineData.agent.company || 'Real Estate Company',
+            name: `${timelineData.agent.firstName || ''} ${timelineData.agent.lastName || ''}`.trim(),
+            company: timelineData.agent.company,
             phone: timelineData.agent.phone || undefined,
             email: timelineData.agent.email || '',
-            logo: timelineData.agent.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(`${timelineData.agent.firstName} ${timelineData.agent.lastName}`.trim() || 'Agent') + '&background=6366f1&color=fff',
-            brandColor: timelineData.agent.brandColor || '#3b82f6',
+            logo: timelineData.agent.avatar,
+            brandColor: timelineData.agent.brandColor,
             firstName: timelineData.agent.firstName || '',
             lastName: timelineData.agent.lastName || '',
             // Add extended profile data when available
-            yearsExperience: 5, // This should come from agent profile
-            bio: `${timelineData.agent.name || 'Your agent'} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,
-            title: 'Senior Real Estate Agent',
-            license: 'RE License #123456',
+            yearsExperience: timelineData.agent.yearsExperience,
+            specialties: timelineData.agent.specialties,
+            bio: timelineData.agent.bio,
+            license: timelineData.agent.license || undefined,
             website: timelineData.agent.website || undefined,
           }}
           isSticky={true}

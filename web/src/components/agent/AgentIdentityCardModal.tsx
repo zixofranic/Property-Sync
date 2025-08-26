@@ -206,8 +206,65 @@ Highly recommend reaching out if you're looking to buy or sell!
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {/* Text Description - Now on top */}
+              <div className="text-center mb-8">
+                <p className="text-slate-400 text-sm max-w-2xl mx-auto">
+                  Help {agent.name} grow their network by sharing this professional identity card with friends, 
+                  family, or anyone looking for a trusted real estate agent.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center space-y-8">
+                {/* Action Buttons - Now above card in one row */}
+                <div className="w-full max-w-[600px] flex flex-col sm:flex-row gap-4 justify-center">
+                  <motion.button
+                    onClick={handleDownloadCard}
+                    disabled={isDownloading}
+                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-800 disabled:to-blue-900 text-white rounded-xl transition-all duration-200 shadow-lg"
+                    whileHover={{ scale: isDownloading ? 1 : 1.02 }}
+                    whileTap={{ scale: isDownloading ? 1 : 0.98 }}
+                  >
+                    {downloadSuccess ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="hidden sm:inline">Downloaded!</span>
+                        <span className="sm:hidden">✓</span>
+                      </>
+                    ) : isDownloading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span className="hidden sm:inline">Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        <span className="hidden sm:inline">Download</span>
+                      </>
+                    )}
+                  </motion.button>
+
+                  <motion.button
+                    onClick={handleShareCard}
+                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Share2 className="w-5 h-5" />
+                    <span className="hidden sm:inline">Share</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={handleCopyShareText}
+                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl transition-all duration-200 shadow-lg border border-slate-600"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Copy className="w-5 h-5" />
+                    <span className="hidden sm:inline">Copy</span>
+                  </motion.button>
+                </div>
+
                 {/* Agent Identity Card */}
                 <div className="flex justify-center">
                   <div
@@ -231,11 +288,7 @@ Highly recommend reaching out if you're looking to buy or sell!
                           className="px-4 py-2 rounded-2xl text-white font-bold text-sm"
                           style={{ backgroundColor: agent.brandColor }}
                         >
-                          REALTOR® PROFILE
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-slate-500">Property Sync</div>
-                          <div className="text-xs text-slate-400">Professional Network</div>
+                          MEET YOUR REALTOR
                         </div>
                       </div>
 
@@ -281,18 +334,47 @@ Highly recommend reaching out if you're looking to buy or sell!
                         </div>
                       </div>
 
-                      {/* Experience & Stats */}
-                      {agent.yearsExperience && (
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
-                          <div className="text-center">
-                            <div className="text-3xl font-bold" style={{ color: agent.brandColor }}>
-                              {agent.yearsExperience}
+                      {/* Experience & Specialties */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                        {/* Experience */}
+                        {agent.yearsExperience && (
+                          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold" style={{ color: agent.brandColor }}>
+                                {agent.yearsExperience}
+                              </div>
+                              <div className="text-sm text-slate-600">Years Experience</div>
+                              <div className="text-xs text-slate-500">{startYear} - {currentYear}</div>
                             </div>
-                            <div className="text-sm text-slate-600">Years Experience</div>
-                            <div className="text-xs text-slate-500">{startYear} - {currentYear}</div>
                           </div>
-                        </div>
-                      )}
+                        )}
+
+                        {/* Specialties */}
+                        {agent.specialties && agent.specialties.length > 0 && (
+                          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+                            <h4 className="text-sm font-bold text-slate-700 mb-3 text-center flex items-center justify-center">
+                              <Star className="w-4 h-4 mr-1" style={{ color: agent.brandColor }} />
+                              Specialties
+                            </h4>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {agent.specialties.slice(0, 4).map((specialty, index) => (
+                                <span
+                                  key={index}
+                                  className="px-3 py-1 text-xs font-medium text-white rounded-full shadow-sm"
+                                  style={{ backgroundColor: agent.brandColor }}
+                                >
+                                  {specialty}
+                                </span>
+                              ))}
+                              {agent.specialties.length > 4 && (
+                                <span className="px-3 py-1 text-xs font-medium text-slate-600 rounded-full border border-slate-300">
+                                  +{agent.specialties.length - 4} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Contact Information */}
                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
@@ -353,78 +435,6 @@ Highly recommend reaching out if you're looking to buy or sell!
                   </div>
                 </div>
 
-                {/* Actions Panel */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Share this profile card</h3>
-                    <p className="text-slate-400 text-sm mb-6">
-                      Help {agent.name} grow their network by sharing this professional identity card with friends, 
-                      family, or anyone looking for a trusted real estate agent.
-                    </p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-4">
-                    <motion.button
-                      onClick={handleDownloadCard}
-                      disabled={isDownloading}
-                      className="w-full flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-800 disabled:to-blue-900 text-white rounded-xl transition-all duration-200 shadow-lg"
-                      whileHover={{ scale: isDownloading ? 1 : 1.02 }}
-                      whileTap={{ scale: isDownloading ? 1 : 0.98 }}
-                    >
-                      {downloadSuccess ? (
-                        <>
-                          <CheckCircle className="w-5 h-5" />
-                          <span>Downloaded Successfully!</span>
-                        </>
-                      ) : isDownloading ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Creating Image...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-5 h-5" />
-                          <span>Download as Image</span>
-                        </>
-                      )}
-                    </motion.button>
-
-                    <motion.button
-                      onClick={handleShareCard}
-                      className="w-full flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Share2 className="w-5 h-5" />
-                      <span>Share Directly</span>
-                    </motion.button>
-
-                    <motion.button
-                      onClick={handleCopyShareText}
-                      className="w-full flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl transition-all duration-200 shadow-lg border border-slate-600"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Copy className="w-5 h-5" />
-                      <span>Copy Agent Info</span>
-                    </motion.button>
-                  </div>
-
-                  {/* Tips */}
-                  <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-4">
-                    <h4 className="text-emerald-400 font-medium mb-2 flex items-center">
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Sharing Tips
-                    </h4>
-                    <ul className="text-sm text-slate-300 space-y-1">
-                      <li>• Perfect for social media posts and stories</li>
-                      <li>• Share via text, email, or messaging apps</li>
-                      <li>• Great for referrals and recommendations</li>
-                      <li>• Professional networking and marketing</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </motion.div>
