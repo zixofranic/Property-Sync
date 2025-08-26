@@ -1096,7 +1096,11 @@ export class TimelinesService {
       where: { shareToken },
       include: {
         client: true,
-        agent: true,
+        agent: {
+          include: {
+            profile: true,
+          },
+        },
       },
     });
 
@@ -1104,18 +1108,23 @@ export class TimelinesService {
       throw new NotFoundException('Timeline not found or inactive');
     }
 
+    // Get agent name from profile
+    const agentName = timeline.agent.profile
+      ? `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`
+      : timeline.agent.email;
+
     // Generate mock notifications for now (in future, this would come from a notifications table)
     const notifications = [
       {
         id: 1,
-        message: `New properties have been added to your timeline by ${timeline.agent.name}`,
+        message: `New properties have been added to your timeline by ${agentName}`,
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
         isRead: false,
         type: 'property'
       },
       {
         id: 2,
-        message: `${timeline.agent.name} has sent you a message about your property search`,
+        message: `${agentName} has sent you a message about your property search`,
         timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
         isRead: false,
         type: 'message'
