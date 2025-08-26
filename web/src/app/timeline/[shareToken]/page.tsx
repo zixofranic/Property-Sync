@@ -274,17 +274,18 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         setTimelineData(newData);
         setIsAuthenticated(newData?.isAuthenticated || false);
         
-        // Calculate new properties count (properties added in last 24 hours)
+        // Calculate new properties count (properties added in last 24 hours WITHOUT feedback)
         if (newData?.properties) {
           const now = new Date();
           const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
           
-          const recentProperties = newData.properties.filter((property: any) => {
+          const newPropertiesWithoutFeedback = newData.properties.filter((property: any) => {
             const createdAt = new Date(property.createdAt);
-            return createdAt > twentyFourHoursAgo;
+            const hasNoFeedback = !property.feedback || property.feedback.length === 0;
+            return createdAt > twentyFourHoursAgo && hasNoFeedback;
           });
           
-          setNewPropertyCount(recentProperties.length);
+          setNewPropertyCount(newPropertiesWithoutFeedback.length);
         }
         
         // Fetch client notifications
@@ -713,11 +714,6 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <p className="text-sm text-slate-400">
                   Curated just for you by {timelineData.agent.name} • REALTOR®
                 </p>
-                <div className="mt-1">
-                  <p className="text-xs text-slate-500">
-                    Powered by <span className="font-medium" style={{ color: timelineData.agent.brandColor }}>Property Sync</span>
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -741,9 +737,9 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <Bell className="w-5 h-5 text-slate-300" />
-                  {unreadMessageCount > 0 && (
+                  {clientMessages.filter(msg => !msg.isRead).length > 0 && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
-                      {unreadMessageCount}
+                      {clientMessages.filter(msg => !msg.isRead).length}
                     </div>
                   )}
                 </button>
@@ -787,7 +783,13 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                 <div className="w-2 h-2 bg-red-400 rounded-full flex-shrink-0 mt-2" />
                               )}
                             </div>
-                            <button className="absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-600/50 rounded transition-all duration-200">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClientMessages(prev => prev.filter(m => m.id !== msg.id));
+                              }}
+                              className="absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-600/50 rounded transition-all duration-200"
+                            >
                               <X className="w-3 h-3 text-slate-400 hover:text-white" />
                             </button>
                           </div>
@@ -1506,14 +1508,14 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <AgentCard
           shareToken={shareToken}
           agent={{
-            name: timelineData.agent.name || 'Your Agent',
+            name: `${timelineData.agent.firstName} ${timelineData.agent.lastName}`.trim() || 'Your Agent',
             company: timelineData.agent.company || 'Real Estate Company',
             phone: timelineData.agent.phone || undefined,
             email: timelineData.agent.email || '',
-            logo: (timelineData.agent as any).profilePicture || (timelineData.agent as any).avatar || (timelineData.agent as any).logo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(timelineData.agent.name || 'Agent') + '&background=6366f1&color=fff',
+            logo: timelineData.agent.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(`${timelineData.agent.firstName} ${timelineData.agent.lastName}`.trim() || 'Agent') + '&background=6366f1&color=fff',
             brandColor: timelineData.agent.brandColor || '#3b82f6',
-            firstName: (timelineData.agent as any).firstName || timelineData.agent.name?.split(' ')[0] || '',
-            lastName: (timelineData.agent as any).lastName || timelineData.agent.name?.split(' ')[1] || '',
+            firstName: timelineData.agent.firstName || '',
+            lastName: timelineData.agent.lastName || '',
             // Add extended profile data when available
             yearsExperience: 5, // This should come from agent profile
             bio: `${timelineData.agent.name || 'Your agent'} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,

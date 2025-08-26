@@ -85,7 +85,7 @@ export class TimelinesService {
         lastName: timeline.agent.profile?.lastName || '',
         company: timeline.agent.profile?.company || '',
         brandColor: timeline.agent.profile?.brandColor || '#0ea5e9',
-        logo: timeline.agent.profile?.logo,
+        avatar: timeline.agent.profile?.avatar,
       },
 
       properties: timeline.properties.map((property) =>
@@ -1113,30 +1113,34 @@ export class TimelinesService {
       ? `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`
       : timeline.agent.email;
 
-    // Generate mock notifications for now (in future, this would come from a notifications table)
-    const notifications = [
-      {
+    // Get properties to check for new/unfeedback properties
+    const properties = await this.prisma.property.findMany({
+      where: { timelineId: timeline.id },
+      include: {
+        feedback: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Calculate properties added in last 24 hours without feedback
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const newPropertiesWithoutFeedback = properties.filter(property => 
+      new Date(property.createdAt) > twentyFourHoursAgo && 
+      (!property.feedback || property.feedback.length === 0)
+    );
+
+    const notifications: any[] = [];
+
+    // Only add new properties notification if there are actually new properties without feedback
+    if (newPropertiesWithoutFeedback.length > 0) {
+      notifications.push({
         id: 1,
-        message: `New properties have been added to your timeline by ${agentName}`,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+        message: `${newPropertiesWithoutFeedback.length} new ${newPropertiesWithoutFeedback.length === 1 ? 'property has' : 'properties have'} been added to your timeline by ${agentName}`,
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         isRead: false,
         type: 'property'
-      },
-      {
-        id: 2,
-        message: `${agentName} has sent you a message about your property search`,
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-        isRead: false,
-        type: 'message'
-      },
-      {
-        id: 3,
-        message: `Feedback requested for properties in your timeline`,
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-        isRead: true,
-        type: 'feedback'
-      }
-    ];
+      });
+    }
 
     return notifications;
   }
