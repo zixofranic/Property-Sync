@@ -1138,9 +1138,20 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 clientsError: null,
               });
 
+              // Restore previously selected client or auto-select first one
               if (!state.selectedClient && transformedClients.length > 0) {
-                console.log('Store: Auto-selecting first client');
-                get().selectClient(transformedClients[0]);
+                const storedClientId = localStorage.getItem('selectedClientId');
+                const clientToSelect = storedClientId 
+                  ? transformedClients.find(c => c.id === storedClientId)
+                  : transformedClients[0];
+                
+                if (clientToSelect) {
+                  console.log('Store: Restoring selected client:', clientToSelect.name);
+                  get().selectClient(clientToSelect);
+                } else if (transformedClients.length > 0) {
+                  console.log('Store: Stored client not found, auto-selecting first client');
+                  get().selectClient(transformedClients[0]);
+                }
               }
             }
           } catch (error) {
@@ -1340,10 +1351,13 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           console.log('Store: Selecting client:', client?.name || 'none');
           set({ selectedClient: client });
           
+          // Store selected client ID in localStorage for persistence
           if (client) {
+            localStorage.setItem('selectedClientId', client.id);
             console.log('Store: Auto-loading timeline for client:', client.id);
             get().loadTimeline(client.id);
           } else {
+            localStorage.removeItem('selectedClientId');
             set({ activeTimeline: null });
           }
         },

@@ -1138,9 +1138,35 @@ export class TimelinesService {
 
     // Only add new properties notification if there are actually new properties without feedback
     if (newPropertiesWithoutFeedback.length > 0) {
+      // Format property addresses as "number + first word" (e.g., "3215 Autumn", "3456 Main")
+      const formatPropertyAddress = (address: string): string => {
+        const parts = address.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          return `${parts[0]} ${parts[1]}`;
+        }
+        return parts[0] || address;
+      };
+
+      const propertyAddresses = newPropertiesWithoutFeedback
+        .map(p => formatPropertyAddress(p.address))
+        .slice(0, 3); // Show max 3 addresses
+
+      // Create client name from timeline.client
+      const clientName = `${timeline.client.firstName} ${timeline.client.lastName}`.trim();
+
+      let message: string;
+      if (newPropertiesWithoutFeedback.length === 1) {
+        message = `New property: ${propertyAddresses[0]} added for ${clientName} by ${agentName}`;
+      } else if (newPropertiesWithoutFeedback.length <= 3) {
+        message = `New properties: ${propertyAddresses.join(', ')} added for ${clientName} by ${agentName}`;
+      } else {
+        const remainingCount = newPropertiesWithoutFeedback.length - 3;
+        message = `New properties: ${propertyAddresses.join(', ')} and ${remainingCount} more added for ${clientName} by ${agentName}`;
+      }
+
       notifications.push({
         id: 1,
-        message: `${newPropertiesWithoutFeedback.length} new ${newPropertiesWithoutFeedback.length === 1 ? 'property has' : 'properties have'} been added to your timeline by ${agentName}`,
+        message,
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         isRead: false,
         type: 'property'
