@@ -109,6 +109,25 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const notificationRef = useRef<HTMLDivElement>(null);
   const [clientMessages, setClientMessages] = useState<any[]>([]);
 
+  // Helper function to manage dismissed notifications in localStorage
+  const getDismissedNotifications = () => {
+    try {
+      return JSON.parse(localStorage.getItem(`dismissed-notifications-${shareToken}`) || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const addDismissedNotification = (notificationId: number | string) => {
+    try {
+      const dismissed = getDismissedNotifications();
+      dismissed.push(notificationId);
+      localStorage.setItem(`dismissed-notifications-${shareToken}`, JSON.stringify(dismissed));
+    } catch (error) {
+      console.warn('Failed to save dismissed notification:', error);
+    }
+  };
+
   // Utility function to format relative time
   const formatRelativeTime = (timestamp: string | Date): string => {
     const now = new Date();
@@ -292,8 +311,14 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         try {
           const notificationsResponse = await apiClient.getClientNotifications(shareToken);
           if (notificationsResponse.data && Array.isArray(notificationsResponse.data)) {
-            setClientMessages(notificationsResponse.data);
-            const unreadCount = notificationsResponse.data.filter((msg: any) => !msg.isRead).length;
+            // Filter out dismissed notifications using localStorage
+            const dismissedNotifications = getDismissedNotifications();
+            const filteredNotifications = notificationsResponse.data.filter((msg: any) => 
+              !dismissedNotifications.includes(msg.id)
+            );
+            
+            setClientMessages(filteredNotifications);
+            const unreadCount = filteredNotifications.filter((msg: any) => !msg.isRead).length;
             setUnreadMessageCount(unreadCount);
           } else {
             // No notifications found
@@ -796,6 +821,11 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
+                                
+                                // Save dismissed notification to localStorage
+                                addDismissedNotification(msg.id);
+                                
+                                // Remove from local state
                                 setClientMessages(prev => prev.filter(m => m.id !== msg.id));
                               }}
                               className="absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-600/50 rounded transition-all duration-200"
