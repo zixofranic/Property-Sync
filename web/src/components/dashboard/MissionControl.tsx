@@ -26,7 +26,8 @@ import {
   Share2,
   Mail,
   AlertCircle,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { BatchPropertyModal } from '../modals/BatchPropertyModal';
@@ -456,13 +457,14 @@ const testProfileAPI = async () => {
       <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
         <div className="flex items-center justify-between p-2 sm:p-4">
           {/* Enhanced Client Selector */}
-          <div className="relative">
-            <motion.button
-              onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-              className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <motion.button
+                onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
               <Target className="w-4 h-4 sm:w-5 sm:h-5" />
               <div className="text-left min-w-0">
                 <div className="font-semibold text-xs sm:text-sm truncate">
@@ -557,6 +559,25 @@ const testProfileAPI = async () => {
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
+
+            {/* Client Timeline Preview Button */}
+            {selectedClient && (
+              <motion.button
+                onClick={() => {
+                  const timeline = getClientTimeline(selectedClient.id);
+                  if (timeline?.shareToken) {
+                    window.open(`/timeline/${timeline.shareToken}?client=${selectedClient.name.replace(/\s+/g, '')}`, '_blank');
+                  }
+                }}
+                className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 hover:text-white rounded-lg sm:rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="Preview Client Timeline"
+              >
+                <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5" />
+              </motion.button>
+            )}
           </div>
 
           {/* Enhanced Client Stats HUD with Basic Connection Status */}
