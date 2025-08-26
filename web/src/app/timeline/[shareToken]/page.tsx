@@ -241,16 +241,6 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         
         const newData = response.data;
         
-        // DEBUG: Check what agent data we're getting from the backend
-        console.log('=== AGENT DATA DEBUG ===');
-        console.log('Raw response.data:', response.data);
-        console.log('Agent object:', response.data?.agent);
-        console.log('Agent firstName:', response.data?.agent?.firstName);
-        console.log('Agent lastName:', response.data?.agent?.lastName);
-        console.log('Agent avatar:', response.data?.agent?.avatar);
-        console.log('Agent logo (if exists):', response.data?.agent?.logo);
-        console.log('========================');
-        
         // Check for new properties if we have previous data
         if (timelineData && newData && isAuthenticated) {
           const newPropertyCount = newData.properties.length;

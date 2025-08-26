@@ -62,15 +62,6 @@ export class TimelinesService {
       await this.trackTimelineView(timeline.id);
     }
 
-    // DEBUG: Check what profile data we have
-    console.log('=== BACKEND AGENT DEBUG ===');
-    console.log('timeline.agent:', timeline.agent);
-    console.log('timeline.agent.profile:', timeline.agent.profile);
-    console.log('Profile firstName:', timeline.agent.profile?.firstName);
-    console.log('Profile lastName:', timeline.agent.profile?.lastName);
-    console.log('Profile avatar:', timeline.agent.profile?.avatar);
-    console.log('============================');
-
     return {
       id: timeline.id,
       title: timeline.title,

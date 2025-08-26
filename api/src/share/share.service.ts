@@ -180,14 +180,21 @@ export class ShareService {
         email: timeline.client.email,
       },
       agent: {
+        firstName: timeline.agent.profile?.firstName,
+        lastName: timeline.agent.profile?.lastName,
         name: timeline.agent.profile
           ? `${timeline.agent.profile.firstName} ${timeline.agent.profile.lastName}`
           : 'Your Agent',
-        company: timeline.agent.profile?.company || 'Realtor',
+        company: timeline.agent.profile?.company,
         phone: timeline.agent.profile?.phone,
         email: timeline.agent.email,
-        logo: timeline.agent.profile?.logo,
-        brandColor: timeline.agent.profile?.brandColor || '#3b82f6',
+        avatar: timeline.agent.profile?.avatar,
+        brandColor: timeline.agent.profile?.brandColor,
+        yearsExperience: timeline.agent.profile?.yearsExperience,
+        specialties: timeline.agent.profile?.specialties,
+        bio: timeline.agent.profile?.bio,
+        license: timeline.agent.profile?.licenseNumber,
+        website: timeline.agent.profile?.website,
       },
       properties: timeline.properties.map((property) => ({
         id: property.id,
