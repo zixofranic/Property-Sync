@@ -215,15 +215,8 @@ export class ClientsService {
     // Calculate actual feedback rate as percentage
     const realFeedbackRate = totalProperties > 0 ? (propertiesWithFeedback / totalProperties) * 100 : 0;
     
-    // Calculate engagement score based on real metrics (0-100)
-    const engagementScore = Math.min(
-      100,
-      Math.round(
-        realFeedbackRate * 0.6 +                    // 60% weight on feedback rate
-        Math.min(timelineViews, 20) * 2 +           // 40% weight on views (capped at 20 views = 40 points)
-        (client.lastActivity && client.lastActivity > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) ? 10 : 0) // 10 bonus points if active in last 7 days
-      ),
-    );
+    // Simple engagement score: just use feedback rate (0-100%)
+    const engagementScore = Math.round(realFeedbackRate);
 
     // Determine status based on activity and engagement
     const daysSinceLastActivity = client.lastActivity
