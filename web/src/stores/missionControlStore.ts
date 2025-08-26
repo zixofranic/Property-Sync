@@ -1138,20 +1138,31 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 clientsError: null,
               });
 
-              // Restore previously selected client or auto-select first one
+              // Restore previously selected client
               if (!state.selectedClient && transformedClients.length > 0) {
                 const storedClientId = localStorage.getItem('selectedClientId');
-                const clientToSelect = storedClientId 
-                  ? transformedClients.find(c => c.id === storedClientId)
-                  : transformedClients[0];
+                console.log('Store: Attempting client restoration. Current selected client:', state.selectedClient?.name);
+                console.log('Store: Stored client ID from localStorage:', storedClientId);
+                console.log('Store: Available clients:', transformedClients.map(c => ({ id: c.id, name: c.name })));
                 
-                if (clientToSelect) {
-                  console.log('Store: Restoring selected client:', clientToSelect.name);
-                  get().selectClient(clientToSelect);
-                } else if (transformedClients.length > 0) {
-                  console.log('Store: Stored client not found, auto-selecting first client');
+                if (storedClientId) {
+                  // Try to find the stored client
+                  const storedClient = transformedClients.find(c => c.id === storedClientId);
+                  if (storedClient) {
+                    console.log('Store: ✅ Restoring selected client:', storedClient.name);
+                    get().selectClient(storedClient);
+                  } else {
+                    console.log('Store: ❌ Stored client not found in available clients, clearing localStorage');
+                    localStorage.removeItem('selectedClientId');
+                    // Don't auto-select first client - let user choose
+                  }
+                } else {
+                  // No stored client, auto-select first one only on initial load
+                  console.log('Store: No stored client, auto-selecting first client:', transformedClients[0].name);
                   get().selectClient(transformedClients[0]);
                 }
+              } else {
+                console.log('Store: Skipping client restoration - selectedClient already exists:', state.selectedClient?.name);
               }
             }
           } catch (error) {
@@ -1354,10 +1365,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           // Store selected client ID in localStorage for persistence
           if (client) {
             localStorage.setItem('selectedClientId', client.id);
+            console.log('Store: Stored client ID in localStorage:', client.id);
             console.log('Store: Auto-loading timeline for client:', client.id);
             get().loadTimeline(client.id);
           } else {
             localStorage.removeItem('selectedClientId');
+            console.log('Store: Removed selectedClientId from localStorage');
             set({ activeTimeline: null });
           }
         },
