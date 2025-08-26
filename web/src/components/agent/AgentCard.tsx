@@ -110,17 +110,22 @@ Thank you!`;
                   </div>
                 )}
                 
-                <div className="hidden sm:block">
+                <div className="hidden sm:block flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
                     <h3 className="text-white font-semibold text-sm">{agent.name}</h3>
                     <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor }}>
                       REALTOR®
                     </span>
                   </div>
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1 mb-1">
                     <Building className="w-3 h-3 text-slate-400" />
                     <p className="text-slate-400 text-xs">{agent.company}</p>
                   </div>
+                  {agent.bio && (
+                    <p className="text-slate-300 text-xs leading-relaxed line-clamp-2 max-w-md">
+                      {agent.bio}
+                    </p>
+                  )}
                 </div>
 
                 {/* Mobile: Name only */}
@@ -136,7 +141,7 @@ Thank you!`;
                 {agent.email && (
                   <motion.button
                     onClick={() => handleSmartContact('email')}
-                    className="flex items-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                    className="flex items-center space-x-1 px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -148,7 +153,7 @@ Thank you!`;
                 {agent.phone && (
                   <motion.button
                     onClick={() => handleSmartContact('phone')}
-                    className="flex items-center space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                    className="flex items-center space-x-1 px-2 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -157,16 +162,28 @@ Thank you!`;
                   </motion.button>
                 )}
 
+                {agent.website && (
+                  <motion.button
+                    onClick={() => handleSmartContact('website')}
+                    className="flex items-center space-x-1 px-2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span className="hidden sm:inline">Website</span>
+                  </motion.button>
+                )}
+
                 {/* Share Agent Button */}
                 <motion.button
                   onClick={() => setShowIdentityCard(true)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
+                  className="flex items-center space-x-1 px-2 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <Share2 className="w-3 h-3" />
-                  <span className="hidden md:inline">Share Agent</span>
-                  <span className="md:hidden">Share</span>
+                  <span className="hidden lg:inline">Share Agent</span>
+                  <span className="lg:hidden">Share</span>
                 </motion.button>
               </div>
             </div>

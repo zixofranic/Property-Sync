@@ -386,6 +386,14 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         throw new Error(response.error);
       }
 
+      // Reduce new property counter if this was a new property
+      const property = timelineData.properties.find(p => p.id === propertyId);
+      const isNewProperty = property && getPropertyStatus(property, timelineData.properties, timelineData.properties.indexOf(property)) === 'new';
+      
+      if (isNewProperty && newPropertyCount > 0) {
+        setNewPropertyCount(prev => Math.max(0, prev - 1));
+      }
+
       // Update local state - this will remove the flashing icon
       setTimelineData(prev => {
         if (!prev) return prev;
@@ -742,35 +750,46 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 
                 {/* Notification Dropdown */}
                 {showNotificationDropdown && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50">
-                    <div className="p-4 border-b border-slate-700">
-                      <h3 className="text-lg font-semibold text-white flex items-center">
-                        <Bell className="w-5 h-5 mr-2 text-blue-400" />
-                        Notifications
-                      </h3>
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-slate-800/95 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-2xl z-50">
+                    <div className="p-4 border-b border-slate-700/50">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-white flex items-center">
+                          <Bell className="w-5 h-5 mr-2 text-blue-400" />
+                          Notifications
+                        </h3>
+                        <button
+                          onClick={() => setShowNotificationDropdown(false)}
+                          className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4 text-slate-400 hover:text-white" />
+                        </button>
+                      </div>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {clientMessages.length > 0 ? (
                         clientMessages.map((msg, index) => (
                           <div 
                             key={msg.id}
-                            className={`p-4 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${
-                              !msg.isRead ? 'bg-blue-900/20' : ''
-                            }`}
+                            className={`p-4 hover:bg-slate-700/30 transition-colors relative group ${
+                              !msg.isRead ? 'bg-blue-900/20 border-l-2 border-blue-400' : ''
+                            } ${index < clientMessages.length - 1 ? 'border-b border-slate-700/30' : ''}`}
                           >
-                            <div className="flex items-start space-x-3">
+                            <div className="flex items-start space-x-3 pr-8">
                               <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
                                 msg.type === 'property' ? 'bg-green-400' :
                                 msg.type === 'message' ? 'bg-blue-400' : 'bg-yellow-400'
                               }`} />
                               <div className="flex-1">
-                                <p className="text-slate-300 text-sm leading-relaxed">{msg.message}</p>
-                                <p className="text-slate-500 text-xs mt-1">{formatRelativeTime(msg.timestamp)}</p>
+                                <p className="text-white text-sm leading-relaxed">{msg.message}</p>
+                                <p className="text-slate-400 text-xs mt-1">{formatRelativeTime(msg.timestamp)}</p>
                               </div>
                               {!msg.isRead && (
                                 <div className="w-2 h-2 bg-red-400 rounded-full flex-shrink-0 mt-2" />
                               )}
                             </div>
+                            <button className="absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-600/50 rounded transition-all duration-200">
+                              <X className="w-3 h-3 text-slate-400 hover:text-white" />
+                            </button>
                           </div>
                         ))
                       ) : (
@@ -781,14 +800,6 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                           <p className="text-slate-400 text-sm">No notifications</p>
                         </div>
                       )}
-                    </div>
-                    <div className="p-3 border-t border-slate-700 text-center">
-                      <button 
-                        onClick={() => setShowNotificationDropdown(false)}
-                        className="text-blue-400 hover:text-blue-300 text-sm font-medium"
-                      >
-                        Close
-                      </button>
                     </div>
                   </div>
                 )}
@@ -1505,10 +1516,10 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             lastName: (timelineData.agent as any).lastName || timelineData.agent.name?.split(' ')[1] || '',
             // Add extended profile data when available
             yearsExperience: 5, // This should come from agent profile
-            specialties: ['First-Time Buyers', 'Investment Properties', 'Luxury Homes'],
             bio: `${timelineData.agent.name || 'Your agent'} is a dedicated real estate professional committed to helping clients find their perfect home. With years of experience in the industry, they provide personalized service and expert guidance throughout the entire buying or selling process.`,
             title: 'Senior Real Estate Agent',
             license: 'RE License #123456',
+            website: timelineData.agent.website || undefined,
           }}
           isSticky={true}
         />
