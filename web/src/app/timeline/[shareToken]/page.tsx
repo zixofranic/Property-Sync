@@ -694,13 +694,13 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <img
                   src={timelineData.agent.logo}
                   alt={timelineData.agent.company}
-                  className="w-12 h-12 object-cover rounded-none"
+                  className="w-12 h-12 object-contain"
                 />
               )}
               
               <div>
                 <h1 className="text-xl font-bold text-white">
-                  {timelineData.timeline.title} [v51af32b-TEST]
+                  {timelineData.timeline.title}
                 </h1>
                 <p className="text-sm text-slate-400">
                   Curated just for you by {timelineData.agent.name} • REALTOR®
@@ -1499,7 +1499,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             company: timelineData.agent.company || 'Real Estate Company',
             phone: timelineData.agent.phone || undefined,
             email: timelineData.agent.email || '',
-            logo: timelineData.agent.logo || undefined,
+            logo: timelineData.agent.profilePicture || timelineData.agent.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(timelineData.agent.name || 'Agent') + '&background=6366f1&color=fff',
             brandColor: timelineData.agent.brandColor || '#3b82f6',
             firstName: (timelineData.agent as any).firstName || timelineData.agent.name?.split(' ')[0] || '',
             lastName: (timelineData.agent as any).lastName || timelineData.agent.name?.split(' ')[1] || '',
