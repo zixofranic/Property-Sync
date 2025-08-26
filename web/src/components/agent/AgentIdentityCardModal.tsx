@@ -68,8 +68,8 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        width: 600,
-        height: 800,
+        width: 500,
+        height: 550,
         logging: false,
         ignoreElements: (element) => {
           // Ignore elements that might cause issues
@@ -250,8 +250,6 @@ Highly recommend reaching out if you're looking to buy or sell!
     }
   };
 
-  const currentYear = new Date().getFullYear();
-  const startYear = agent.yearsExperience ? currentYear - agent.yearsExperience : currentYear;
 
   return (
     <AnimatePresence>
@@ -346,7 +344,7 @@ Highly recommend reaching out if you're looking to buy or sell!
                   <div
                     ref={cardRef}
                     data-agent-card="true"
-                    className="w-full max-w-[600px] min-h-[800px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-4 sm:p-8 relative overflow-hidden"
+                    className="w-full max-w-[500px] min-h-[550px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-4 sm:p-6 relative overflow-hidden"
                     style={{ fontFamily: 'Arial, sans-serif' }}
                   >
                     {/* Background Pattern */}
@@ -370,7 +368,7 @@ Highly recommend reaching out if you're looking to buy or sell!
                       </div>
 
                       {/* Agent Photo & Basic Info */}
-                      <div className="text-center mb-8">
+                      <div className="text-center mb-6">
                         {agent.logo ? (
                           <img
                             src={agent.logo}
@@ -402,11 +400,17 @@ Highly recommend reaching out if you're looking to buy or sell!
                           <p className="text-lg sm:text-xl text-slate-700 font-medium">{agent.company}</p>
                         </div>
                         
-                        <div className="flex items-center justify-center space-x-4">
+                        <div className="flex items-center justify-center space-x-4 flex-wrap gap-2">
                           <div className="flex items-center space-x-1">
                             <Award className="w-4 h-4" style={{ color: agent.brandColor }} />
                             <span className="text-sm font-semibold" style={{ color: agent.brandColor }}>REALTOR®</span>
                           </div>
+                          {agent.yearsExperience && (
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="w-4 h-4 text-slate-600" />
+                              <span className="text-sm text-slate-600">{agent.yearsExperience} years experience</span>
+                            </div>
+                          )}
                           {agent.license && (
                             <div className="flex items-center space-x-1">
                               <CheckCircle className="w-4 h-4 text-green-600" />
@@ -416,50 +420,9 @@ Highly recommend reaching out if you're looking to buy or sell!
                         </div>
                       </div>
 
-                      {/* Experience & Specialties */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                        {/* Experience */}
-                        {agent.yearsExperience && (
-                          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold" style={{ color: agent.brandColor }}>
-                                {agent.yearsExperience}
-                              </div>
-                              <div className="text-sm text-slate-600">Years Experience</div>
-                              <div className="text-xs text-slate-500">{startYear} - {currentYear}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Specialties */}
-                        {agent.specialties && agent.specialties.length > 0 && (
-                          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-                            <h4 className="text-sm font-bold text-slate-700 mb-3 text-center flex items-center justify-center">
-                              <Star className="w-4 h-4 mr-1" style={{ color: agent.brandColor }} />
-                              Specialties
-                            </h4>
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {agent.specialties.slice(0, 4).map((specialty, index) => (
-                                <span
-                                  key={index}
-                                  className="px-3 py-1 text-xs font-medium text-white rounded-full shadow-sm"
-                                  style={{ backgroundColor: agent.brandColor }}
-                                >
-                                  {specialty}
-                                </span>
-                              ))}
-                              {agent.specialties.length > 4 && (
-                                <span className="px-3 py-1 text-xs font-medium text-slate-600 rounded-full border border-slate-300">
-                                  +{agent.specialties.length - 4} more
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Contact Information */}
-                      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
+                      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-lg">
                         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                           <Phone className="w-5 h-5 mr-2" style={{ color: agent.brandColor }} />
                           Contact Information
@@ -493,12 +456,12 @@ Highly recommend reaching out if you're looking to buy or sell!
 
                       {/* Bio */}
                       {agent.bio && (
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-lg">
-                          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-lg">
+                          <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center">
                             <User className="w-5 h-5 mr-2" style={{ color: agent.brandColor }} />
                             About Me
                           </h3>
-                          <p className="text-slate-700 leading-relaxed">{agent.bio}</p>
+                          <p className="text-slate-700 leading-relaxed text-sm">{agent.bio}</p>
                         </div>
                       )}
 
