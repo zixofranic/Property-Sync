@@ -189,6 +189,7 @@ export class ShareService {
         phone: timeline.agent.profile?.phone,
         email: timeline.agent.email,
         avatar: timeline.agent.profile?.avatar,
+        logo: timeline.agent.profile?.logo,
         brandColor: timeline.agent.profile?.brandColor,
         yearsExperience: timeline.agent.profile?.yearsExperience,
         specialties: timeline.agent.profile?.specialties,

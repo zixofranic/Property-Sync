@@ -70,10 +70,6 @@ export function SettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [logoLoading, setLogoLoading] = useState(false);
-  const [logoError, setLogoError] = useState(false);
-  const [logoTimestamp, setLogoTimestamp] = useState(0);
-  const [currentLogoUrl, setCurrentLogoUrl] = useState('');
 
   const tabs = [
     { id: 'branding', label: 'Branding', icon: Palette },
@@ -99,115 +95,9 @@ export function SettingsModal({
   };
 
   const handleLogoChange = (url: string) => {
-    console.log('🇺🇾Settings: Logo URL changed to:', url);
     updatePreference(['logo'], url);
-    
-    // Only show loading state if URL is valid
-    if (url.trim() && isValidUrl(url)) {
-      setLogoLoading(true);
-      setLogoError(false);
-      setLogoTimestamp(Date.now()); // Force cache refresh
-    } else {
-      setLogoLoading(false);
-      setLogoError(!url.trim() ? false : true); // Error only if URL is invalid
-      setLogoTimestamp(0);
-    }
   };
   
-  // Helper function to validate URL
-  const isValidUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url) || url.includes('logo');
-    } catch {
-      return false;
-    }
-  };
-
-  const handleLogoLoad = () => {
-    console.log('✅ Settings: Logo loaded successfully');
-    setLogoLoading(false);
-    setLogoError(false);
-  };
-
-  const handleLogoError = () => {
-    console.error('❌ Settings: Logo failed to load');
-    setLogoLoading(false);
-    setLogoError(true);
-  };
-
-  // Update logo URL state only when it actually changes
-  useEffect(() => {
-    const logoUrl = preferences.logo || '';
-    if (currentLogoUrl !== logoUrl) {
-      console.log('📝 Settings: Logo URL changed from', currentLogoUrl.substring(0, 30), 'to', logoUrl.substring(0, 30));
-      setCurrentLogoUrl(logoUrl);
-    }
-  }, [preferences.logo, currentLogoUrl]);
-
-  // Smart logo loading management - only when stable logo URL changes
-  useEffect(() => {
-    if (!currentLogoUrl.trim()) {
-      console.log('🗑️ Settings: No logo URL, resetting states');
-      setLogoLoading(false);
-      setLogoError(false);
-      setLogoTimestamp(0);
-      return;
-    }
-    
-    // Check if URL is valid before setting loading state
-    if (!isValidUrl(currentLogoUrl)) {
-      console.log('❌ Settings: Invalid logo URL, showing error');
-      setLogoLoading(false);
-      setLogoError(true);
-      setLogoTimestamp(0);
-      return;
-    }
-    
-    // Trigger loading for new URL
-    console.log('🔄 Settings: Processing logo URL:', currentLogoUrl.substring(0, 50));
-    setLogoLoading(true);
-    setLogoError(false);
-    setLogoTimestamp(Date.now());
-    
-    // Failsafe: If image doesn't load within 10 seconds, reset loading state
-    const failsafeTimeout = setTimeout(() => {
-      console.log('⏰ Settings: Logo loading timeout, resetting...');
-      setLogoLoading(false);
-      setLogoError(true);
-    }, 10000);
-    
-    return () => clearTimeout(failsafeTimeout);
-  }, [currentLogoUrl]);
-  
-  // Reset loading state when modal opens (only if truly stuck)
-  useEffect(() => {
-    if (isOpen && currentLogoUrl && isValidUrl(currentLogoUrl)) {
-      console.log('🔓 Settings: Modal opened, checking logo state');
-      
-      // Only reset if loading has been stuck for more than 3 seconds
-      if (logoLoading) {
-        const checkTimeout = setTimeout(() => {
-          if (logoLoading) { // Still loading after 3 seconds
-            console.log('🔄 Settings: Logo stuck loading for 3s, resetting...');
-            setLogoLoading(false);
-            setLogoError(false);
-          }
-        }, 3000);
-        
-        return () => clearTimeout(checkTimeout);
-      }
-    }
-  }, [isOpen]);
-
-  // Create cache-busting URL for logo
-  const getLogoUrl = () => {
-    if (!currentLogoUrl || !currentLogoUrl.trim()) return '';
-    if (logoTimestamp === 0) return currentLogoUrl;
-    
-    const separator = currentLogoUrl.includes('?') ? '&' : '?';
-    return `${currentLogoUrl}${separator}_t=${logoTimestamp}`;
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -326,29 +216,13 @@ export function SettingsModal({
                     }}
                   >
                     <div className="flex items-center justify-center space-x-4 mb-4">
-                      {currentLogoUrl && !logoError && (
-                        <div className="relative">
-                          {logoLoading && (
-                            <div className="w-16 h-16 flex items-center justify-center">
-                              <Loader className="w-4 h-4 text-white/60 animate-spin" />
-                            </div>
-                          )}
-                          <img 
-                            key={`modern-preview-${currentLogoUrl}-${logoTimestamp}`}
-                            src={getLogoUrl()} 
-                            alt="Logo" 
-                            className={`h-16 w-auto object-contain transition-opacity duration-200 ${logoLoading ? 'opacity-0 absolute' : 'opacity-100'}`}
-                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
-                            onLoad={() => {
-                              console.log('✅ Modern Preview: Logo loaded successfully');
-                              handleLogoLoad();
-                            }}
-                            onError={() => {
-                              console.error('❌ Modern Preview: Logo failed to load');
-                              handleLogoError();
-                            }}
-                          />
-                        </div>
+                      {preferences.logo && (
+                        <img 
+                          src={preferences.logo} 
+                          alt="Logo" 
+                          className="h-16 w-auto object-contain"
+                          style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                        />
                       )}
                     </div>
                     <h1 className="text-white text-xl font-bold mb-1">5 Properties Selected For You</h1>
@@ -389,29 +263,14 @@ export function SettingsModal({
                 <div className="bg-white rounded-lg overflow-hidden shadow-lg">
                   {/* Classical Header */}
                   <div className="bg-slate-700 px-6 py-6 text-center border-b-4 border-slate-500">
-                    {currentLogoUrl && !logoError && (
+                    {preferences.logo && (
                       <div className="flex justify-center mb-4">
-                        {logoLoading ? (
-                          <div className="w-16 h-16 flex items-center justify-center">
-                            <Loader className="w-4 h-4 text-white/60 animate-spin" />
-                          </div>
-                        ) : (
-                          <img 
-                            key={`classical-preview-${currentLogoUrl}-${logoTimestamp}`}
-                            src={getLogoUrl()} 
-                            alt="Logo" 
-                            className={`h-16 w-auto object-contain transition-opacity duration-200 ${logoLoading ? 'opacity-0' : 'opacity-100'}`}
-                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
-                            onLoad={() => {
-                              console.log('✅ Classical Preview: Logo loaded successfully');
-                              handleLogoLoad();
-                            }}
-                            onError={() => {
-                              console.error('❌ Classical Preview: Logo failed to load');
-                              handleLogoError();
-                            }}
-                          />
-                        )}
+                        <img 
+                          src={preferences.logo} 
+                          alt="Logo" 
+                          className="h-16 w-auto object-contain"
+                          style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                        />
                       </div>
                     )}
                     <h1 className="text-white text-xl font-bold mb-1 tracking-wide" style={{ fontFamily: 'Georgia, serif' }}>Property Timeline</h1>
