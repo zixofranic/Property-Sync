@@ -108,8 +108,6 @@ Thank you!`;
 
 If you're looking to buy or sell, I can't recommend them enough! 👏
 
-Check out their profile: ${agentPageUrl.toString()}
-
 #RealEstate #PropertyJourney #RecommendedAgent #RealEstateExcellence`;
 
     try {

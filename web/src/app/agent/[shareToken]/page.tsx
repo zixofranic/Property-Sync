@@ -199,7 +199,7 @@ export default function AgentSharePage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Meet Your REALTOR®</h1>
-              <p className="text-slate-400">Professional Real Estate Services</p>
+              <p className="text-slate-400">Created with Property Sync</p>
             </div>
           </div>
         </div>
@@ -217,15 +217,6 @@ export default function AgentSharePage() {
           />
 
           <div className="relative">
-            {/* Brand Header */}
-            <div className="flex justify-center mb-8">
-              <div 
-                className="px-8 py-4 rounded-2xl text-white font-bold text-lg text-center"
-                style={{ backgroundColor: agent.brandColor }}
-              >
-                MEET YOUR REALTOR
-              </div>
-            </div>
 
             {/* Agent Photo & Basic Info */}
             <div className="text-center mb-8">
@@ -261,7 +252,8 @@ export default function AgentSharePage() {
                   <img
                     src={agent.logo}
                     alt={agent.company}
-                    className="h-8 w-auto max-w-40"
+                    className="h-14 w-auto"
+                    style={{ maxWidth: '230px' }}
                   />
                 ) : (
                   <>

@@ -78,8 +78,6 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
 
 If you're looking to buy or sell, I can't recommend them enough! 👏
 
-Check out their profile: ${agentPageUrl}
-
 #RealEstate #PropertyJourney #RecommendedAgent #RealEstateExcellence`;
 
     try {
