@@ -6,6 +6,8 @@ export class AgentService {
   constructor(private prisma: PrismaService) {}
 
   async getAgentByShareToken(shareToken: string) {
+    console.log('🔍 Agent Service: Looking for shareToken:', shareToken);
+    
     // Find a timeline with this shareToken to get the agent
     const timeline = await this.prisma.timeline.findFirst({
       where: { 
@@ -21,12 +23,25 @@ export class AgentService {
       },
     });
 
+    console.log('📦 Agent Service: Timeline found:', !!timeline);
+    console.log('👤 Agent Service: Agent found:', !!timeline?.agent);
+    console.log('📋 Agent Service: Profile found:', !!timeline?.agent?.profile);
+
     if (!timeline || !timeline.agent) {
+      console.log('❌ Agent Service: No timeline or agent found');
       return null;
     }
 
     const agent = timeline.agent;
     const profile = agent.profile;
+    
+    console.log('🔧 Agent Service: Profile data:', {
+      firstName: profile?.firstName,
+      lastName: profile?.lastName,
+      company: profile?.company,
+      avatar: profile?.avatar,
+      logo: profile?.logo,
+    });
 
     // Return agent data in the format expected by the frontend
     return {

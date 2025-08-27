@@ -424,8 +424,10 @@ export class TimelinesService {
         propertyCount: timeline.properties.length,
         spouseEmail: timeline.client.spouseEmail || undefined,
         agentPhoto: agentProfile?.logo || undefined,
+        companyLogo: agentProfile?.companyLogo || undefined,
         brandColor: agentProfile?.brandColor || '#3b82f6',
         templateStyle: templateStyle,
+        emailType: emailType,
       });
 
       // Check final result (after Resend attempt + potential Nodemailer fallback)

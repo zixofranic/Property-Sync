@@ -90,6 +90,7 @@ model Profile {
   
   // Branding (Pro+ feature)
   logo         String? // URL to logo image
+  companyLogo  String? // URL to company logo image
   brandColor   String? @default("#0ea5e9") // Hex color code
 
   // 🆕 ADD EMAIL TEMPLATE PREFERENCE

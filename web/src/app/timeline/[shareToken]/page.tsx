@@ -752,35 +752,21 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Agent Company Logo - SIMPLIFIED */}
-              <div className="flex-shrink-0 w-20 h-20">
+              {/* Agent Company Logo - SIMPLEST APPROACH */}
+              <div className="flex-shrink-0 w-20 h-20 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
                 {timelineData.agent.logo ? (
                   <img
                     src={timelineData.agent.logo}
                     alt={timelineData.agent.company}
                     className="w-full h-full object-contain rounded-lg"
-                    onError={(e) => {
-                      // Hide broken image and show fallback
-                      (e.target as HTMLImageElement).style.display = 'none';
-                      const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                      if (fallback) fallback.style.display = 'flex';
-                    }}
                   />
-                ) : null}
-                
-                {/* Fallback - always rendered but hidden if logo loads */}
-                <div 
-                  className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600"
-                  style={{ display: timelineData.agent.logo ? 'none' : 'flex' }}
-                >
-                  {timelineData.agent.company ? (
-                    <div className="text-xs font-bold text-white text-center leading-tight px-1">
-                      {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
-                    </div>
-                  ) : (
-                    <Building className="w-8 h-8 text-slate-400" />
-                  )}
-                </div>
+                ) : timelineData.agent.company ? (
+                  <div className="text-xs font-bold text-white text-center leading-tight px-1">
+                    {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
+                  </div>
+                ) : (
+                  <Building className="w-8 h-8 text-slate-400" />
+                )}
               </div>
               
               <div className="min-h-16 flex flex-col justify-center">

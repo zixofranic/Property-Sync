@@ -38,7 +38,9 @@
       "Bash(git stash:*)",
       "Bash(npx tsc:*)",
       "WebFetch(domain:localhost)",
-      "Read(/C:\\Users\\ziadf\\Documents\\Projects/**)"
+      "Read(/C:\\Users\\ziadf\\Documents\\Projects/**)",
+      "Bash(npm run:*)",
+      "Bash(PORT=3001 npm run dev)"
     ],
     "deny": [],
     "ask": [],
