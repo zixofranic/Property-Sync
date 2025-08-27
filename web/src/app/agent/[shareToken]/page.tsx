@@ -26,12 +26,35 @@ interface AgentData {
 
 // Fetch agent data with fallback
 const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
+  // Handle demo/invalid tokens immediately
+  if (shareToken === 'demo' || !shareToken) {
+    console.log('🎭 Using demo shareToken, skipping API call');
+    const fallbackData = {
+      firstName: "Ziad",
+      lastName: "El Feghali", 
+      company: "ReMax Properties East",
+      phone: "(502) 295-0925",
+      email: "ziadfeg@gmail.com",
+      website: "https://ziad.realtor",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face&auto=format&q=80",
+      brandColor: "#0066cc",
+      yearsExperience: 10,
+      licenseNumber: "KY123456",
+      bio: "Ziad Feghali is a REALTOR® with RE/MAX Properties East, serving clients across Louisville, Kentucky. Fluent in English, French, and Arabic, he offers clear communication and a global perspective backed by strong local expertise. With over two decades of experience in technology and education, Ziad excels in strategic planning and problem-solving, guiding clients seamlessly through every transaction.",
+      specialties: ["Buyer's Agent", "Seller's Agent", "Relocation Specialist", "International Buyers", "First-Time Buyers"]
+    };
+    console.log('🔄 Using demo fallback data:', fallbackData);
+    return fallbackData;
+  }
+
   try {
+    console.log('🌐 Making API call to:', `/api/v1/agent/${shareToken}`);
     // Try to get real data from API first
     const response = await apiClient.getPublicAgentProfile(shareToken);
+    console.log('📡 API response:', response);
     
     if (response.data) {
-      return {
+      const agentData = {
         firstName: response.data.firstName,
         lastName: response.data.lastName,
         company: response.data.company,
@@ -46,13 +69,15 @@ const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
         bio: response.data.bio,
         website: response.data.website,
       };
+      console.log('✅ Using real API data:', agentData);
+      return agentData;
     }
   } catch (error) {
-    console.warn('API endpoint not available, using fallback data:', error);
+    console.warn('❌ API endpoint not available, using fallback data:', error);
   }
 
   // Fallback data when API is not available
-  return {
+  const fallbackData = {
     firstName: "Ziad",
     lastName: "El Feghali", 
     company: "ReMax Properties East",
@@ -66,6 +91,8 @@ const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
     bio: "Ziad Feghali is a REALTOR® with RE/MAX Properties East, serving clients across Louisville, Kentucky. Fluent in English, French, and Arabic, he offers clear communication and a global perspective backed by strong local expertise. With over two decades of experience in technology and education, Ziad excels in strategic planning and problem-solving, guiding clients seamlessly through every transaction.",
     specialties: ["Buyer's Agent", "Seller's Agent", "Relocation Specialist", "International Buyers", "First-Time Buyers"]
   };
+  console.log('🔄 Using fallback data:', fallbackData);
+  return fallbackData;
 };
 
 export default function AgentSharePage() {
@@ -83,7 +110,9 @@ export default function AgentSharePage() {
   React.useEffect(() => {
     const loadAgentData = async () => {
       try {
+        console.log('🔍 Loading agent data for shareToken:', shareToken);
         const agentData = await getAgentData(shareToken as string);
+        console.log('📦 Agent data received:', agentData);
         setAgent(agentData);
 
         // Temporarily disabled analytics tracking
