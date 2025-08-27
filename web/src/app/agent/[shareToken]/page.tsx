@@ -48,26 +48,27 @@ const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
   }
 
   try {
-    console.log('🌐 Making API call to:', `/api/v1/agent/${shareToken}`);
-    // Try to get real data from API first
-    const response = await apiClient.getPublicAgentProfile(shareToken);
+    console.log('🌐 Making API call to:', `/api/v1/share/${shareToken}`);
+    // Use the existing share endpoint which has all the agent data
+    const response = await apiClient.getTimelineData(shareToken);
     console.log('📡 API response:', response);
     
-    if (response.data) {
+    if (response.data && response.data.agent) {
+      const agent = response.data.agent;
       const agentData = {
-        firstName: response.data.firstName,
-        lastName: response.data.lastName,
-        company: response.data.company,
-        phone: response.data.phone,
-        email: response.data.email,
-        avatar: response.data.avatar,
-        logo: response.data.logo,
-        brandColor: response.data.brandColor,
-        licenseNumber: response.data.licenseNumber,
-        yearsExperience: response.data.yearsExperience,
-        specialties: response.data.specialties,
-        bio: response.data.bio,
-        website: response.data.website,
+        firstName: agent.firstName,
+        lastName: agent.lastName,
+        company: agent.company,
+        phone: agent.phone,
+        email: agent.email,
+        avatar: agent.avatar,
+        logo: agent.logo,
+        brandColor: agent.brandColor,
+        licenseNumber: agent.license,
+        yearsExperience: agent.yearsExperience,
+        specialties: agent.specialties,
+        bio: agent.bio,
+        website: agent.website,
       };
       console.log('✅ Using real API data:', agentData);
       return agentData;
