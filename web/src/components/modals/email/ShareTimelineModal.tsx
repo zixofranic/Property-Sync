@@ -5,7 +5,6 @@ import {
   Phone, Link as LinkIcon, ExternalLink, Send,
   Sparkles, Users, Settings, AlertCircle, Loader
 } from 'lucide-react';
-import { EmailTemplateSelector } from './EmailTemplateSelector';
 
 interface EmailState {
   canSendInitial: boolean;
@@ -34,7 +33,6 @@ interface ShareTimelineModalProps {
   };
   agentName: string;
   onSendEmail: (templateOverride?: 'modern' | 'classical', emailType?: 'initial' | 'reminder') => Promise<void>;
-  initialTemplate?: 'modern' | 'classical';
   emailState?: EmailState;
 }
 
@@ -45,15 +43,12 @@ export function ShareTimelineModal({
   timeline, 
   agentName,
   onSendEmail,
-  initialTemplate = 'modern',
   emailState
 }: ShareTimelineModalProps) {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classical'>(initialTemplate);
-  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   // Smart email logic
   const getEmailType = (): 'initial' | 'reminder' => {
@@ -119,7 +114,7 @@ export function ShareTimelineModal({
     
     try {
       const emailType = getEmailType();
-      await onSendEmail(selectedTemplate, emailType);
+      await onSendEmail(undefined, emailType); // No template override - use user's default setting
       setCopiedItem('email-sent');
       setShowConfirmation(false);
       setTimeout(() => setCopiedItem(null), 3000);
@@ -261,41 +256,6 @@ export function ShareTimelineModal({
 
               {/* Quick Actions */}
               <div className="space-y-3">
-                
-                {/* Email Template Selector Toggle */}
-                <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg border border-slate-600/30">
-                  <div className="flex items-center space-x-2">
-                    <Settings className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-300">Email Template</span>
-                    <span className="text-xs text-slate-400 bg-slate-600/50 px-2 py-1 rounded-full capitalize">{selectedTemplate}</span>
-                  </div>
-                  <button
-                    onClick={() => setShowTemplateSelector(!showTemplateSelector)}
-                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                  >
-                    {showTemplateSelector ? 'Hide' : 'Change'}
-                  </button>
-                </div>
-
-                {/* Template Selector */}
-                <AnimatePresence>
-                  {showTemplateSelector && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <EmailTemplateSelector
-                        currentTemplate={selectedTemplate}
-                        onTemplateChange={setSelectedTemplate}
-                        agentName={agentName}
-                        companyName="Your Company"
-                        brandColor="#3b82f6"
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
                 {/* Error Display */}
                 {emailError && (
@@ -533,10 +493,9 @@ export function ShareTimelineModal({
                 </h3>
                 <p className="text-slate-400 mb-6">
                   {getEmailType() === 'initial' 
-                    ? `Send ${timeline.propertyCount} properties to ${client.name} using the `
-                    : `Send ${emailState?.newPropertyCount || 0} new properties to ${client.name} using the `
+                    ? `Send ${timeline.propertyCount} properties to ${client.name} using your default email template.`
+                    : `Send ${emailState?.newPropertyCount || 0} new properties to ${client.name} using your default email template.`
                   }
-                  <span className="capitalize font-medium text-white">{selectedTemplate}</span> template.
                 </p>
                 
                 {getEmailType() === 'reminder' && emailState && (

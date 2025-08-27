@@ -391,6 +391,15 @@ export class TimelinesService {
         agentProfile?.emailTemplateStyle ||
         'modern') as 'modern' | 'classical';
 
+    // DEBUG: Log template selection
+    console.log('🎨 Email Template Selection Debug:', {
+      emailOptionsTemplate: emailOptions?.templateStyle,
+      agentProfileTemplate: agentProfile?.emailTemplateStyle,
+      finalTemplate: templateStyle,
+      agentId: agentId,
+      timelineId: timelineId
+    });
+
     const clientLoginCode = this.generateClientLoginCode(
       timeline.client.firstName,
       timeline.client.phone || undefined,

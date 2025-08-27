@@ -480,6 +480,14 @@ export class ResendProvider {
     const templateStyle = data.templateStyle || 'modern';
     const brandColor = data.brandColor || '#3b82f6';
 
+    // DEBUG: Log template generation
+    console.log('📧 Email Template Generation Debug:', {
+      requestedTemplate: data.templateStyle,
+      finalTemplate: templateStyle,
+      willUseClassical: templateStyle === 'classical',
+      clientName: data.clientName
+    });
+
     if (templateStyle === 'classical') {
       return this.getClassicalTimelineTemplate(data, brandColor);
     } else {
@@ -960,13 +968,13 @@ Powered by Property Sync - Making real estate personal
 <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #334155; max-width: 650px; margin: 0 auto; padding: 0; background: #f8fafc;">
   
   <!-- Header with Agent Photo -->
-  <div style="background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); padding: 45px 30px; text-align: center; border-radius: 16px 16px 0 0; position: relative; overflow: hidden;">
+  <div style="background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); padding: 25px 20px; text-align: center; border-radius: 16px 16px 0 0; position: relative; overflow: hidden;">
     <!-- Decorative elements -->
     <div style="position: absolute; top: -20px; right: -20px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
     <div style="position: absolute; bottom: -30px; left: -30px; width: 80px; height: 80px; background: rgba(255,255,255,0.15); border-radius: 50%;"></div>
     
     <div style="position: relative; z-index: 10;">
-      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 50%; border: 5px solid white; margin-bottom: 20px; object-fit: cover; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">` : `<div style="width: 90px; height: 90px; border-radius: 50%; border: 5px solid white; margin: 0 auto 20px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 36px;">🏠</div>`}
+      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 12px; border: 3px solid white; margin-bottom: 20px; object-fit: cover; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">` : `<div style="width: 90px; height: 90px; border-radius: 12px; border: 3px solid white; margin: 0 auto 20px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 36px;">🏠</div>`}
       
       <!-- Prominent Property Count -->
       <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; display: inline-block; padding: 8px 20px; margin-bottom: 15px;">
@@ -980,7 +988,7 @@ Powered by Property Sync - Making real estate personal
   </div>
   
   <!-- Welcome Message -->
-  <div style="background: white; padding: 40px 35px 30px 35px; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
+  <div style="background: white; padding: 25px 20px 20px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
     <h2 style="color: #1e293b; font-size: 24px; font-weight: 600; margin: 0 0 20px 0; text-align: center;">Hi ${data.clientName}! 👋</h2>
     
     <p style="font-size: 17px; line-height: 1.8; margin: 0 0 25px 0; text-align: center; color: #475569;">
@@ -1056,45 +1064,44 @@ Powered by Property Sync - Making real estate personal
     </div>
   </div>
   
-  <!-- Enhanced Agent Branding Footer -->
-  <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 35px 30px; border-radius: 0 0 16px 16px; color: white; position: relative; overflow: hidden;">
-    <!-- Decorative background -->
-    <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
-    <div style="position: absolute; bottom: -30px; left: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.03); border-radius: 50%;"></div>
-    
-    <div style="position: relative; z-index: 10;">
-      <!-- Agent Card -->
-      <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
-        <div style="display: flex; align-items: center; margin-bottom: 20px;">
-          ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 70px; height: 70px; border-radius: 12px; border: 3px solid rgba(255,255,255,0.2); margin-right: 20px; object-fit: cover;">` : `<div style="width: 70px; height: 70px; border-radius: 12px; border: 3px solid rgba(255,255,255,0.2); margin-right: 20px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 28px;">👤</div>`}
-          
-          <div style="flex: 1;">
-            <h3 style="margin: 0 0 5px 0; font-size: 20px; font-weight: 700; color: white;">${data.agentName}</h3>
-            <p style="margin: 0 0 8px 0; color: #cbd5e1; font-size: 16px; font-weight: 500;">${data.agentCompany}</p>
-            <div style="background: ${brandColor}; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; display: inline-block; letter-spacing: 0.5px;">
-              ⭐ REALTOR®
-            </div>
-          </div>
-        </div>
-        
-        ${data.agentEmail || data.agentPhone ? `
-        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-          <p style="margin: 0 0 10px 0; color: #e2e8f0; font-size: 14px; font-weight: 600;">Ready to discuss your next move?</p>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            ${data.agentEmail ? `<a href="mailto:${data.agentEmail}" style="background: rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; border: 1px solid rgba(255,255,255,0.2);">📧 Email Me</a>` : ''}
-            ${data.agentPhone ? `<a href="tel:${data.agentPhone}" style="background: rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; border: 1px solid rgba(255,255,255,0.2);">📱 Call Me</a>` : ''}
-          </div>
-        </div>` : ''}
+  <!-- Agent Footer - Matches Client Timeline Sticky Footer -->
+  <div style="background: linear-gradient(45deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); border-top: 1px solid #334155; padding: 25px 30px; color: white;">
+    <!-- Agent Info Section -->
+    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+      <!-- Agent Photo -->
+      <div style="position: relative; width: 50px; height: 50px; margin-right: 15px;">
+        ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${brandColor}; object-fit: cover;">` : `<div style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${brandColor}; background: ${brandColor}20; color: ${brandColor}; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>`}
       </div>
+      
+      <!-- Agent Details -->
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <h3 style="margin: 0; margin-right: 10px; font-size: 16px; font-weight: 600; color: white;">${data.agentName}</h3>
+          <span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ${brandColor}20; color: ${brandColor}; font-weight: 600; letter-spacing: 0.5px;">⭐ REALTOR®</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="font-size: 12px; color: #94a3b8; margin-right: 5px;">🏢</span>
+          <p style="margin: 0; color: #94a3b8; font-size: 12px;">${data.agentCompany}</p>
+        </div>
+      </div>
+    </div>
 
-      <!-- Footer -->
-      <div style="text-align: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 16px; font-weight: 500;">Powered by</p>
-        <div style="color: ${brandColor}; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          🏠 <span>Property Sync</span>
-        </div>
-        <p style="margin: 8px 0 0 0; color: #64748b; font-size: 12px; font-style: italic;">Making real estate personal</p>
+    <!-- Ready to discuss message -->
+    <p style="margin: 0 0 15px 0; color: #e2e8f0; font-size: 14px; font-weight: 500; font-style: italic;">Ready to discuss your next move?</p>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      ${data.agentEmail ? `<a href="mailto:${data.agentEmail}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #3b82f6; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📧 <span>Email</span></a>` : ''}
+      ${data.agentPhone ? `<a href="tel:${data.agentPhone}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #16a34a; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📱 <span>Call</span></a>` : ''}
+    </div>
+
+    <!-- Property Sync Footer -->
+    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; text-align: center;">
+      <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 14px; font-weight: 500;">Powered by</p>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 5px; color: ${brandColor}; font-size: 16px; font-weight: 700;">
+        🏠 <span>Property Sync</span>
       </div>
+      <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px; font-style: italic;">Making real estate personal</p>
     </div>
   </div>
 </body>
@@ -1102,56 +1109,140 @@ Powered by Property Sync - Making real estate personal
   }
 
   private getClassicalTimelineTemplate(data: TimelineEmailData, brandColor: string): string {
-    const classicalColor = '#34495e';
+    // Extract client's first name and phone for login instructions
+    const firstName = data.clientName.split(' ')[0];
+    const clientPhone = data.clientPhone || 'your phone number';
+    const last4Digits = clientPhone.length >= 4 ? clientPhone.slice(-4) : '****';
+    const classicalColor = brandColor || '#34495e';
+    
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Your Property Timeline</title>
+  <title>🏠 Your Property Timeline - ${data.propertyCount} Properties Selected</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Georgia:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Georgia:wght@400;600&display=swap');
   </style>
 </head>
-<body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.8; color: #2c3e50; max-width: 600px; margin: 0 auto; padding: 0; background: #fafafa;">
-  <div style="background: ${classicalColor}; padding: 40px 30px; text-align: center; border-bottom: 3px double #bdc3c7;">
-    ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 50%; border: 3px solid #ecf0f1; margin-bottom: 25px; object-fit: cover;">` : ''}
-    <h1 style="color: #ecf0f1; margin: 0 0 15px 0; font-size: 32px; font-weight: 700; letter-spacing: 1px;">Property Timeline</h1>
-    <p style="color: #bdc3c7; margin: 0; font-size: 16px; font-style: italic;">Presented by ${data.agentName}</p>
-    <p style="color: #95a5a6; margin: 5px 0 0 0; font-size: 14px;">${data.agentCompany}</p>
+<body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.8; color: #2c3e50; max-width: 650px; margin: 0 auto; padding: 0; background: #f8f9fa;">
+  
+  <!-- Enhanced Header with Agent Photo -->
+  <div style="background: linear-gradient(135deg, ${classicalColor} 0%, #2c3e50 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0; position: relative; overflow: hidden;">
+    <!-- Decorative elements -->
+    <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%;"></div>
+    <div style="position: absolute; bottom: -40px; left: -40px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+    
+    <div style="position: relative; z-index: 10;">
+      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 12px; border: 4px solid rgba(255,255,255,0.9); margin-bottom: 25px; object-fit: cover; box-shadow: 0 8px 25px rgba(0,0,0,0.4);">` : `<div style="width: 90px; height: 90px; border-radius: 12px; border: 4px solid rgba(255,255,255,0.9); margin: 0 auto 25px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 36px;">🏠</div>`}
+      
+      <!-- Property Count Badge -->
+      <div style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; display: inline-block; padding: 8px 20px; margin-bottom: 20px;">
+        <span style="color: white; font-size: 14px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.3); letter-spacing: 0.5px;">✨ ${data.propertyCount} PROPERTIES SELECTED FOR YOU ✨</span>
+      </div>
+      
+      <h1 style="color: #ecf0f1; margin: 0 0 10px 0; font-size: 36px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.4); font-family: 'Playfair Display', Georgia, serif;">Your Personal Property Timeline</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 18px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">Curated by ${data.agentName}</p>
+      <p style="color: rgba(255,255,255,0.75); margin: 5px 0 0 0; font-size: 15px;">${data.agentCompany}</p>
+    </div>
   </div>
   
-  <div style="background: #ffffff; padding: 50px 40px; border-left: 5px solid ${classicalColor}; border-right: 5px solid ${classicalColor};">
+  <!-- Welcome Message -->
+  <div style="background: white; padding: 35px 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
     <div style="text-align: center; margin-bottom: 30px;">
-      <h2 style="color: #2c3e50; font-size: 24px; font-weight: 700; margin: 0 0 10px 0; letter-spacing: 0.5px;">Dear ${data.clientName},</h2>
-      <div style="width: 60px; height: 2px; background: ${classicalColor}; margin: 0 auto;"></div>
+      <h2 style="color: #2c3e50; font-size: 28px; font-weight: 700; margin: 0 0 15px 0; letter-spacing: 0.5px; font-family: 'Playfair Display', Georgia, serif;">Dear ${data.clientName},</h2>
+      <div style="width: 80px; height: 3px; background: linear-gradient(135deg, ${classicalColor}, #2c3e50); margin: 0 auto; border-radius: 2px;"></div>
     </div>
     
-    <p style="font-size: 17px; line-height: 1.9; margin: 0 0 30px 0; text-align: justify; text-indent: 30px;">It is my distinct pleasure to present to you a carefully curated selection of <strong>${data.propertyCount} exceptional properties</strong> that have been thoughtfully chosen to align with your specific requirements and preferences.</p>
+    <p style="font-size: 18px; line-height: 1.9; margin: 0 0 30px 0; text-align: justify; text-indent: 35px; color: #34495e;">
+      It is my distinct pleasure to present to you a carefully curated selection of <strong style="color: ${classicalColor}; font-size: 19px;">${data.propertyCount} exceptional properties</strong> that have been thoughtfully chosen to align with your specific requirements and preferences. Each home has been selected with meticulous attention to your needs and desires.
+    </p>
     
-    <div style="background: #ecf0f1; padding: 35px; border: 2px solid #bdc3c7; text-align: center; margin: 40px 0;">
-      <h3 style="color: #2c3e50; margin: 0 0 25px 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">Your Property Portfolio</h3>
-      <a href="${data.timelineUrl}" style="display: inline-block; background: ${classicalColor}; color: #ecf0f1; padding: 15px 40px; border: 2px solid ${classicalColor}; text-decoration: none; font-weight: 700; font-size: 16px; letter-spacing: 1px; transition: all 0.3s ease;">VIEW TIMELINE</a>
+    <!-- Property Count Highlight -->
+    <div style="background: linear-gradient(135deg, ${classicalColor}10 0%, #2c3e5010 100%); border: 2px solid ${classicalColor}30; border-radius: 16px; padding: 30px; text-align: center; margin: 30px 0; position: relative;">
+      <div style="background: ${classicalColor}; color: white; font-size: 28px; font-weight: 700; width: 70px; height: 70px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 6px 20px ${classicalColor}40; font-family: 'Playfair Display', Georgia, serif;">
+        ${data.propertyCount}
+      </div>
+      <h3 style="color: #2c3e50; margin: 0 0 12px 0; font-size: 22px; font-weight: 700; font-family: 'Playfair Display', Georgia, serif;">Exceptional Properties</h3>
+      <p style="margin: 0; color: #5a6c7d; font-size: 16px; font-style: italic;">Handpicked from thousands of listings</p>
     </div>
-    
-    <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; margin: 30px 0;">
-      <h4 style="margin: 0 0 20px 0; color: #2c3e50; font-weight: 700; font-size: 18px; text-align: center;">Instructions for Review</h4>
-      <ol style="margin: 0; padding-left: 25px; color: #34495e; font-size: 16px;">
-        <li style="margin-bottom: 12px;">Examine each property with careful consideration</li>
-        <li style="margin-bottom: 12px;">Provide feedback using the designated response options</li>
-        <li>Record any observations or inquiries for future discussion</li>
+  </div>
+
+  <!-- Access Instructions -->
+  <div style="background: white; padding: 0 35px 35px 35px;">
+    <div style="background: #fff8e1; border: 2px solid #ffa726; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+      <h3 style="color: #e65100; margin: 0 0 15px 0; font-size: 20px; font-weight: 700; display: flex; align-items: center; font-family: 'Playfair Display', Georgia, serif;">
+        🔑 <span style="margin-left: 10px;">Access Instructions</span>
+      </h3>
+      <p style="margin: 0 0 15px 0; color: #ef6c00; font-size: 17px; line-height: 1.6;">
+        <strong>Login Details:</strong> Use your first name and last 4 digits of your phone number
+      </p>
+      <div style="background: white; border: 2px solid #ffb74d; border-radius: 8px; padding: 18px; font-family: Georgia, serif;">
+        <div style="color: #e65100; font-size: 15px; margin-bottom: 8px; font-weight: 600;">👤 <strong>Username:</strong> ${firstName}</div>
+        <div style="color: #e65100; font-size: 15px; font-weight: 600;">🔢 <strong>Password:</strong> ${last4Digits}</div>
+      </div>
+    </div>
+
+    <!-- Step-by-Step Guide -->
+    <div style="background: #f3f4f6; border: 2px solid #9ca3af; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+      <h3 style="color: #374151; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-align: center; font-family: 'Playfair Display', Georgia, serif;">📋 Instructions for Review</h3>
+      
+      <ol style="margin: 0; padding-left: 25px; color: #4b5563; font-size: 16px; line-height: 1.8;">
+        <li style="margin-bottom: 15px; font-weight: 600;">Click the "View Timeline" button below to access your personalized property portal</li>
+        <li style="margin-bottom: 15px; font-weight: 600;">Enter your login details (${firstName} / ${last4Digits}) when prompted</li>
+        <li style="margin-bottom: 15px; font-weight: 600;">Examine each property with detailed photos, descriptions, and pricing</li>
+        <li style="margin-bottom: 0; font-weight: 600;">Provide feedback using Love It! ❤️, Let's Talk 💬, or Not for Me ❌ buttons</li>
       </ol>
     </div>
-    
-    <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #bdc3c7;">
-      <p style="font-size: 18px; font-style: italic; margin: 0 0 20px 0; color: #2c3e50;">With professional regards,</p>
-      <p style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #2c3e50;">${data.agentName}</p>
-      <p style="margin: 0; color: #7f8c8d; font-size: 16px; font-style: italic;">${data.agentCompany}</p>
+
+    <!-- CTA Button -->
+    <div style="text-align: center; margin: 35px 0;">
+      <a href="${data.timelineUrl}" style="display: inline-block; background: linear-gradient(135deg, ${classicalColor} 0%, #2c3e50 100%); color: white; padding: 20px 50px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px; box-shadow: 0 8px 25px ${classicalColor}50; border: 3px solid transparent; letter-spacing: 0.5px; font-family: 'Playfair Display', Georgia, serif;">
+        🏠 VIEW YOUR PROPERTY TIMELINE
+      </a>
+      <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 14px; font-style: italic;">Click above to access your personalized timeline</p>
     </div>
   </div>
   
-  <div style="background: #2c3e50; padding: 25px 20px; text-align: center; color: #bdc3c7; font-size: 12px; border-top: 3px double #34495e;">
-    <p style="margin: 0;">This correspondence was generated by Property Sync</p>
+  <!-- Agent Footer - Matches Client Timeline Sticky Footer -->
+  <div style="background: linear-gradient(45deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); border-top: 1px solid #334155; padding: 25px 30px; color: white;">
+    <!-- Agent Info Section -->
+    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+      <!-- Agent Photo -->
+      <div style="position: relative; width: 50px; height: 50px; margin-right: 15px;">
+        ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${classicalColor}; object-fit: cover;">` : `<div style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${classicalColor}; background: ${classicalColor}20; color: ${classicalColor}; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>`}
+      </div>
+      
+      <!-- Agent Details -->
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <h3 style="margin: 0; margin-right: 10px; font-size: 16px; font-weight: 600; color: white; font-family: 'Playfair Display', Georgia, serif;">${data.agentName}</h3>
+          <span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ${classicalColor}20; color: ${classicalColor}; font-weight: 600; letter-spacing: 0.5px;">⭐ REALTOR®</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="font-size: 12px; color: #94a3b8; margin-right: 5px;">🏢</span>
+          <p style="margin: 0; color: #94a3b8; font-size: 12px;">${data.agentCompany}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ready to discuss message -->
+    <p style="margin: 0 0 15px 0; color: #e2e8f0; font-size: 14px; font-weight: 500; font-style: italic;">Ready to discuss your next move?</p>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      ${data.agentEmail ? `<a href="mailto:${data.agentEmail}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #3b82f6; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📧 <span>Email</span></a>` : ''}
+      ${data.agentPhone ? `<a href="tel:${data.agentPhone}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #16a34a; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📱 <span>Call</span></a>` : ''}
+    </div>
+
+    <!-- Property Sync Footer -->
+    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; text-align: center;">
+      <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 14px; font-weight: 500;">Powered by</p>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 5px; color: ${classicalColor}; font-size: 16px; font-weight: 700; font-family: 'Playfair Display', Georgia, serif;">
+        🏠 <span>Property Sync</span>
+      </div>
+      <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px; font-style: italic;">Making real estate personal</p>
+    </div>
   </div>
 </body>
 </html>`;

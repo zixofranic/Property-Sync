@@ -3,7 +3,7 @@
 
 import { use, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell } from 'lucide-react';
+import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell, Building } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
 import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
@@ -108,6 +108,9 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [showNotificationDropdown, setShowNotificationDropdown] = useState<boolean>(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [clientMessages, setClientMessages] = useState<any[]>([]);
+  const [logoLoading, setLogoLoading] = useState<boolean>(false);
+  const [logoError, setLogoError] = useState<boolean>(false);
+  const [currentLogoUrl, setCurrentLogoUrl] = useState<string>('');
 
   // Helper function to manage dismissed notifications in localStorage
   const getDismissedNotifications = () => {
@@ -238,115 +241,154 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     };
   }, [showNotificationDropdown]);
 
-  // Fetch timeline data
-  useEffect(() => {
-    const fetchTimelineData = async () => {
+  // Fetch timeline data function (extracted for reuse)
+  const fetchTimelineData = async (isInitialLoad = false) => {
+    try {
+      if (isInitialLoad) setIsLoading(true);
+      
+      // Extract client code from URL params
+      const urlParams = new URLSearchParams(window.location.search);
+      const clientCode = urlParams.get('client');
+      
+      const response = await apiClient.getPublicTimeline(shareToken, clientCode, sessionToken || undefined);
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      if (!response.data) {
+        throw new Error('No timeline data received');
+      }
+      
+      const newData = response.data;
+      
+      // Check for new properties if we have previous data
+      if (timelineData && newData && isAuthenticated) {
+        const newPropertyCount = newData.properties.length;
+        const oldPropertyCount = timelineData.properties.length;
+        const newPropertiesAdded = newPropertyCount - oldPropertyCount;
+        
+        if (newPropertiesAdded > 0 && settings.bannerNotifications && settings.newProperties) {
+          // Check if we already have a recent notification for this timeline
+          const existingNotification = getVisibleNotifications().find(n => 
+            n.type === 'new-properties' && 
+            n.timelineId === newData.timeline.id &&
+            n.isVisible &&
+            !n.isRead
+          );
+          
+          // Only create notification if no existing unread notification exists
+          if (!existingNotification) {
+            addNotification(createNewPropertiesNotification(
+              newData.timeline.id,
+              newData.timeline.title,
+              newData.agent.name,
+              newPropertiesAdded,
+              newPropertyCount
+            ));
+            
+            setShowNewPropertiesBanner(true);
+          }
+        }
+      }
+      
+      setTimelineData(newData);
+      setIsAuthenticated(newData?.isAuthenticated || false);
+      
+      // Calculate new properties count (properties added in last 24 hours WITHOUT feedback)
+      if (newData?.properties) {
+        const now = new Date();
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        
+        const newPropertiesWithoutFeedback = newData.properties.filter((property: any) => {
+          const createdAt = new Date(property.createdAt);
+          const hasNoFeedback = !property.feedback || property.feedback.length === 0;
+          return createdAt > twentyFourHoursAgo && hasNoFeedback;
+        });
+        
+        setNewPropertyCount(newPropertiesWithoutFeedback.length);
+      }
+      
+      // Fetch client notifications
       try {
-        setIsLoading(true);
-        
-        // Extract client code from URL params
-        const urlParams = new URLSearchParams(window.location.search);
-        const clientCode = urlParams.get('client');
-        
-        const response = await apiClient.getPublicTimeline(shareToken, clientCode, sessionToken || undefined);
-        
-        if (response.error) {
-          throw new Error(response.error);
-        }
-        
-        if (!response.data) {
-          throw new Error('No timeline data received');
-        }
-        
-        const newData = response.data;
-        
-        // Check for new properties if we have previous data
-        if (timelineData && newData && isAuthenticated) {
-          const newPropertyCount = newData.properties.length;
-          const oldPropertyCount = timelineData.properties.length;
-          const newPropertiesAdded = newPropertyCount - oldPropertyCount;
+        const notificationsResponse = await apiClient.getClientNotifications(shareToken);
+        if (notificationsResponse.data && Array.isArray(notificationsResponse.data)) {
+          // Filter out dismissed notifications using localStorage
+          const dismissedNotifications = getDismissedNotifications();
+          const filteredNotifications = notificationsResponse.data.filter((msg: any) => 
+            !dismissedNotifications.includes(msg.id)
+          );
           
-          if (newPropertiesAdded > 0 && settings.bannerNotifications && settings.newProperties) {
-            // Check if we already have a recent notification for this timeline
-            const existingNotification = getVisibleNotifications().find(n => 
-              n.type === 'new-properties' && 
-              n.timelineId === newData.timeline.id &&
-              n.isVisible &&
-              !n.isRead
-            );
-            
-            // Only create notification if no existing unread notification exists
-            if (!existingNotification) {
-              addNotification(createNewPropertiesNotification(
-                newData.timeline.id,
-                newData.timeline.title,
-                newData.agent.name,
-                newPropertiesAdded,
-                newPropertyCount
-              ));
-              
-              setShowNewPropertiesBanner(true);
-            }
-          }
-        }
-        
-        setTimelineData(newData);
-        setIsAuthenticated(newData?.isAuthenticated || false);
-        
-        // Calculate new properties count (properties added in last 24 hours WITHOUT feedback)
-        if (newData?.properties) {
-          const now = new Date();
-          const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          
-          const newPropertiesWithoutFeedback = newData.properties.filter((property: any) => {
-            const createdAt = new Date(property.createdAt);
-            const hasNoFeedback = !property.feedback || property.feedback.length === 0;
-            return createdAt > twentyFourHoursAgo && hasNoFeedback;
-          });
-          
-          setNewPropertyCount(newPropertiesWithoutFeedback.length);
-        }
-        
-        // Fetch client notifications
-        try {
-          const notificationsResponse = await apiClient.getClientNotifications(shareToken);
-          if (notificationsResponse.data && Array.isArray(notificationsResponse.data)) {
-            // Filter out dismissed notifications using localStorage
-            const dismissedNotifications = getDismissedNotifications();
-            const filteredNotifications = notificationsResponse.data.filter((msg: any) => 
-              !dismissedNotifications.includes(msg.id)
-            );
-            
-            setClientMessages(filteredNotifications);
-            const unreadCount = filteredNotifications.filter((msg: any) => !msg.isRead).length;
-            setUnreadMessageCount(unreadCount);
-          } else {
-            // No notifications found
-            setClientMessages([]);
-            setUnreadMessageCount(0);
-          }
-        } catch (error) {
-          console.warn('Failed to fetch notifications:', error);
-          // Set empty notifications if API fails
+          setClientMessages(filteredNotifications);
+          const unreadCount = filteredNotifications.filter((msg: any) => !msg.isRead).length;
+          setUnreadMessageCount(unreadCount);
+        } else {
+          // No notifications found
           setClientMessages([]);
           setUnreadMessageCount(0);
         }
-        
-        // Track timeline view if authenticated
-        if (newData?.isAuthenticated) {
-          await apiClient.trackTimelineView(shareToken, { source: 'client_access' });
-        }
-        
       } catch (error) {
-        console.error('Failed to fetch timeline data:', error);
-        setTimelineData(null);
-      } finally {
-        setIsLoading(false);
+        console.warn('Failed to fetch notifications:', error);
+        // Set empty notifications if API fails
+        setClientMessages([]);
+        setUnreadMessageCount(0);
       }
-    };
+      
+      // Track timeline view if authenticated
+      if (newData?.isAuthenticated) {
+        await apiClient.trackTimelineView(shareToken, { source: 'client_access' });
+      }
+      
+    } catch (error) {
+      console.error('Failed to fetch timeline data:', error);
+      if (isInitialLoad) setTimelineData(null);
+    } finally {
+      if (isInitialLoad) setIsLoading(false);
+    }
+  };
 
-    fetchTimelineData();
+  // Initial fetch timeline data
+  useEffect(() => {
+    fetchTimelineData(true);
   }, [shareToken, sessionToken]);
+  
+  // Auto-refresh timeline data every 60 seconds when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !shareToken) return;
+    
+    const interval = setInterval(async () => {
+      console.log('🔄 Auto-refreshing client timeline data...');
+      await fetchTimelineData(false);
+    }, 60000); // 60 seconds
+    
+    console.log('✅ Client timeline auto-refresh enabled (60s)');
+    
+    return () => {
+      clearInterval(interval);
+      console.log('🛑 Client timeline auto-refresh disabled');
+    };
+  }, [isAuthenticated, shareToken, sessionToken]);
+  
+  // Smart logo loading management - reset loading state when logo URL changes
+  useEffect(() => {
+    if (timelineData?.agent?.logo) {
+      // If logo URL changed, reset loading states
+      if (currentLogoUrl !== timelineData.agent.logo) {
+        console.log('🔄 Logo URL changed, resetting loading states:', {
+          from: currentLogoUrl,
+          to: timelineData.agent.logo
+        });
+        setCurrentLogoUrl(timelineData.agent.logo);
+        setLogoLoading(true);
+        setLogoError(false);
+      }
+    } else {
+      // No logo URL, reset states
+      setLogoLoading(false);
+      setLogoError(false);
+      setCurrentLogoUrl('');
+    }
+  }, [timelineData?.agent?.logo, currentLogoUrl]);
 
   // Handle ESC key for MLS modal
   useEffect(() => {
@@ -733,20 +775,59 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Agent Company Logo */}
-              {timelineData.agent.logo && (
-                <img
-                  src={timelineData.agent.logo}
-                  alt={timelineData.agent.company}
-                  className="w-24 h-24 object-contain"
-                />
-              )}
+              {/* Agent Company Logo with Smart Loading */}
+              <div className="relative flex-shrink-0">
+                {console.log('🏢 Agent Logo State:', { 
+                  hasLogo: !!timelineData.agent.logo, 
+                  logoUrl: timelineData.agent.logo?.substring(0, 50) + '...',
+                  currentLogoUrl: currentLogoUrl?.substring(0, 30) + '...',
+                  logoLoading, 
+                  logoError,
+                  urlChanged: currentLogoUrl !== timelineData.agent.logo
+                })}
+                
+                {timelineData.agent.logo && !logoError ? (
+                  <div className="relative w-20 h-20">
+                    {logoLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-800 rounded-lg border border-slate-700 z-10">
+                        <div className="w-6 h-6 border-2 border-slate-600 border-t-blue-500 rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                    <img
+                      key={timelineData.agent.logo} // Force re-render when URL changes
+                      src={timelineData.agent.logo}
+                      alt={timelineData.agent.company}
+                      className={`w-full h-full object-contain rounded-lg transition-opacity duration-300 ${logoLoading ? 'opacity-0' : 'opacity-100'}`}
+                      onLoad={() => {
+                        console.log('✅ Logo loaded successfully:', timelineData.agent.logo?.substring(0, 50));
+                        setLogoLoading(false);
+                      }}
+                      onError={(e) => {
+                        console.error('❌ Logo failed to load:', timelineData.agent.logo, e);
+                        setLogoError(true);
+                        setLogoLoading(false);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // Fallback: Company name initials or building icon
+                  <div className="w-20 h-20 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
+                    {timelineData.agent.company ? (
+                      <div className="text-xs font-bold text-white text-center leading-tight px-1">
+                        {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
+                      </div>
+                    ) : (
+                      <Building className="w-8 h-8 text-slate-400" />
+                    )}
+                  </div>
+                )}
+              </div>
               
-              <div>
-                <h1 className="text-xl font-bold text-white">
+              <div className="min-h-16 flex flex-col justify-center">
+                <h1 className="text-xl font-bold text-white leading-tight">
                   {timelineData.timeline.title}
                 </h1>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-400 leading-tight">
                   Curated just for you by {timelineData.agent.name} • REALTOR®
                 </p>
               </div>

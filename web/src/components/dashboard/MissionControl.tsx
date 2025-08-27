@@ -70,6 +70,9 @@ export function MissionControl() {
     userPreferences,
     updateEmailTemplate,
     updateUserPreferences,
+    getUnreadNotificationsForClient,
+    hasUnreadFeedbackNotifications,
+    createFeedbackNotification,
   } = useMissionControlStore();
   
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -164,6 +167,18 @@ export function MissionControl() {
       fetchEmailState(currentTimeline.id);
     }
   }, [currentTimeline?.id, fetchEmailState]);
+  
+  // Refresh email state periodically to detect client interactions (every 60 seconds)
+  useEffect(() => {
+    if (!currentTimeline) return;
+    
+    const interval = setInterval(async () => {
+      console.log('🔄 Refreshing email state for client activity detection...');
+      await fetchEmailState(currentTimeline.id);
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(interval);
+  }, [currentTimeline?.id, fetchEmailState]);
 
   // Also refresh email state when share modal opens (for latest data)
   useEffect(() => {
@@ -171,6 +186,20 @@ export function MissionControl() {
       fetchEmailState(currentTimeline.id);
     }
   }, [showShareModal, currentTimeline?.id, fetchEmailState]);
+  
+  // Refresh email state when new feedback notifications are received
+  useEffect(() => {
+    const feedbackNotifications = notifications.filter(n => 
+      n.type === 'feedback' && 
+      !n.read && 
+      n.clientId === selectedClient?.id
+    );
+    
+    if (feedbackNotifications.length > 0 && currentTimeline) {
+      console.log('🔄 Refreshing email state due to new feedback notifications...');
+      fetchEmailState(currentTimeline.id);
+    }
+  }, [notifications, selectedClient?.id, currentTimeline?.id, fetchEmailState]);
 
   // Check if there are properties queued for bulk sending
   const bulkQueueCount = properties.filter(p => !p.clientFeedback).length;
@@ -218,6 +247,62 @@ export function MissionControl() {
     }
   };
 
+  // Calculate client status based on engagement data if not provided by backend
+  const calculateClientStatus = (client: any): 'active' | 'warm' | 'cold' => {
+    // Debug: Log the actual client data
+    console.log('🔍 Client Status Debug:', {
+      name: client.name,
+      backendStatus: client.status,
+      engagementScore: client.engagementScore,
+      lastActive: client.lastActive,
+      propertiesViewed: client.propertiesViewed,
+      createdAt: client.createdAt
+    });
+    
+    // Skip backend status for now since it's incorrectly hardcoded as 'cold'
+    // TODO: Fix backend status calculation logic
+    console.log(`🚫 Ignoring backend status: ${client.status} (hardcoded as cold) for ${client.name}`);
+    // if (client.status && ['active', 'warm', 'cold'].includes(client.status)) {
+    //   console.log(`✅ Using backend status: ${client.status} for ${client.name}`);
+    //   return client.status;
+    // }
+    
+    // Fallback: Calculate based on engagement score and activity
+    const engagementScore = client.engagementScore || 0;
+    const lastActive = client.lastActive;
+    const propertiesViewed = client.propertiesViewed || 0;
+    
+    // Calculate days since last active
+    let daysSinceActive = Infinity;
+    if (lastActive) {
+      const lastActiveDate = new Date(lastActive);
+      const now = new Date();
+      daysSinceActive = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    console.log(`📊 Calculating status for ${client.name}:`, {
+      engagementScore,
+      daysSinceActive,
+      propertiesViewed
+    });
+    
+    // Very lenient status logic for testing - let's see some variety!
+    let calculatedStatus: 'active' | 'warm' | 'cold';
+    
+    if (engagementScore >= 70) {
+      calculatedStatus = 'active'; // High engagement
+    } else if (engagementScore >= 30) {
+      calculatedStatus = 'warm'; // Medium engagement  
+    } else if (engagementScore > 0) {
+      calculatedStatus = 'warm'; // Any engagement at all
+    } else {
+      calculatedStatus = 'cold'; // No engagement
+    }
+    
+    console.log(`🎯 Calculated status for ${client.name}: ${calculatedStatus}`);
+    return calculatedStatus;
+  };
+  
   const getStatusColor = (status: string | undefined) => {
     switch (status) {
       case 'active': return 'text-green-400 bg-green-400/20';
@@ -332,7 +417,8 @@ export function MissionControl() {
     
     return name.includes(searchTerm) || email.includes(searchTerm);
   });
-  // Add this after your existing useState declarations
+  
+// Add this after your existing useState declarations
 const testProfileAPI = async () => {
   try {
     const response = await apiClient.getProfile();
@@ -512,9 +598,30 @@ const testProfileAPI = async () => {
                             setIsClientDropdownOpen(false);
                             setClientSearch('');
                           }}
-                          className="w-full p-4 text-left hover:bg-slate-700/50 transition-colors border-b border-slate-700/50 last:border-b-0"
+                          className="w-full p-4 text-left hover:bg-slate-700/50 transition-colors border-b border-slate-700/50 last:border-b-0 relative"
                           whileHover={{ x: 4 }}
                         >
+                          {/* Client Notification Indicators */}
+                          {(() => {
+                            const unreadCount = getUnreadNotificationsForClient(client.id).length;
+                            const hasFeedbackNotifications = hasUnreadFeedbackNotifications(client.id);
+                            
+                            if (unreadCount > 0) {
+                              return (
+                                <div className="absolute top-2 right-2 flex items-center space-x-1">
+                                  {hasFeedbackNotifications && (
+                                    <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse" title="New feedback" />
+                                  )}
+                                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" title={`${unreadCount} new notifications`} />
+                                  {unreadCount > 1 && (
+                                    <span className="text-xs text-red-400 font-bold ml-1">{unreadCount}</span>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="font-medium text-white">{client.name || 'Unnamed Client'}</div>
@@ -524,9 +631,14 @@ const testProfileAPI = async () => {
                               </div>
                             </div>
                             <div className="text-right ml-4">
-                              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
-                                {client.status || 'active'}
-                              </div>
+                              {(() => {
+                                const calculatedStatus = calculateClientStatus(client);
+                                return (
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(calculatedStatus)}`}>
+                                    {calculatedStatus}
+                                  </div>
+                                );
+                              })()}
                               <div className="text-xs text-slate-400 mt-1">
                                 {client.engagementScore || 0}% engagement
                               </div>
@@ -639,19 +751,41 @@ const testProfileAPI = async () => {
               
               <div className="relative" data-notifications-dropdown>
                 <button
-                  onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                  onClick={() => {
+                    // Mark all notifications as read when bell is clicked
+                    const unreadNotifications = notifications.filter(n => !n.read);
+                    unreadNotifications.forEach(n => markNotificationAsRead(n.id));
+                    
+                    // Toggle dropdown
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                  }}
                   className="relative p-1"
+                  title={`Notifications ${notifications.filter(n => !n.read).length > 0 ? `(${notifications.filter(n => !n.read).length} unread)` : ''}`}
                 >
-                  <Bell className={`w-5 h-5 cursor-pointer transition-all duration-300 ${
-                    notifications.filter(n => !n.read).length > 0 
-                      ? 'text-red-400 hover:text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse' 
-                      : 'text-slate-400 hover:text-white'
-                  }`} />
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
-                      {notifications.filter(n => !n.read).length}
-                    </span>
-                  )}
+                  {(() => {
+                    const unreadCount = notifications.filter(n => !n.read).length;
+                    const hasUnreadFeedback = notifications.some(n => !n.read && (n.type === 'feedback' || n.feedbackType));
+                    
+                    return (
+                      <>
+                        <Bell className={`w-5 h-5 cursor-pointer transition-all duration-300 ${
+                          unreadCount > 0
+                            ? 'text-red-400 hover:text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse' 
+                            : 'text-slate-400 hover:text-white'
+                        }`} />
+                        {unreadCount > 0 && (
+                          <>
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold animate-pulse">
+                              {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                            {hasUnreadFeedback && (
+                              <span className="absolute -top-2 -left-1 w-3 h-3 bg-purple-500 rounded-full animate-pulse" title="New client feedback" />
+                            )}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </button>
                 
                 {/* Notifications Dropdown */}
@@ -686,12 +820,34 @@ const testProfileAPI = async () => {
                             key={notification.id}
                             className={`p-3 border-b border-slate-700 last:border-b-0 hover:bg-slate-700/30 transition-colors ${
                               !notification.read ? 'bg-blue-500/5 border-l-4 border-l-blue-500' : ''
+                            } ${
+                              notification.type === 'feedback' || notification.feedbackType ? 'bg-purple-500/5 border-l-4 border-l-purple-500' : ''
                             }`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <p className="text-white text-sm font-medium">{notification.title}</p>
                                 <p className="text-slate-300 text-xs mt-1">{notification.message}</p>
+                                {/* Enhanced details for feedback and activity notifications */}
+                                {(notification.type === 'feedback' || notification.feedbackType || notification.clientName || notification.propertyAddress) && (
+                                  <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-600/30">
+                                    {notification.clientName && (
+                                      <p className="text-slate-200 text-xs font-medium">
+                                        Client: {notification.clientName}
+                                      </p>
+                                    )}
+                                    {notification.propertyAddress && (
+                                      <p className="text-slate-400 text-xs mt-1">
+                                        Property: {notification.propertyAddress}
+                                      </p>
+                                    )}
+                                    {notification.feedbackType && (
+                                      <p className="text-purple-300 text-xs mt-1 font-medium">
+                                        Feedback: {notification.feedbackType.charAt(0).toUpperCase() + notification.feedbackType.slice(1)}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                                 <p className="text-slate-500 text-xs mt-1">
                                   {new Date(notification.timestamp).toLocaleString()}
                                 </p>
@@ -768,7 +924,6 @@ const testProfileAPI = async () => {
     }}
     agentName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
     onSendEmail={handleSendTimelineEmail}
-    initialTemplate={userPreferences?.emailTemplateStyle || 'modern'}
     emailState={emailState}
   />
 )}
@@ -1071,6 +1226,7 @@ const testProfileAPI = async () => {
           </motion.button>
         </div>
       )}
+      
 
      <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6">
   <motion.div

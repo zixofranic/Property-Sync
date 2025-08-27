@@ -73,6 +73,7 @@ export function SettingsModal({
   const [logoLoading, setLogoLoading] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [logoTimestamp, setLogoTimestamp] = useState(0);
+  const [currentLogoUrl, setCurrentLogoUrl] = useState('');
 
   const tabs = [
     { id: 'branding', label: 'Branding', icon: Palette },
@@ -98,46 +99,114 @@ export function SettingsModal({
   };
 
   const handleLogoChange = (url: string) => {
+    console.log('🇺🇾Settings: Logo URL changed to:', url);
     updatePreference(['logo'], url);
-    if (url.trim()) {
+    
+    // Only show loading state if URL is valid
+    if (url.trim() && isValidUrl(url)) {
       setLogoLoading(true);
       setLogoError(false);
+      setLogoTimestamp(Date.now()); // Force cache refresh
     } else {
       setLogoLoading(false);
-      setLogoError(false);
+      setLogoError(!url.trim() ? false : true); // Error only if URL is invalid
+      setLogoTimestamp(0);
+    }
+  };
+  
+  // Helper function to validate URL
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url) || url.includes('logo');
+    } catch {
+      return false;
     }
   };
 
   const handleLogoLoad = () => {
+    console.log('✅ Settings: Logo loaded successfully');
     setLogoLoading(false);
     setLogoError(false);
   };
 
   const handleLogoError = () => {
+    console.error('❌ Settings: Logo failed to load');
     setLogoLoading(false);
     setLogoError(true);
   };
 
-  // Reset logo states when preferences change
+  // Update logo URL state only when it actually changes
   useEffect(() => {
-    if (preferences.logo && preferences.logo.trim()) {
-      setLogoLoading(true);
-      setLogoError(false);
-      setLogoTimestamp(Date.now()); // Force image reload
-    } else {
+    const logoUrl = preferences.logo || '';
+    if (currentLogoUrl !== logoUrl) {
+      console.log('📝 Settings: Logo URL changed from', currentLogoUrl.substring(0, 30), 'to', logoUrl.substring(0, 30));
+      setCurrentLogoUrl(logoUrl);
+    }
+  }, [preferences.logo, currentLogoUrl]);
+
+  // Smart logo loading management - only when stable logo URL changes
+  useEffect(() => {
+    if (!currentLogoUrl.trim()) {
+      console.log('🗑️ Settings: No logo URL, resetting states');
       setLogoLoading(false);
       setLogoError(false);
       setLogoTimestamp(0);
+      return;
     }
-  }, [preferences.logo]);
+    
+    // Check if URL is valid before setting loading state
+    if (!isValidUrl(currentLogoUrl)) {
+      console.log('❌ Settings: Invalid logo URL, showing error');
+      setLogoLoading(false);
+      setLogoError(true);
+      setLogoTimestamp(0);
+      return;
+    }
+    
+    // Trigger loading for new URL
+    console.log('🔄 Settings: Processing logo URL:', currentLogoUrl.substring(0, 50));
+    setLogoLoading(true);
+    setLogoError(false);
+    setLogoTimestamp(Date.now());
+    
+    // Failsafe: If image doesn't load within 10 seconds, reset loading state
+    const failsafeTimeout = setTimeout(() => {
+      console.log('⏰ Settings: Logo loading timeout, resetting...');
+      setLogoLoading(false);
+      setLogoError(true);
+    }, 10000);
+    
+    return () => clearTimeout(failsafeTimeout);
+  }, [currentLogoUrl]);
+  
+  // Reset loading state when modal opens (only if truly stuck)
+  useEffect(() => {
+    if (isOpen && currentLogoUrl && isValidUrl(currentLogoUrl)) {
+      console.log('🔓 Settings: Modal opened, checking logo state');
+      
+      // Only reset if loading has been stuck for more than 3 seconds
+      if (logoLoading) {
+        const checkTimeout = setTimeout(() => {
+          if (logoLoading) { // Still loading after 3 seconds
+            console.log('🔄 Settings: Logo stuck loading for 3s, resetting...');
+            setLogoLoading(false);
+            setLogoError(false);
+          }
+        }, 3000);
+        
+        return () => clearTimeout(checkTimeout);
+      }
+    }
+  }, [isOpen]);
 
   // Create cache-busting URL for logo
   const getLogoUrl = () => {
-    if (!preferences.logo || !preferences.logo.trim()) return '';
-    if (logoTimestamp === 0) return preferences.logo;
+    if (!currentLogoUrl || !currentLogoUrl.trim()) return '';
+    if (logoTimestamp === 0) return currentLogoUrl;
     
-    const separator = preferences.logo.includes('?') ? '&' : '?';
-    return `${preferences.logo}${separator}_t=${logoTimestamp}`;
+    const separator = currentLogoUrl.includes('?') ? '&' : '?';
+    return `${currentLogoUrl}${separator}_t=${logoTimestamp}`;
   };
 
   const handleSave = async () => {
@@ -168,11 +237,8 @@ export function SettingsModal({
                     onChange={handleLogoChange}
                     placeholder="https://yourcompany.com/logo.png"
                     label="Company Logo URL"
-                    preview={true}
+                    preview={false}
                   />
-                  <p className="text-xs text-slate-400 mt-2">
-                    Enter a URL to your company logo. Recommended: Square format, 200x200px or larger.
-                  </p>
                 </div>
 
                 {/* Brand Color */}
@@ -245,46 +311,148 @@ export function SettingsModal({
               </div>
             </div>
 
-            {/* Brand Preview */}
+            {/* Email Template Preview */}
             <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-              <h4 className="font-medium text-white mb-3">Brand Preview</h4>
-              <div className="bg-white rounded-lg p-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  {preferences.logo && (
-                    <div className="h-12 flex items-center">
-                      {logoLoading ? (
-                        <div className="w-8 h-8 flex items-center justify-center">
-                          <Loader className="w-4 h-4 text-gray-400 animate-spin" />
+              <h4 className="font-medium text-white mb-3">Email Template Preview</h4>
+              
+              {preferences.emailTemplateStyle === 'modern' ? (
+                // Modern Template Preview
+                <div className="bg-white rounded-lg overflow-hidden shadow-lg">
+                  {/* Modern Header */}
+                  <div 
+                    className="px-6 py-6 text-center"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${preferences.brandColor} 0%, #8b5cf6 100%)` 
+                    }}
+                  >
+                    <div className="flex items-center justify-center space-x-4 mb-4">
+                      {currentLogoUrl && !logoError && (
+                        <div className="relative">
+                          {logoLoading && (
+                            <div className="w-16 h-16 flex items-center justify-center">
+                              <Loader className="w-4 h-4 text-white/60 animate-spin" />
+                            </div>
+                          )}
+                          <img 
+                            key={`modern-preview-${currentLogoUrl}-${logoTimestamp}`}
+                            src={getLogoUrl()} 
+                            alt="Logo" 
+                            className={`h-16 w-auto object-contain transition-opacity duration-200 ${logoLoading ? 'opacity-0 absolute' : 'opacity-100'}`}
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                            onLoad={() => {
+                              console.log('✅ Modern Preview: Logo loaded successfully');
+                              handleLogoLoad();
+                            }}
+                            onError={() => {
+                              console.error('❌ Modern Preview: Logo failed to load');
+                              handleLogoError();
+                            }}
+                          />
                         </div>
-                      ) : logoError ? (
-                        <div className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded border">
-                          <ImageIcon className="w-4 h-4 text-gray-400" />
-                        </div>
-                      ) : (
-                        <img 
-                          key={`${preferences.logo}-${logoTimestamp}`} 
-                          src={getLogoUrl()} 
-                          alt="Logo" 
-                          className="h-12 w-auto object-contain"
-                          onLoad={handleLogoLoad}
-                          onError={handleLogoError}
-                        />
                       )}
                     </div>
-                  )}
-                  <div className="text-gray-800">
-                    <div className="font-semibold">{user.firstName} {user.lastName}</div>
-                    <div className="text-sm text-gray-600">Realtor</div>
+                    <h1 className="text-white text-xl font-bold mb-1">5 Properties Selected For You</h1>
+                    <p className="text-white/90 text-sm">Curated by {user.firstName} {user.lastName}</p>
+                  </div>
+                  
+                  {/* Modern Content */}
+                  <div className="p-6">
+                    <h2 className="text-gray-900 text-lg font-semibold mb-3">Hi Sarah! 👋</h2>
+                    <p className="text-gray-700 text-sm mb-4 leading-relaxed">
+                      I've personally selected <span style={{ color: preferences.brandColor }} className="font-semibold">5 exceptional properties</span> that perfectly match your criteria.
+                    </p>
+                    
+                    {/* Property count highlight */}
+                    <div 
+                      className="rounded-lg p-4 mb-4 text-center"
+                      style={{ 
+                        background: `linear-gradient(135deg, ${preferences.brandColor}08 0%, #8b5cf608 100%)`,
+                        border: `2px solid ${preferences.brandColor}20`
+                      }}
+                    >
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-lg"
+                        style={{ backgroundColor: preferences.brandColor }}
+                      >
+                        5
+                      </div>
+                      <p className="text-gray-800 font-medium text-sm">Properties Ready for You</p>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 text-center">
+                      Modern • Clean Design • Bold Typography
+                    </div>
                   </div>
                 </div>
-                <div 
-                  className="h-1 rounded-full mb-3"
-                  style={{ backgroundColor: preferences.brandColor }}
-                />
-                <div className="text-sm text-gray-600">
-                  This is how your branding will appear in client emails and timelines.
+              ) : (
+                // Classical Template Preview  
+                <div className="bg-white rounded-lg overflow-hidden shadow-lg">
+                  {/* Classical Header */}
+                  <div className="bg-slate-700 px-6 py-6 text-center border-b-4 border-slate-500">
+                    {currentLogoUrl && !logoError && (
+                      <div className="flex justify-center mb-4">
+                        {logoLoading ? (
+                          <div className="w-16 h-16 flex items-center justify-center">
+                            <Loader className="w-4 h-4 text-white/60 animate-spin" />
+                          </div>
+                        ) : (
+                          <img 
+                            key={`classical-preview-${currentLogoUrl}-${logoTimestamp}`}
+                            src={getLogoUrl()} 
+                            alt="Logo" 
+                            className={`h-16 w-auto object-contain transition-opacity duration-200 ${logoLoading ? 'opacity-0' : 'opacity-100'}`}
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                            onLoad={() => {
+                              console.log('✅ Classical Preview: Logo loaded successfully');
+                              handleLogoLoad();
+                            }}
+                            onError={() => {
+                              console.error('❌ Classical Preview: Logo failed to load');
+                              handleLogoError();
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <h1 className="text-white text-xl font-bold mb-1 tracking-wide" style={{ fontFamily: 'Georgia, serif' }}>Property Timeline</h1>
+                    <p className="text-white/80 text-sm italic">Presented by {user.firstName} {user.lastName}</p>
+                  </div>
+                  
+                  {/* Classical Content */}
+                  <div className="p-6" style={{ fontFamily: 'Georgia, serif' }}>
+                    <div className="text-center mb-4">
+                      <h2 className="text-gray-900 text-lg font-bold mb-2">Dear Sarah,</h2>
+                      <div className="w-12 h-0.5 bg-slate-600 mx-auto"></div>
+                    </div>
+                    
+                    <p className="text-gray-700 text-sm mb-4 leading-relaxed text-justify" style={{ textIndent: '1.5rem' }}>
+                      It is my distinct pleasure to present to you a carefully curated selection of <strong>5 exceptional properties</strong> that have been thoughtfully chosen to align with your specific requirements.
+                    </p>
+                    
+                    {/* Classical CTA */}
+                    <div className="bg-gray-100 border-2 border-gray-300 p-4 text-center mb-4">
+                      <h3 className="text-gray-800 font-bold text-sm mb-2">Your Property Portfolio</h3>
+                      <div 
+                        className="inline-block px-6 py-2 border-2 text-white font-bold text-sm tracking-wide"
+                        style={{ 
+                          backgroundColor: '#34495e',
+                          borderColor: '#34495e'
+                        }}
+                      >
+                        VIEW TIMELINE
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 text-center italic">
+                      Classical • Traditional Layout • Professional Styling
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+              
+              <p className="text-xs text-slate-400 mt-3 text-center">
+                This preview shows how your branding will appear in client emails
+              </p>
             </div>
           </div>
         );

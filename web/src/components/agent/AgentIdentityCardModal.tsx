@@ -41,6 +41,17 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to preload image with proper cross-origin handling
+  const preloadImage = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+      img.src = src;
+    });
+  };
+
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
 
@@ -60,23 +71,34 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
 
     setIsDownloading(true);
     try {
-      // Wait a moment for any images to finish loading
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Preload the agent logo if it exists
+      if (agent.logo) {
+        try {
+          console.log('🖼️ Preloading agent logo for canvas:', agent.logo);
+          await preloadImage(agent.logo);
+          console.log('✅ Agent logo preloaded successfully');
+        } catch (error) {
+          console.warn('⚠️ Failed to preload agent logo:', error);
+        }
+      }
+
+      // Wait a bit more for any remaining renders
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: null,
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false, // Changed to false for better cross-origin handling
         width: 500,
         height: 550,
-        logging: false,
+        logging: true, // Enable logging to debug issues
+        foreignObjectRendering: false, // Disable for better compatibility
         ignoreElements: (element) => {
-          // Ignore elements that might cause issues
           return element.classList.contains('ignore-in-canvas');
         },
         onclone: async (clonedDoc) => {
-          // Fix any styling issues in the cloned document
+          console.log('🎨 Processing cloned document for canvas...');
           const clonedElement = clonedDoc.querySelector('[data-agent-card]');
           if (clonedElement) {
             // Ensure no text-decoration issues
@@ -93,15 +115,33 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
               }
             });
             
-            // Handle profile image
+            // Handle profile image more robustly
             const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
             if (profileImage && agent.logo) {
-              // Try to ensure the image is loaded for canvas
+              console.log('🖼️ Processing profile image in canvas...');
+              profileImage.crossOrigin = 'anonymous';
+              
               if (!profileImage.complete) {
+                console.log('⏳ Waiting for profile image to load...');
                 await new Promise((resolve) => {
-                  profileImage.onload = resolve;
-                  profileImage.onerror = resolve;
+                  const timeout = setTimeout(() => {
+                    console.warn('⚠️ Profile image load timeout');
+                    resolve(undefined);
+                  }, 3000);
+                  
+                  profileImage.onload = () => {
+                    clearTimeout(timeout);
+                    console.log('✅ Profile image loaded in canvas');
+                    resolve(profileImage);
+                  };
+                  profileImage.onerror = () => {
+                    clearTimeout(timeout);
+                    console.error('❌ Profile image failed to load in canvas');
+                    resolve(undefined);
+                  };
                 });
+              } else {
+                console.log('✅ Profile image already loaded');
               }
             }
           }
@@ -142,20 +182,32 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
     }
 
     try {
-      // Wait a moment for any images to finish loading
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Preload the agent logo if it exists
+      if (agent.logo) {
+        try {
+          console.log('🖼️ Preloading agent logo for share canvas:', agent.logo);
+          await preloadImage(agent.logo);
+          console.log('✅ Agent logo preloaded successfully for share');
+        } catch (error) {
+          console.warn('⚠️ Failed to preload agent logo for share:', error);
+        }
+      }
+
+      // Wait a bit more for any remaining renders
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: null,
         scale: 2,
         useCORS: true,
-        allowTaint: true,
-        logging: false,
+        allowTaint: false, // Changed to false for better cross-origin handling
+        logging: true, // Enable logging to debug issues
+        foreignObjectRendering: false, // Disable for better compatibility
         ignoreElements: (element) => {
           return element.classList.contains('ignore-in-canvas');
         },
         onclone: async (clonedDoc) => {
-          // Fix styling issues in the cloned document
+          console.log('🎨 Processing cloned document for share canvas...');
           const clonedElement = clonedDoc.querySelector('[data-agent-card]');
           if (clonedElement) {
             const textElements = clonedElement.querySelectorAll('*');
@@ -171,15 +223,33 @@ export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: A
               }
             });
             
-            // Handle profile image
+            // Handle profile image more robustly
             const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
             if (profileImage && agent.logo) {
-              // Try to ensure the image is loaded for canvas
+              console.log('🖼️ Processing profile image in share canvas...');
+              profileImage.crossOrigin = 'anonymous';
+              
               if (!profileImage.complete) {
+                console.log('⏳ Waiting for profile image to load in share...');
                 await new Promise((resolve) => {
-                  profileImage.onload = resolve;
-                  profileImage.onerror = resolve;
+                  const timeout = setTimeout(() => {
+                    console.warn('⚠️ Profile image load timeout in share');
+                    resolve(undefined);
+                  }, 3000);
+                  
+                  profileImage.onload = () => {
+                    clearTimeout(timeout);
+                    console.log('✅ Profile image loaded in share canvas');
+                    resolve(profileImage);
+                  };
+                  profileImage.onerror = () => {
+                    clearTimeout(timeout);
+                    console.error('❌ Profile image failed to load in share canvas');
+                    resolve(undefined);
+                  };
                 });
+              } else {
+                console.log('✅ Profile image already loaded in share');
               }
             }
           }

@@ -42,6 +42,8 @@ export function AgentCard({
   shareToken
 }: AgentCardProps) {
   const [showIdentityCard, setShowIdentityCard] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   const handleSmartContact = async (type: 'email' | 'phone' | 'website') => {
     // Track the agent interaction if shareToken is available
@@ -94,21 +96,38 @@ Thank you!`;
             <div className="flex items-center justify-between">
               {/* Agent Info Section */}
               <div className="flex items-center space-x-4">
-                {agent.logo ? (
-                  <img
-                    src={agent.logo}
-                    alt={agent.name}
-                    className="w-10 h-10 rounded-full object-cover border-2"
-                    style={{ borderColor: agent.brandColor }}
-                  />
-                ) : (
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor }}
-                  >
-                    <User className="w-5 h-5" />
-                  </div>
-                )}
+                <div className="relative w-10 h-10">
+                  {agent.logo && !imageError ? (
+                    <>
+                      {imageLoading && (
+                        <div 
+                          className="absolute inset-0 rounded-full flex items-center justify-center border-2"
+                          style={{ borderColor: agent.brandColor, backgroundColor: `${agent.brandColor}10` }}
+                        >
+                          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: agent.brandColor }}></div>
+                        </div>
+                      )}
+                      <img
+                        src={agent.logo}
+                        alt={agent.name}
+                        className={`w-10 h-10 rounded-full object-cover border-2 transition-opacity duration-200 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                        style={{ borderColor: agent.brandColor }}
+                        onLoad={() => setImageLoading(false)}
+                        onError={() => {
+                          setImageError(true);
+                          setImageLoading(false);
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center border-2"
+                      style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor, borderColor: agent.brandColor }}
+                    >
+                      <User className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
                 
                 <div className="hidden sm:block flex-1 min-w-0">
                   <div className="flex items-center space-x-2">

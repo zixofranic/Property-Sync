@@ -178,7 +178,7 @@ export function ImageUrlInput({
       {/* Drag & Drop Hint */}
       {!disabled && (
         <p className="text-xs text-slate-400">
-          💡 Tip: Drag an image from any website directly into the field above
+          Enter or drag a URL to your company logo. Recommended: Square format, 200x200px or larger.
         </p>
       )}
 
