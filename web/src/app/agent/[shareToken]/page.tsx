@@ -50,11 +50,15 @@ const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
   try {
     console.log('🌐 Making API call to:', `/api/v1/share/${shareToken}`);
     // Use the existing share endpoint which has all the agent data
-    const response = await apiClient.getTimelineData(shareToken);
+    const response = await apiClient.getPublicTimeline(shareToken);
     console.log('📡 API response:', response);
     
     if (response.data && response.data.agent) {
       const agent = response.data.agent;
+      console.log('🔍 Raw agent data from API:', agent);
+      console.log('📸 Avatar field value:', agent.avatar);
+      console.log('🏢 Logo field value:', agent.logo);
+      
       const agentData = {
         firstName: agent.firstName,
         lastName: agent.lastName,
@@ -71,6 +75,7 @@ const getAgentData = async (shareToken: string): Promise<AgentData | null> => {
         website: agent.website,
       };
       console.log('✅ Using real API data:', agentData);
+      console.log('📸 Final avatar value:', agentData.avatar);
       return agentData;
     }
   } catch (error) {
