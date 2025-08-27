@@ -82,7 +82,9 @@ export class ResendProvider {
 
     try {
       this.resend = new Resend(apiKey);
-      this.fromEmail = 'Property Sync <onboarding@resend.dev>';
+      this.fromEmail = this.isDevelopment 
+        ? 'Property Sync <onboarding@resend.dev>'
+        : 'Property Sync <noreply@property-sync.com>';
       this.logger.log('Resend client initialized successfully');
     } catch (error) {
       this.logger.error('Failed to initialize Resend client:', error);

@@ -422,7 +422,9 @@ export class EmailService {
   }> {
     try {
       const mailOptions = {
-        from: 'Acme <onboarding@resend.dev>', // this the production send email'"Property Sync" <noreply@propertysync.com>',
+        from: process.env.NODE_ENV === 'development' 
+          ? 'Property Sync <onboarding@resend.dev>'
+          : 'Property Sync <noreply@property-sync.com>',
         to: data.clientEmail,
         subject: `Your Property Timeline from ${data.agentName}`,
         html: this.generateTimelineEmailHtmlNodemailer(data),

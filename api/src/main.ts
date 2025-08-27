@@ -21,6 +21,8 @@ async function bootstrap() {
       'http://192.168.1.209:3002',
       'http://192.168.1.209:3004',
       'https://property-sync-mu.vercel.app',
+      'https://property-sync.com',
+      'https://www.property-sync.com',
       /https:\/\/.*\.vercel\.app$/,
       /https:\/\/.*\.up\.railway\.app$/,
     ],
