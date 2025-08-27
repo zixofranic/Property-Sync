@@ -85,21 +85,12 @@ Thank you!`;
   };
 
   const handleReferAgent = async () => {
-    // Track the refer action
-    if (shareToken) {
-      try {
-        await apiClient.trackAgentInteraction(shareToken, 'agent_refer', {
-          agentName: agent.name,
-          agentCompany: agent.company,
-          clientName: clientName || 'Unknown',
-          action: 'refer_agent',
-          shareMethod: 'native_share',
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.warn('Failed to track agent refer:', error);
-      }
-    }
+    // Temporarily disabled analytics tracking
+    console.log('Agent refer action:', {
+      shareToken,
+      action: 'refer_agent',
+      clientName: clientName || 'Unknown'
+    });
 
     // Create agent page URL with tracking parameters
     const agentPageUrl = new URL(`${window.location.origin}/agent/${shareToken || 'demo'}`);

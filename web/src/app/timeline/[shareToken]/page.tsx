@@ -108,9 +108,6 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [showNotificationDropdown, setShowNotificationDropdown] = useState<boolean>(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [clientMessages, setClientMessages] = useState<any[]>([]);
-  const [logoLoading, setLogoLoading] = useState<boolean>(false);
-  const [logoError, setLogoError] = useState<boolean>(false);
-  const [currentLogoUrl, setCurrentLogoUrl] = useState<string>('');
 
   // Helper function to manage dismissed notifications in localStorage
   const getDismissedNotifications = () => {
@@ -369,26 +366,6 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
     };
   }, [isAuthenticated, shareToken, sessionToken]);
   
-  // Smart logo loading management - reset loading state when logo URL changes
-  useEffect(() => {
-    if (timelineData?.agent?.logo) {
-      // If logo URL changed, reset loading states
-      if (currentLogoUrl !== timelineData.agent.logo) {
-        console.log('🔄 Logo URL changed, resetting loading states:', {
-          from: currentLogoUrl,
-          to: timelineData.agent.logo
-        });
-        setCurrentLogoUrl(timelineData.agent.logo);
-        setLogoLoading(true);
-        setLogoError(false);
-      }
-    } else {
-      // No logo URL, reset states
-      setLogoLoading(false);
-      setLogoError(false);
-      setCurrentLogoUrl('');
-    }
-  }, [timelineData?.agent?.logo, currentLogoUrl]);
 
   // Handle ESC key for MLS modal
   useEffect(() => {
@@ -775,52 +752,35 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Agent Company Logo with Smart Loading */}
-              <div className="relative flex-shrink-0">
-                {console.log('🏢 Agent Logo State:', { 
-                  hasLogo: !!timelineData.agent.logo, 
-                  logoUrl: timelineData.agent.logo?.substring(0, 50) + '...',
-                  currentLogoUrl: currentLogoUrl?.substring(0, 30) + '...',
-                  logoLoading, 
-                  logoError,
-                  urlChanged: currentLogoUrl !== timelineData.agent.logo
-                })}
+              {/* Agent Company Logo - SIMPLIFIED */}
+              <div className="flex-shrink-0 w-20 h-20">
+                {timelineData.agent.logo ? (
+                  <img
+                    src={timelineData.agent.logo}
+                    alt={timelineData.agent.company}
+                    className="w-full h-full object-contain rounded-lg"
+                    onError={(e) => {
+                      // Hide broken image and show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
                 
-                {timelineData.agent.logo && !logoError ? (
-                  <div className="relative w-20 h-20">
-                    {logoLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-slate-800 rounded-lg border border-slate-700 z-10">
-                        <div className="w-6 h-6 border-2 border-slate-600 border-t-blue-500 rounded-full animate-spin"></div>
-                      </div>
-                    )}
-                    <img
-                      key={timelineData.agent.logo} // Force re-render when URL changes
-                      src={timelineData.agent.logo}
-                      alt={timelineData.agent.company}
-                      className={`w-full h-full object-contain rounded-lg transition-opacity duration-300 ${logoLoading ? 'opacity-0' : 'opacity-100'}`}
-                      onLoad={() => {
-                        console.log('✅ Logo loaded successfully:', timelineData.agent.logo?.substring(0, 50));
-                        setLogoLoading(false);
-                      }}
-                      onError={(e) => {
-                        console.error('❌ Logo failed to load:', timelineData.agent.logo, e);
-                        setLogoError(true);
-                        setLogoLoading(false);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  // Fallback: Company name initials or building icon
-                  <div className="w-20 h-20 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
-                    {timelineData.agent.company ? (
-                      <div className="text-xs font-bold text-white text-center leading-tight px-1">
-                        {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
-                      </div>
-                    ) : (
-                      <Building className="w-8 h-8 text-slate-400" />
-                    )}
-                  </div>
-                )}
+                {/* Fallback - always rendered but hidden if logo loads */}
+                <div 
+                  className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600"
+                  style={{ display: timelineData.agent.logo ? 'none' : 'flex' }}
+                >
+                  {timelineData.agent.company ? (
+                    <div className="text-xs font-bold text-white text-center leading-tight px-1">
+                      {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
+                    </div>
+                  ) : (
+                    <Building className="w-8 h-8 text-slate-400" />
+                  )}
+                </div>
               </div>
               
               <div className="min-h-16 flex flex-col justify-center">
