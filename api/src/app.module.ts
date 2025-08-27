@@ -10,7 +10,8 @@ import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
 import { TimelinesModule } from './timelines/timelines.module';
 import { AnalyticsModule } from './analytics/analytics.module';
-import { ShareModule } from './share/share.module'; // Add this import
+import { ShareModule } from './share/share.module';
+import { AgentModule } from './agent/agent.module'; // Add this import
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { EmailModule } from './email/email.module';
 import { MLSParserModule } from './mls-parser/mls-parser.module';
@@ -27,6 +28,7 @@ import { MLSParserModule } from './mls-parser/mls-parser.module';
     TimelinesModule,
     AnalyticsModule,
     ShareModule,
+    AgentModule,
     EmailModule,
     MLSParserModule,
   ],

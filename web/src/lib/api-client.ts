@@ -920,6 +920,11 @@ async updateEmailPreferences(preferences: {
     return this.request(url, {}, true); // Skip auth for public
   }
 
+  // Get public agent profile by shareToken
+  async getPublicAgentProfile(shareToken: string): Promise<ApiResponse<UserProfile>> {
+    return this.request(`/api/v1/agent/${shareToken}`, {}, true); // Skip auth for public
+  }
+
   async authenticateClientAccess(shareToken: string, clientName: string, phoneLastFour: string): Promise<ApiResponse<{
     sessionToken: string;
     clientName: string;

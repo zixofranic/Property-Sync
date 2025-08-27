@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  X, Download, Share2, Copy, Phone, Mail, MapPin, Globe, 
+  X, Share2, Copy, Phone, Mail, MapPin, Globe, 
   Award, Star, Calendar, Building2, User, CheckCircle,
   Sparkles, Heart
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { apiClient } from '@/lib/api-client';
 
 interface AgentData {
@@ -37,288 +36,77 @@ interface AgentIdentityCardModalProps {
 }
 
 export function AgentIdentityCardModal({ agent, isOpen, onClose, shareToken }: AgentIdentityCardModalProps) {
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to preload image with proper cross-origin handling
-  const preloadImage = (src: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-      img.src = src;
-    });
-  };
-
-  const handleDownloadCard = async () => {
-    if (!cardRef.current) return;
-
-    // Track the download action
-    if (shareToken) {
-      try {
-        await apiClient.trackAgentInteraction(shareToken, 'agent_card_download', {
-          agentName: agent.name,
-          agentCompany: agent.company,
-          action: 'download_agent_card',
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.warn('Failed to track agent card download:', error);
-      }
-    }
-
-    setIsDownloading(true);
-    try {
-      // Preload the agent logo if it exists
-      if (agent.logo) {
-        try {
-          console.log('🖼️ Preloading agent logo for canvas:', agent.logo);
-          await preloadImage(agent.logo);
-          console.log('✅ Agent logo preloaded successfully');
-        } catch (error) {
-          console.warn('⚠️ Failed to preload agent logo:', error);
-        }
-      }
-
-      // Wait a bit more for any remaining renders
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        allowTaint: false, // Changed to false for better cross-origin handling
-        width: 500,
-        height: 550,
-        logging: true, // Enable logging to debug issues
-        foreignObjectRendering: false, // Disable for better compatibility
-        ignoreElements: (element) => {
-          return element.classList.contains('ignore-in-canvas');
-        },
-        onclone: async (clonedDoc) => {
-          console.log('🎨 Processing cloned document for canvas...');
-          const clonedElement = clonedDoc.querySelector('[data-agent-card]');
-          if (clonedElement) {
-            // Ensure no text-decoration issues
-            const textElements = clonedElement.querySelectorAll('*');
-            textElements.forEach((el) => {
-              const style = (el as HTMLElement).style;
-              if (style.textDecoration && style.textDecoration.includes('line-through')) {
-                style.textDecoration = 'none';
-              }
-              // Force remove any computed strikethrough
-              const computedStyle = window.getComputedStyle(el as Element);
-              if (computedStyle.textDecoration.includes('line-through')) {
-                style.textDecoration = 'none !important';
-              }
-            });
-            
-            // Handle profile image more robustly
-            const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
-            if (profileImage && agent.logo) {
-              console.log('🖼️ Processing profile image in canvas...');
-              profileImage.crossOrigin = 'anonymous';
-              
-              if (!profileImage.complete) {
-                console.log('⏳ Waiting for profile image to load...');
-                await new Promise((resolve) => {
-                  const timeout = setTimeout(() => {
-                    console.warn('⚠️ Profile image load timeout');
-                    resolve(undefined);
-                  }, 3000);
-                  
-                  profileImage.onload = () => {
-                    clearTimeout(timeout);
-                    console.log('✅ Profile image loaded in canvas');
-                    resolve(profileImage);
-                  };
-                  profileImage.onerror = () => {
-                    clearTimeout(timeout);
-                    console.error('❌ Profile image failed to load in canvas');
-                    resolve(undefined);
-                  };
-                });
-              } else {
-                console.log('✅ Profile image already loaded');
-              }
-            }
-          }
-        }
+  // Debug agent data when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      console.log('🔍 Agent Identity Modal Debug:', {
+        agentName: agent.name,
+        agentLogo: agent.logo,
+        hasLogo: !!agent.logo,
+        logoLength: agent.logo?.length || 0,
+        brandColor: agent.brandColor,
+        shareToken: shareToken
       });
-
-      // Create download link
-      const link = document.createElement('a');
-      link.download = `${agent.name.replace(/\s+/g, '_')}_Agent_Card.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 2000);
-    } catch (error) {
-      console.error('Failed to download card:', error);
-    } finally {
-      setIsDownloading(false);
     }
-  };
+  }, [isOpen, agent, shareToken]);
+
+
+
 
   const handleShareCard = async () => {
-    if (!cardRef.current) return;
-
     // Track the share action
     if (shareToken) {
       try {
-        await apiClient.trackAgentInteraction(shareToken, 'agent_card_share', {
-          agentName: agent.name,
+        await apiClient.trackAgentInteraction(shareToken, 'agent_url_share', {
+          agentName: `${agent.firstName} ${agent.lastName}`,
           agentCompany: agent.company,
-          action: 'share_agent_card',
+          action: 'share_agent_url',
           shareMethod: 'native_share',
           timestamp: new Date().toISOString()
         });
       } catch (error) {
-        console.warn('Failed to track agent card share:', error);
+        console.warn('Failed to track agent URL share:', error);
       }
     }
+
+    const agentPageUrl = `${window.location.origin}/agent/${shareToken || 'demo'}`;
+    
+    // Client-perspective referral message
+    const clientReferralText = `Just had to share! 🏠✨ My real estate agent ${agent.firstName} ${agent.lastName} from ${agent.company} has been absolutely incredible helping me through my property journey. ${agent.yearsExperience ? `With ${agent.yearsExperience} years of experience` : 'Professional service'}, they truly know the market inside and out!
+
+If you're looking to buy or sell, I can't recommend them enough! 👏
+
+Check out their profile: ${agentPageUrl}
+
+#RealEstate #PropertyJourney #RecommendedAgent #RealEstateExcellence`;
 
     try {
-      // Preload the agent logo if it exists
-      if (agent.logo) {
-        try {
-          console.log('🖼️ Preloading agent logo for share canvas:', agent.logo);
-          await preloadImage(agent.logo);
-          console.log('✅ Agent logo preloaded successfully for share');
-        } catch (error) {
-          console.warn('⚠️ Failed to preload agent logo for share:', error);
-        }
-      }
-
-      // Wait a bit more for any remaining renders
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        allowTaint: false, // Changed to false for better cross-origin handling
-        logging: true, // Enable logging to debug issues
-        foreignObjectRendering: false, // Disable for better compatibility
-        ignoreElements: (element) => {
-          return element.classList.contains('ignore-in-canvas');
-        },
-        onclone: async (clonedDoc) => {
-          console.log('🎨 Processing cloned document for share canvas...');
-          const clonedElement = clonedDoc.querySelector('[data-agent-card]');
-          if (clonedElement) {
-            const textElements = clonedElement.querySelectorAll('*');
-            textElements.forEach((el) => {
-              const style = (el as HTMLElement).style;
-              if (style.textDecoration && style.textDecoration.includes('line-through')) {
-                style.textDecoration = 'none';
-              }
-              // Force remove any computed strikethrough
-              const computedStyle = window.getComputedStyle(el as Element);
-              if (computedStyle.textDecoration.includes('line-through')) {
-                style.textDecoration = 'none !important';
-              }
-            });
-            
-            // Handle profile image more robustly
-            const profileImage = clonedElement.querySelector('img[alt="' + agent.name + '"]') as HTMLImageElement;
-            if (profileImage && agent.logo) {
-              console.log('🖼️ Processing profile image in share canvas...');
-              profileImage.crossOrigin = 'anonymous';
-              
-              if (!profileImage.complete) {
-                console.log('⏳ Waiting for profile image to load in share...');
-                await new Promise((resolve) => {
-                  const timeout = setTimeout(() => {
-                    console.warn('⚠️ Profile image load timeout in share');
-                    resolve(undefined);
-                  }, 3000);
-                  
-                  profileImage.onload = () => {
-                    clearTimeout(timeout);
-                    console.log('✅ Profile image loaded in share canvas');
-                    resolve(profileImage);
-                  };
-                  profileImage.onerror = () => {
-                    clearTimeout(timeout);
-                    console.error('❌ Profile image failed to load in share canvas');
-                    resolve(undefined);
-                  };
-                });
-              } else {
-                console.log('✅ Profile image already loaded in share');
-              }
-            }
-          }
-        }
-      });
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-
-        if (navigator.share) {
-          try {
-            const file = new File([blob], `${agent.name}_Agent_Card.png`, { type: 'image/png' });
-            await navigator.share({
-              title: `${agent.name} - Your Trusted Real Estate Agent`,
-              text: `I'd love to introduce you to my amazing real estate agent, ${agent.name} from ${agent.company}. They've been incredible in helping me with my home buying journey!`,
-              files: [file],
-            });
-          } catch (shareError) {
-            // Fallback to copy link
-            handleCopyShareText();
-          }
-        } else {
-          handleCopyShareText();
-        }
-      }, 'image/png');
-    } catch (error) {
-      console.error('Failed to share card:', error);
-      handleCopyShareText();
-    }
-  };
-
-  const handleCopyShareText = async () => {
-    // Track the copy action
-    if (shareToken) {
-      try {
-        await apiClient.trackAgentInteraction(shareToken, 'agent_info_copy', {
-          agentName: agent.name,
-          agentCompany: agent.company,
-          action: 'copy_agent_info',
-          shareMethod: 'copy_text',
-          timestamp: new Date().toISOString()
+      if (navigator.share) {
+        await navigator.share({
+          title: `${agent.firstName} ${agent.lastName} - Your Trusted Real Estate Agent`,
+          text: clientReferralText,
+          url: agentPageUrl,
         });
-      } catch (error) {
-        console.warn('Failed to track agent info copy:', error);
+      } else {
+        // Fallback to copy URL
+        await navigator.clipboard.writeText(agentPageUrl);
+        alert('Agent profile URL copied to clipboard! You can share it anywhere.');
+      }
+    } catch (error) {
+      console.error('Failed to share:', error);
+      // Final fallback - copy URL
+      try {
+        await navigator.clipboard.writeText(agentPageUrl);
+        alert('Agent profile URL copied to clipboard! You can share it anywhere.');
+      } catch (clipboardError) {
+        console.error('Failed to copy to clipboard:', clipboardError);
       }
     }
-
-    const shareText = `🏠 Meet ${agent.name} - An amazing real estate agent!
-
-${agent.company} • REALTOR®
-${agent.yearsExperience ? `${agent.yearsExperience} years of experience` : 'Experienced professional'}
-
-📧 ${agent.email}
-${agent.phone ? `📱 ${agent.phone}` : ''}
-${agent.website ? `🌐 ${agent.website}` : ''}
-
-${agent.bio || `${agent.name} is a dedicated real estate professional committed to helping clients find their perfect home.`}
-
-Highly recommend reaching out if you're looking to buy or sell!
-
-#RealEstate #YourTrustedAgent #PropertySync`;
-
-    try {
-      await navigator.clipboard.writeText(shareText);
-      alert('Agent information copied to clipboard! You can now paste and share it anywhere.');
-    } catch (error) {
-      console.error('Failed to copy text:', error);
-    }
   };
+
+
 
 
   return (
@@ -360,60 +148,11 @@ Highly recommend reaching out if you're looking to buy or sell!
               </div>
 
               <div className="flex flex-col items-center space-y-8">
-                {/* Action Buttons - Now above card in one row */}
-                <div className="w-full max-w-[600px] flex flex-col sm:flex-row gap-4 justify-center">
-                  <motion.button
-                    onClick={handleDownloadCard}
-                    disabled={isDownloading}
-                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-800 disabled:to-blue-900 text-white rounded-xl transition-all duration-200 shadow-lg"
-                    whileHover={{ scale: isDownloading ? 1 : 1.02 }}
-                    whileTap={{ scale: isDownloading ? 1 : 0.98 }}
-                  >
-                    {downloadSuccess ? (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="hidden sm:inline">Downloaded!</span>
-                        <span className="sm:hidden">✓</span>
-                      </>
-                    ) : isDownloading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span className="hidden sm:inline">Creating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-5 h-5" />
-                        <span className="hidden sm:inline">Download</span>
-                      </>
-                    )}
-                  </motion.button>
-
-                  <motion.button
-                    onClick={handleShareCard}
-                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Share2 className="w-5 h-5" />
-                    <span className="hidden sm:inline">Share</span>
-                  </motion.button>
-
-                  <motion.button
-                    onClick={handleCopyShareText}
-                    className="flex-1 flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl transition-all duration-200 shadow-lg border border-slate-600"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Copy className="w-5 h-5" />
-                    <span className="hidden sm:inline">Copy</span>
-                  </motion.button>
-                </div>
 
                 {/* Agent Identity Card */}
                 <div className="flex justify-center">
                   <div
                     ref={cardRef}
-                    data-agent-card="true"
                     className="w-full max-w-[500px] min-h-[550px] bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-3xl shadow-2xl p-4 sm:p-6 relative overflow-hidden"
                     style={{ fontFamily: 'Arial, sans-serif' }}
                   >
@@ -443,17 +182,9 @@ Highly recommend reaching out if you're looking to buy or sell!
                           <img
                             src={agent.logo}
                             alt={agent.name}
-                            crossOrigin="anonymous"
                             className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover mx-auto mb-6 border-4 shadow-xl"
                             style={{ borderColor: agent.brandColor }}
-                            onLoad={(e) => {
-                              // Ensure the image is ready for canvas rendering
-                              (e.target as HTMLImageElement).setAttribute('data-loaded', 'true');
-                            }}
-                            onError={(e) => {
-                              console.error('Agent profile image failed to load:', agent.logo);
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
+                            crossOrigin="anonymous"
                           />
                         ) : (
                           <div 
@@ -490,7 +221,6 @@ Highly recommend reaching out if you're looking to buy or sell!
                         </div>
                       </div>
 
-
                       {/* Contact Information */}
                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-lg">
                         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
@@ -500,12 +230,12 @@ Highly recommend reaching out if you're looking to buy or sell!
                         <div className="space-y-3">
                           <div className="flex items-center space-x-3">
                             <Mail className="w-4 h-4 text-slate-600" />
-                            <span className="text-slate-700 font-medium" style={{ textDecoration: 'none' }}>{agent.email}</span>
+                            <span className="text-slate-700 font-medium">{agent.email}</span>
                           </div>
                           {agent.phone && (
                             <div className="flex items-center space-x-3">
                               <Phone className="w-4 h-4 text-slate-600" />
-                              <span className="text-slate-700 font-medium" style={{ textDecoration: 'none' }}>{agent.phone}</span>
+                              <span className="text-slate-700 font-medium">{agent.phone}</span>
                             </div>
                           )}
                           {agent.website && (
@@ -522,7 +252,6 @@ Highly recommend reaching out if you're looking to buy or sell!
                           )}
                         </div>
                       </div>
-
 
                       {/* Bio */}
                       {agent.bio && (

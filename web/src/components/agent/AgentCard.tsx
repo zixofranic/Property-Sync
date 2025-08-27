@@ -32,6 +32,7 @@ interface AgentCardProps {
   variant?: 'dashboard' | 'email';
   className?: string;
   shareToken?: string;
+  clientName?: string;
 }
 
 export function AgentCard({ 
@@ -39,7 +40,8 @@ export function AgentCard({
   isSticky = false, 
   variant = 'dashboard',
   className = '',
-  shareToken
+  shareToken,
+  clientName
 }: AgentCardProps) {
   const [showIdentityCard, setShowIdentityCard] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
@@ -79,6 +81,67 @@ Thank you!`;
       window.location.href = `tel:${agent.phone}`;
     } else if (type === 'website' && agent.website) {
       window.open(agent.website, '_blank');
+    }
+  };
+
+  const handleReferAgent = async () => {
+    // Track the refer action
+    if (shareToken) {
+      try {
+        await apiClient.trackAgentInteraction(shareToken, 'agent_refer', {
+          agentName: agent.name,
+          agentCompany: agent.company,
+          clientName: clientName || 'Unknown',
+          action: 'refer_agent',
+          shareMethod: 'native_share',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to track agent refer:', error);
+      }
+    }
+
+    // Create agent page URL with tracking parameters
+    const agentPageUrl = new URL(`${window.location.origin}/agent/${shareToken || 'demo'}`);
+    agentPageUrl.searchParams.set('ref', 'client_referral');
+    agentPageUrl.searchParams.set('agent', agent.name);
+    if (clientName) {
+      agentPageUrl.searchParams.set('client', clientName);
+    }
+    if (shareToken) {
+      agentPageUrl.searchParams.set('token', shareToken);
+    }
+
+    // Client-perspective referral message
+    const clientReferralText = `Just had to share! 🏠✨ My real estate agent ${agent.name} from ${agent.company} has been absolutely incredible helping me through my property journey. ${agent.yearsExperience ? `With ${agent.yearsExperience} years of experience` : 'Professional service'}, they truly know the market inside and out!
+
+If you're looking to buy or sell, I can't recommend them enough! 👏
+
+Check out their profile: ${agentPageUrl.toString()}
+
+#RealEstate #PropertyJourney #RecommendedAgent #RealEstateExcellence`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${agent.name} - Your Trusted Real Estate Agent`,
+          text: clientReferralText,
+          url: agentPageUrl.toString(),
+        });
+      } else {
+        // Fallback to copy URL
+        await navigator.clipboard.writeText(agentPageUrl.toString());
+        alert('Agent profile URL copied to clipboard! You can share it anywhere.');
+      }
+    } catch (error) {
+      console.error('Failed to share:', error);
+      // Final fallback - copy URL
+      try {
+        await navigator.clipboard.writeText(agentPageUrl.toString());
+        alert('Agent profile URL copied to clipboard! You can share it anywhere.');
+      } catch (clipboardError) {
+        console.error('Failed to copy to clipboard:', clipboardError);
+      }
     }
   };
 
@@ -188,16 +251,16 @@ Thank you!`;
                   </motion.button>
                 )}
 
-                {/* Share Agent Button */}
+                {/* Refer Agent Button */}
                 <motion.button
-                  onClick={() => setShowIdentityCard(true)}
+                  onClick={() => handleReferAgent()}
                   className="flex items-center space-x-1 px-2 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg transition-all duration-200"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <Share2 className="w-3 h-3" />
-                  <span className="hidden lg:inline">Share Agent</span>
-                  <span className="lg:hidden">Share</span>
+                  <span className="hidden lg:inline">Refer Agent</span>
+                  <span className="lg:hidden">Refer</span>
                 </motion.button>
               </div>
             </div>
@@ -206,12 +269,6 @@ Thank you!`;
           </div>
         </motion.div>
 
-        {/* Agent Identity Card Modal */}
-        <AgentIdentityCardModal
-          agent={agent}
-          isOpen={showIdentityCard}
-          onClose={() => setShowIdentityCard(false)}
-        />
       </>
     );
   }

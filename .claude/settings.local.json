@@ -36,7 +36,9 @@
       "Bash(grep:*)",
       "Bash(git log:*)",
       "Bash(git stash:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:localhost)",
+      "Read(/C:\\Users\\ziadf\\Documents\\Projects/**)"
     ],
     "deny": [],
     "ask": [],
