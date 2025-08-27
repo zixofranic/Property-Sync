@@ -123,13 +123,16 @@ export interface Timeline {
 // Notification Interface
 export interface Notification {
   id: string;
-  type: 'success' | 'error' | 'warning' | 'info' | 'activity';
+  type: 'success' | 'error' | 'warning' | 'info' | 'activity' | 'feedback';
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
   clientId?: string; // For client activity notifications
+  clientName?: string; // Direct client name for easy access
   propertyId?: string; // For property-specific notifications
+  propertyAddress?: string; // Direct property address for easy access
+  feedbackType?: 'love' | 'like' | 'dislike'; // Direct feedback type
   metadata?: {
     eventType?: 'timeline_view' | 'property_view' | 'feedback_submit' | 'email_open' | 'client_login';
     clientName?: string;
@@ -263,6 +266,11 @@ interface MissionControlActions extends EmailActions {
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
   
+  // Helper functions for notifications
+  getUnreadNotificationsForClient: (clientId: string) => Notification[];
+  hasUnreadFeedbackNotifications: (clientId?: string) => boolean;
+  createFeedbackNotification: (clientId: string, clientName: string, propertyId: string, propertyAddress: string, feedbackType: 'love' | 'like' | 'dislike') => void;
+  
   // Activity Polling Actions
   startActivityPolling: () => void;
   stopActivityPolling: () => void;
@@ -372,6 +380,8 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         // Initial Notifications State
         notifications: [],
+        processedActivityIds: new Set(), // Track processed activities to prevent duplicates
+        lastTimelineViewNotifications: new Map(), // Track last timeline view notification per client
 
         // Initial Activity Polling State
         lastActivityCheck: null,
@@ -483,6 +493,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             activeTimeline: null,
             analytics: null,
             notifications: [],
+            processedActivityIds: new Set(), // Track processed activities
             lastActivityCheck: null,
             activityPollingInterval: null,
             selectedView: 'clients',
@@ -975,10 +986,62 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           
           if (!preferences) return;
 
+          // Track processed activities to prevent duplicates
+          const processedActivityIds = state.processedActivityIds || new Set();
+          
           activities.forEach((activity) => {
+            // Create unique activity identifier
+            const activityId = `${activity.id || activity.eventType}-${activity.timestamp || Date.now()}-${activity.timeline?.clientId || 'unknown'}`;
+            
+            // Skip if already processed
+            if (processedActivityIds.has(activityId)) {
+              return;
+            }
+            
+            // Smart throttling for timeline_view events (prevent spam)
+            if (activity.eventType === 'timeline_view') {
+              const clientId = activity.timeline?.clientId || activity.clientId;
+              const now = Date.now();
+              const THROTTLE_WINDOW = 10 * 60 * 1000; // 10 minutes
+              
+              // Get last notification time for this client
+              const lastNotificationMap = get().lastTimelineViewNotifications || new Map();
+              const lastNotificationTime = lastNotificationMap.get(clientId) || 0;
+              
+              // If we sent a timeline view notification for this client within the throttle window, skip
+              if (now - lastNotificationTime < THROTTLE_WINDOW) {
+                console.log(`⏰ Throttling timeline view notification for client ${clientId} (last sent ${Math.round((now - lastNotificationTime) / 1000 / 60)} min ago)`);
+                processedActivityIds.add(activityId);
+                return;
+              }
+              
+              // Also check for unread notifications as backup
+              const recentNotifications = get().notifications.filter(n => 
+                n.type === 'activity' && 
+                n.clientId === clientId && 
+                n.metadata?.eventType === 'timeline_view' && 
+                !n.read
+              );
+              
+              if (recentNotifications.length > 0) {
+                console.log(`⏭️ Skipping duplicate unread timeline view notification for client ${clientId}`);
+                processedActivityIds.add(activityId);
+                return;
+              }
+              
+              // Update the last notification time for this client
+              lastNotificationMap.set(clientId, now);
+              set({ lastTimelineViewNotifications: lastNotificationMap });
+            }
+            
+            // Extract client information from activity
             const clientName = activity.timeline?.client?.firstName && activity.timeline?.client?.lastName 
               ? `${activity.timeline.client.firstName} ${activity.timeline.client.lastName}` 
-              : 'Client';
+              : activity.timeline?.client?.name || activity.clientName || 'Client';
+            
+            const clientId = activity.timeline?.clientId || activity.clientId;
+            const propertyId = activity.propertyId;
+            const propertyAddress = activity.property?.address || activity.metadata?.propertyAddress || activity.propertyAddress;
             
             let notification: Omit<Notification, 'id' | 'timestamp'> | null = null;
 
@@ -990,10 +1053,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                     title: '👁️ Client Timeline View',
                     message: `${clientName} just viewed their timeline`,
                     read: false,
-                    clientId: activity.timeline?.clientId,
+                    clientId,
+                    clientName,
                     metadata: {
                       eventType: 'timeline_view',
                       clientName,
+                      activityId, // Add for deduplication
                     }
                   };
                 }
@@ -1001,18 +1066,21 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
               case 'property_view':
                 if (preferences.notificationClientViews) {
-                  const propertyInfo = activity.metadata?.propertyAddress || 'a property';
+                  const propertyInfo = propertyAddress || 'a property';
                   notification = {
                     type: 'activity',
                     title: '🏠 Property View',
                     message: `${clientName} viewed ${propertyInfo}`,
                     read: false,
-                    clientId: activity.timeline?.clientId,
-                    propertyId: activity.propertyId,
+                    clientId,
+                    clientName,
+                    propertyId,
+                    propertyAddress: propertyInfo,
                     metadata: {
                       eventType: 'property_view',
                       clientName,
                       propertyAddress: propertyInfo,
+                      activityId, // Add for deduplication
                     }
                   };
                 }
@@ -1020,19 +1088,33 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
               case 'feedback_submit':
                 if (preferences.notificationFeedback) {
-                  const feedbackType = activity.metadata?.feedbackType || 'feedback';
+                  // Map backend feedback types to frontend types
+                  const backendType = activity.metadata?.feedbackType || activity.feedbackType || activity.type;
+                  let feedbackType: 'love' | 'like' | 'dislike' = 'like';
+                  
+                  if (backendType === 'LOVE_IT' || backendType === 'love') feedbackType = 'love';
+                  else if (backendType === 'DISLIKE_IT' || backendType === 'dislike') feedbackType = 'dislike';
+                  else if (backendType === 'LIKE_IT' || backendType === 'like') feedbackType = 'like';
+                  
                   const feedbackEmoji = feedbackType === 'love' ? '❤️' : feedbackType === 'like' ? '👍' : '👎';
+                  const feedbackAction = feedbackType === 'love' ? 'loves' : feedbackType === 'like' ? 'likes' : 'dislikes';
+                  
                   notification = {
-                    type: 'info',
+                    type: 'feedback',
                     title: `${feedbackEmoji} Client Feedback`,
-                    message: `${clientName} ${feedbackType === 'love' ? 'loves' : feedbackType === 'like' ? 'likes' : 'dislikes'} a property`,
+                    message: `${clientName} ${feedbackAction} ${propertyAddress || 'a property'}`,
                     read: false,
-                    clientId: activity.timeline?.clientId,
-                    propertyId: activity.propertyId,
+                    clientId,
+                    clientName,
+                    propertyId,
+                    propertyAddress,
+                    feedbackType,
                     metadata: {
                       eventType: 'feedback_submit',
                       clientName,
+                      propertyAddress,
                       feedbackType,
+                      activityId, // Add for deduplication
                     }
                   };
                 }
@@ -1045,10 +1127,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                     title: '📧 Email Opened',
                     message: `${clientName} opened your timeline email`,
                     read: false,
-                    clientId: activity.timeline?.clientId,
+                    clientId,
+                    clientName,
                     metadata: {
                       eventType: 'email_open',
                       clientName,
+                      activityId, // Add for deduplication
                     }
                   };
                 }
@@ -1061,10 +1145,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                     title: '🔐 Client Login',
                     message: `${clientName} logged into their timeline`,
                     read: false,
-                    clientId: activity.timeline?.clientId,
+                    clientId,
+                    clientName,
                     metadata: {
                       eventType: 'client_login',
                       clientName,
+                      activityId, // Add for deduplication
                     }
                   };
                 }
@@ -1072,6 +1158,21 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             }
 
             if (notification) {
+              // Mark activity as processed
+              processedActivityIds.add(activityId);
+              
+              // Limit processed IDs to prevent memory growth (keep last 1000)
+              if (processedActivityIds.size > 1000) {
+                const idsArray = Array.from(processedActivityIds);
+                const toKeep = idsArray.slice(-800); // Keep last 800
+                processedActivityIds.clear();
+                toKeep.forEach(id => processedActivityIds.add(id));
+              }
+              
+              // Update state with processed IDs
+              set({ processedActivityIds });
+              
+              // Add the notification
               get().addNotification(notification);
             }
           });
@@ -1780,6 +1881,42 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
         clearAllNotifications: () => {
           set({ notifications: [] });
+        },
+        
+        // Helper functions for notifications
+        getUnreadNotificationsForClient: (clientId: string) => {
+          return get().notifications.filter(n => !n.read && n.clientId === clientId);
+        },
+        
+        hasUnreadFeedbackNotifications: (clientId?: string) => {
+          const notifications = get().notifications;
+          if (clientId) {
+            return notifications.some(n => !n.read && n.clientId === clientId && (n.type === 'feedback' || n.feedbackType));
+          }
+          return notifications.some(n => !n.read && (n.type === 'feedback' || n.feedbackType));
+        },
+        
+        createFeedbackNotification: (clientId: string, clientName: string, propertyId: string, propertyAddress: string, feedbackType: 'love' | 'like' | 'dislike') => {
+          const feedbackEmoji = feedbackType === 'love' ? '❤️' : feedbackType === 'like' ? '👍' : '👎';
+          const feedbackAction = feedbackType === 'love' ? 'loves' : feedbackType === 'like' ? 'likes' : 'dislikes';
+          
+          get().addNotification({
+            type: 'feedback',
+            title: `${feedbackEmoji} Client Feedback`,
+            message: `${clientName} ${feedbackAction} ${propertyAddress}`,
+            read: false,
+            clientId,
+            clientName,
+            propertyId,
+            propertyAddress,
+            feedbackType,
+            metadata: {
+              eventType: 'feedback_submit',
+              clientName,
+              propertyAddress,
+              feedbackType,
+            }
+          });
         },
 
         // Retry and recovery actions

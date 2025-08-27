@@ -35,7 +35,8 @@
       "Bash(npm install:*)",
       "Bash(grep:*)",
       "Bash(git log:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Activity } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Activity, Heart } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 
 const icons = {
@@ -11,6 +11,7 @@ const icons = {
   warning: AlertTriangle,
   info: Info,
   activity: Activity,
+  feedback: Heart,
 };
 
 const colors = {
@@ -19,6 +20,7 @@ const colors = {
   warning: 'from-yellow-500 to-amber-600 border-yellow-500/20',
   info: 'from-blue-500 to-cyan-600 border-blue-500/20',
   activity: 'from-purple-500 to-violet-600 border-purple-500/20',
+  feedback: 'from-purple-600 to-pink-600 border-purple-500/20',
 };
 
 export function Notifications() {
@@ -75,6 +77,41 @@ export function Notifications() {
                     <p className="mt-1 text-sm text-white/80">
                       {notification.message}
                     </p>
+                    {/* Enhanced details for feedback notifications */}
+                    {(notification.type === 'feedback' || notification.feedbackType) && (
+                      <div className="mt-2 p-2 bg-white/10 rounded-md">
+                        {notification.clientName && (
+                          <p className="text-xs text-white/90 font-medium">
+                            Client: {notification.clientName}
+                          </p>
+                        )}
+                        {notification.propertyAddress && (
+                          <p className="text-xs text-white/70 mt-1">
+                            Property: {notification.propertyAddress}
+                          </p>
+                        )}
+                        {notification.feedbackType && (
+                          <p className="text-xs text-white/70 mt-1">
+                            Feedback: {notification.feedbackType.charAt(0).toUpperCase() + notification.feedbackType.slice(1)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {/* Enhanced details for activity notifications with client/property info */}
+                    {notification.type === 'activity' && (notification.clientName || notification.propertyAddress) && (
+                      <div className="mt-2 p-2 bg-white/10 rounded-md">
+                        {notification.clientName && (
+                          <p className="text-xs text-white/90 font-medium">
+                            Client: {notification.clientName}
+                          </p>
+                        )}
+                        {notification.propertyAddress && (
+                          <p className="text-xs text-white/70 mt-1">
+                            Property: {notification.propertyAddress}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="ml-4 flex-shrink-0 flex">
                     <button
