@@ -73,121 +73,177 @@ export class EmailTemplateService {
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏡 Welcome to Your Property Timeline - ${data.propertyCount} Properties Selected</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  </style>
 </head>
-<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #334155; max-width: 650px; margin: 0 auto; padding: 0; background: #f8fafc;">
+<body style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; background-color: #f8fafc;">
   
-  <!-- Header with Agent Photo -->
-  <div style="background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); padding: 25px 20px; text-align: center; border-radius: 16px 16px 0 0; position: relative; overflow: hidden;">
-    <!-- Decorative elements -->
-    <div style="position: absolute; top: -20px; right: -20px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
-    <div style="position: absolute; bottom: -30px; left: -30px; width: 80px; height: 80px; background: rgba(255,255,255,0.15); border-radius: 50%;"></div>
-    
-    <div style="position: relative; z-index: 10;">
-      ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 90px; height: 90px; border-radius: 12px; border: 3px solid white; margin-bottom: 20px; object-fit: cover; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">` : `<div style="width: 90px; height: 90px; border-radius: 12px; border: 3px solid white; margin: 0 auto 20px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">🏠</div>`}
-      
-      <!-- Welcome Badge -->
-      <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; display: inline-block; padding: 8px 20px; margin-bottom: 15px;">
-        <span style="color: white; font-size: 14px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">🎉 WELCOME TO YOUR TIMELINE ✨</span>
-      </div>
-      
-      <h1 style="color: white; margin: 0 0 8px 0; font-size: 32px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">Your Personal Property Journey Begins</h1>
-      <p style="color: rgba(255,255,255,0.95); margin: 0; font-size: 18px; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Curated by ${data.agentName}</p>
-      <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0; font-size: 15px;">${data.agentCompany}</p>
-    </div>
-  </div>
-  
-  <!-- Welcome Message -->
-  <div style="background: white; padding: 25px 20px 20px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
-    <h2 style="color: #1e293b; font-size: 24px; font-weight: 600; margin: 0 0 20px 0; text-align: center;">Welcome ${firstName}! 🎉</h2>
-    
-    <p style="font-size: 17px; line-height: 1.8; margin: 0 0 25px 0; text-align: center; color: #475569;">
-      I'm thrilled to introduce you to your personalized property timeline! I've handpicked <strong style="color: ${brandColor}; font-size: 18px;">${data.propertyCount} exceptional properties</strong> that perfectly match your dream home criteria.
-    </p>
-    
-    <!-- Property Count Highlight -->
-    <div style="background: linear-gradient(135deg, ${brandColor}08 0%, #8b5cf608 100%); border: 2px solid ${brandColor}20; border-radius: 16px; padding: 25px; text-align: center; margin: 25px 0; position: relative;">
-      <div style="background: ${brandColor}; color: white; font-size: 32px; font-weight: 700; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 15px ${brandColor}40;">
-        ${data.propertyCount}
-      </div>
-      <h3 style="color: #1e293b; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">Properties Waiting for You</h3>
-      <p style="margin: 0; color: #64748b; font-size: 15px;">Your home-buying journey starts here</p>
-    </div>
-  </div>
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc;">
+    <tr>
+      <td align="center" style="padding: 20px 10px;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: white; margin: 0 auto;">
+          
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background-color: ${brandColor}; padding: 30px 20px; color: white;">
+              
+              <!-- Agent Photo -->
+              ${data.agentPhoto ? 
+                `<img src="${data.agentPhoto}" alt="${data.agentName}" width="80" height="80" style="border-radius: 10px; border: 3px solid white; margin-bottom: 15px; display: block;">` : 
+                `<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="80" height="80" style="margin: 0 auto 15px auto; background-color: rgba(255,255,255,0.2); border-radius: 10px; border: 3px solid white;">
+                  <tr><td align="center" style="font-size: 36px; line-height: 80px;">🏠</td></tr>
+                </table>`
+              }
+              
+              <!-- Welcome Badge -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 15px auto;">
+                <tr>
+                  <td style="background-color: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 25px; padding: 8px 20px;">
+                    <span style="color: white; font-size: 14px; font-weight: bold;">🎉 WELCOME TO YOUR TIMELINE ✨</span>
+                  </td>
+                </tr>
+              </table>
+              
+              <h1 style="color: white; margin: 10px 0; font-size: 28px; font-weight: bold; text-align: center;">Your Personal Property Journey Begins</h1>
+              <p style="color: white; margin: 5px 0; font-size: 16px; font-weight: bold; text-align: center;">Curated by ${data.agentName}</p>
+              <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0; font-size: 14px; text-align: center;">${data.agentCompany}</p>
+              
+            </td>
+          </tr>
+          
+          <!-- Welcome Message -->
+          <tr>
+            <td style="padding: 30px 20px; background-color: white;">
+              <h2 style="color: #1e293b; font-size: 24px; font-weight: bold; margin: 0 0 20px 0; text-align: center;">Welcome ${firstName}! 🎉</h2>
+              
+              <p style="font-size: 16px; line-height: 1.6; margin: 0 0 25px 0; text-align: center; color: #475569;">
+                I'm thrilled to introduce you to your personalized property timeline! I've handpicked <strong style="color: ${brandColor};">${data.propertyCount} exceptional properties</strong> that perfectly match your dream home criteria.
+              </p>
+              
+              <!-- Property Count Highlight -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0;">
+                <tr>
+                  <td align="center" style="padding: 25px; background-color: ${brandColor}08; border: 2px solid ${brandColor}40; border-radius: 12px;">
+                    
+                    <!-- Property Count Circle -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="60" height="60" style="margin: 0 auto 15px auto; background-color: ${brandColor}; border-radius: 30px;">
+                      <tr><td align="center" style="color: white; font-size: 24px; font-weight: bold; line-height: 60px;">${data.propertyCount}</td></tr>
+                    </table>
+                    
+                    <h3 style="color: #1e293b; margin: 0 0 10px 0; font-size: 18px; font-weight: bold; text-align: center;">Properties Waiting for You</h3>
+                    <p style="margin: 0; color: #64748b; font-size: 14px; text-align: center;">Your home-buying journey starts here</p>
+                    
+                  </td>
+                </tr>
+              </table>
+              
+            </td>
+          </tr>
+          
+          <!-- Getting Started Guide -->
+          <tr>
+            <td style="padding: 0 20px 30px 20px; background-color: white;">
+              
+              <!-- Getting Started Box -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px;">
+                <tr>
+                  <td style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 25px;">
+                    
+                    <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 18px; font-weight: bold; text-align: center;">
+                      🎯 Getting Started is Simple
+                    </h3>
+                    <p style="margin: 0 0 15px 0; color: #78350f; font-size: 16px; text-align: center;">
+                      <strong>Your Login Details:</strong> Use your first name and last 4 digits of your phone number
+                    </p>
+                    
+                    <!-- Login Details Box -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: white; border: 1px solid #f59e0b; border-radius: 8px; margin: 15px 0;">
+                      <tr><td style="padding: 15px; text-align: center;">
+                        <div style="color: #92400e; font-size: 14px; margin-bottom: 5px;">👤 <strong>Username:</strong> ${firstName}</div>
+                        <div style="color: #92400e; font-size: 14px;">🔢 <strong>Password:</strong> ${last4Digits}</div>
+                      </td></tr>
+                    </table>
+                    
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- CTA Button -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="${data.timelineUrl}" style="display: inline-block; background-color: ${brandColor}; color: white; padding: 18px 40px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">
+                      🏠 START YOUR PROPERTY JOURNEY →
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <p style="margin: 10px 0 0 0; color: #64748b; font-size: 14px; font-style: italic;">Click above to begin exploring your ${data.propertyCount} properties</p>
+                  </td>
+                </tr>
+              </table>
+              
+            </td>
+          </tr>
+          
+          <!-- Agent Footer -->
+          <tr>
+            <td style="background-color: #1e293b; border-top: 1px solid #334155; padding: 25px 20px; color: white;">
+              
+              <!-- Agent Info Row -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 20px;">
+                <tr>
+                  <td width="60" style="vertical-align: top;">
+                    ${data.agentPhoto ? 
+                      `<img src="${data.agentPhoto}" alt="${data.agentName}" width="50" height="50" style="border-radius: 8px; border: 2px solid ${brandColor};">` : 
+                      `<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="50" height="50" style="background-color: rgba(59, 130, 246, 0.2); border-radius: 8px; border: 2px solid ${brandColor};">
+                        <tr><td align="center" style="color: ${brandColor}; font-size: 20px; line-height: 50px;">👤</td></tr>
+                      </table>`
+                    }
+                  </td>
+                  <td style="vertical-align: top; padding-left: 15px;">
+                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold; color: white;">${data.agentName} <span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: rgba(59, 130, 246, 0.2); color: ${brandColor}; font-weight: bold;">⭐ REALTOR®</span></h3>
+                    <p style="margin: 0; color: #94a3b8; font-size: 12px;">🏢 ${data.agentCompany}</p>
+                  </td>
+                </tr>
+              </table>
 
-  <!-- Getting Started Guide -->
-  <div style="background: white; padding: 0 35px 35px 35px;">
-    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
-      <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 18px; font-weight: 600; display: flex; align-items: center;">
-        🎯 <span style="margin-left: 8px;">Getting Started is Simple</span>
-      </h3>
-      <p style="margin: 0 0 15px 0; color: #78350f; font-size: 16px; line-height: 1.6;">
-        <strong>Your Login Details:</strong> Use your first name and last 4 digits of your phone number
-      </p>
-      <div style="background: white; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; font-family: 'Monaco', 'Menlo', monospace;">
-        <div style="color: #92400e; font-size: 14px; margin-bottom: 5px;">👤 <strong>Username:</strong> ${firstName}</div>
-        <div style="color: #92400e; font-size: 14px;">🔢 <strong>Password:</strong> ${last4Digits}</div>
-      </div>
-    </div>
+              <p style="margin: 0 0 15px 0; color: #e2e8f0; font-size: 14px; font-weight: bold; font-style: italic; text-align: center;">Ready to discuss your dream home?</p>
 
-    <!-- CTA Button -->
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.timelineUrl}" style="display: inline-block; background: linear-gradient(135deg, ${brandColor} 0%, #8b5cf6 100%); color: white; padding: 18px 40px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 18px; box-shadow: 0 6px 20px ${brandColor}40; transition: all 0.3s ease; border: 2px solid transparent;">
-        🏠 START YOUR PROPERTY JOURNEY →
-      </a>
-      <p style="margin: 12px 0 0 0; color: #64748b; font-size: 14px; font-style: italic;">Click above to begin exploring your ${data.propertyCount} properties</p>
-    </div>
-  </div>
-  
-  <!-- Agent Footer -->
-  <div style="background: linear-gradient(45deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); border-top: 1px solid #334155; padding: 25px 30px; color: white;">
-    <div style="display: flex; align-items: center; margin-bottom: 20px;">
-      <div style="position: relative; width: 50px; height: 50px; margin-right: 15px;">
-        ${data.agentPhoto ? `<img src="${data.agentPhoto}" alt="${data.agentName}" style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${brandColor}; object-fit: cover;">` : `<div style="width: 50px; height: 50px; border-radius: 8px; border: 2px solid ${brandColor}; background: ${brandColor}20; color: ${brandColor}; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>`}
-      </div>
-      <div style="flex: 1; min-width: 0;">
-        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-          <h3 style="margin: 0; margin-right: 10px; font-size: 16px; font-weight: 600; color: white;">${data.agentName}</h3>
-          <span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ${brandColor}20; color: ${brandColor}; font-weight: 600; letter-spacing: 0.5px;">⭐ REALTOR®</span>
-        </div>
-        <div style="display: flex; align-items: center;">
-          <span style="font-size: 12px; color: #94a3b8; margin-right: 5px;">🏢</span>
-          <p style="margin: 0; color: #94a3b8; font-size: 12px;">${data.agentCompany}</p>
-        </div>
-      </div>
-    </div>
+              <!-- Contact Buttons -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 20px;">
+                <tr>
+                  <td align="center">
+                    ${data.agentEmail ? `<a href="mailto:${data.agentEmail}" style="display: inline-block; margin: 0 5px; padding: 8px 15px; background-color: #3b82f6; color: white; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 6px;">📧 Email</a>` : ''}
+                    ${data.agentPhone ? `<a href="tel:${data.agentPhone}" style="display: inline-block; margin: 0 5px; padding: 8px 15px; background-color: #16a34a; color: white; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 6px;">📱 Call</a>` : ''}
+                  </td>
+                </tr>
+              </table>
 
-    <p style="margin: 0 0 15px 0; color: #e2e8f0; font-size: 14px; font-weight: 500; font-style: italic;">Ready to discuss your dream home?</p>
-
-    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-      ${data.agentEmail ? `<a href="mailto:${data.agentEmail}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #3b82f6; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📧 <span>Email</span></a>` : ''}
-      ${data.agentPhone ? `<a href="tel:${data.agentPhone}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; background: #16a34a; color: white; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 6px; border: none;">📱 <span>Call</span></a>` : ''}
-    </div>
-
-    <!-- Company Logo Section -->
-    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; text-align: center;">
-      ${data.companyLogo ? `
-        <div style="margin-bottom: 15px;">
-          <img src="${data.companyLogo}" alt="${data.agentCompany} Logo" style="max-width: 200px; height: auto; max-height: 60px; object-fit: contain;">
-        </div>
-      ` : `
-        <div style="margin-bottom: 15px;">
-          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: ${brandColor}; font-size: 18px; font-weight: 700;">
-            🏢 <span>${data.agentCompany}</span>
-          </div>
-        </div>
-      `}
-      
-      <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 14px; font-weight: 500;">Powered by</p>
-      <div style="display: flex; align-items: center; justify-content: center; gap: 5px; color: ${brandColor}; font-size: 16px; font-weight: 700;">
-        🏠 <span>Property Sync</span>
-      </div>
-      <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px; font-style: italic;">Your home-buying journey starts here</p>
-    </div>
-  </div>
+              <!-- Company Logo Section -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                <tr>
+                  <td align="center">
+                    ${data.companyLogo ? 
+                      `<img src="${data.companyLogo}" alt="${data.agentCompany} Logo" style="max-width: 200px; height: auto; max-height: 60px; margin-bottom: 15px;">` : 
+                      `<div style="margin-bottom: 15px; color: ${brandColor}; font-size: 18px; font-weight: bold;">🏢 ${data.agentCompany}</div>`
+                    }
+                    
+                    <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 14px; font-weight: bold;">Powered by</p>
+                    <div style="color: ${brandColor}; font-size: 16px; font-weight: bold;">🏠 Property Sync</div>
+                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px; font-style: italic;">Your home-buying journey starts here</p>
+                  </td>
+                </tr>
+              </table>
+              
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
   }

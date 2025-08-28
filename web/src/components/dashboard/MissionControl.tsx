@@ -762,6 +762,7 @@ const testProfileAPI = async () => {
                     const unreadCount = notifications.filter(n => !n.read).length;
                     const hasUnreadFeedback = notifications.some(n => !n.read && (n.type === 'feedback' || n.feedbackType));
                     
+                    
                     return (
                       <>
                         <Bell className={`w-5 h-5 cursor-pointer transition-all duration-300 ${
@@ -837,13 +838,8 @@ const testProfileAPI = async () => {
                                 <p className="text-white text-sm font-medium">{notification.title}</p>
                                 <p className="text-slate-300 text-xs mt-1">{notification.message}</p>
                                 {/* Enhanced details for feedback and activity notifications */}
-                                {(notification.type === 'feedback' || notification.feedbackType || notification.clientName || notification.propertyAddress) && (
+                                {(notification.type === 'feedback' || notification.feedbackType || notification.propertyAddress) && (
                                   <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-600/30">
-                                    {notification.clientName && (
-                                      <p className="text-slate-200 text-xs font-medium">
-                                        Client: {notification.clientName}
-                                      </p>
-                                    )}
                                     {notification.propertyAddress && (
                                       <p className="text-slate-400 text-xs mt-1">
                                         Property: {notification.propertyAddress}

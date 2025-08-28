@@ -11,6 +11,11 @@ export class UpdatePreferencesDto {
     desktop?: boolean;
     feedback?: boolean;
     newProperties?: boolean;
+    // Activity notifications
+    clientViews?: boolean;
+    clientLogin?: boolean;
+    emailOpens?: boolean;
+    inactiveClients?: boolean;
   };
 
   @IsOptional()

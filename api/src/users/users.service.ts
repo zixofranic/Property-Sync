@@ -369,6 +369,11 @@ export class UsersService {
         desktop: user.profile?.notificationDesktop ?? true,
         feedback: user.profile?.notificationFeedback ?? true,
         newProperties: user.profile?.notificationNewProperties ?? true,
+        // Activity notifications
+        clientViews: user.profile?.notificationClientViews ?? true,
+        clientLogin: user.profile?.notificationClientLogin ?? false,
+        emailOpens: user.profile?.notificationEmailOpens ?? true,
+        inactiveClients: user.profile?.notificationInactiveClients ?? false,
       },
       theme: 'dark' as const,
       soundEnabled: true,
@@ -419,6 +424,19 @@ export class UsersService {
       if (preferences.notifications.newProperties !== undefined) {
         updateData.notificationNewProperties = preferences.notifications.newProperties;
       }
+      // Activity notifications
+      if (preferences.notifications.clientViews !== undefined) {
+        updateData.notificationClientViews = preferences.notifications.clientViews;
+      }
+      if (preferences.notifications.clientLogin !== undefined) {
+        updateData.notificationClientLogin = preferences.notifications.clientLogin;
+      }
+      if (preferences.notifications.emailOpens !== undefined) {
+        updateData.notificationEmailOpens = preferences.notifications.emailOpens;
+      }
+      if (preferences.notifications.inactiveClients !== undefined) {
+        updateData.notificationInactiveClients = preferences.notifications.inactiveClients;
+      }
     }
 
     let updatedProfile = user.profile;
@@ -442,6 +460,11 @@ export class UsersService {
         desktop: updatedProfile?.notificationDesktop ?? true,
         feedback: updatedProfile?.notificationFeedback ?? true,
         newProperties: updatedProfile?.notificationNewProperties ?? true,
+        // Activity notifications
+        clientViews: updatedProfile?.notificationClientViews ?? true,
+        clientLogin: updatedProfile?.notificationClientLogin ?? false,
+        emailOpens: updatedProfile?.notificationEmailOpens ?? true,
+        inactiveClients: updatedProfile?.notificationInactiveClients ?? false,
       },
       theme: preferences.theme || 'dark',
       soundEnabled:

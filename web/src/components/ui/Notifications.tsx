@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Activity, Heart } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
@@ -24,31 +24,47 @@ const colors = {
 };
 
 export function Notifications() {
-  const { notifications, removeNotification, markNotificationAsRead } = useMissionControlStore();
+  const { notifications } = useMissionControlStore();
+  const [hiddenToasts, setHiddenToasts] = useState<Set<string>>(new Set());
+  const timersRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
+  // Auto-hide toasts after 2 seconds
   useEffect(() => {
-    const timers = (notifications || []).map(notification => {
-      if (!notification.read) {
-        return setTimeout(() => {
-          // Mark as read instead of removing completely
-          // This keeps them in the bell dropdown but removes the toast
-          markNotificationAsRead(notification.id);
-        }, 2000); // ✅ CHANGED: 4000ms → 2000ms (2 seconds)
+    if (!notifications) return;
+
+    notifications.forEach(notification => {
+      if (!notification.read && !timersRef.current[notification.id]) {
+        // Set timer to hide this toast after 2 seconds
+        timersRef.current[notification.id] = setTimeout(() => {
+          setHiddenToasts(prev => new Set(prev).add(notification.id));
+          delete timersRef.current[notification.id];
+        }, 2000);
       }
-      return null;
+    });
+
+    // Cleanup timers for notifications that no longer exist or are read
+    Object.keys(timersRef.current).forEach(notificationId => {
+      const notification = notifications.find(n => n.id === notificationId);
+      if (!notification || notification.read) {
+        clearTimeout(timersRef.current[notificationId]);
+        delete timersRef.current[notificationId];
+      }
     });
 
     return () => {
-      timers.forEach(timer => {
-        if (timer) clearTimeout(timer);
-      });
+      Object.values(timersRef.current).forEach(timer => clearTimeout(timer));
     };
-  }, [notifications, markNotificationAsRead]);
+  }, [notifications]); // Remove hiddenToasts from dependencies
+
+  // Show only unread notifications that haven't been hidden yet
+  const toastNotifications = (notifications || [])
+    .filter(n => !n.read && !hiddenToasts.has(n.id))
+    .slice(0, 5);
 
   return (
     <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
       <AnimatePresence>
-        {(notifications || []).filter(n => !n.read).slice(0, 5).map((notification) => {
+        {toastNotifications.map((notification) => {
           const Icon = icons[notification.type];
           const colorClass = colors[notification.type];
 
@@ -116,7 +132,14 @@ export function Notifications() {
                   <div className="ml-4 flex-shrink-0 flex">
                     <button
                       className="inline-flex text-white hover:text-white/80 focus:outline-none"
-                      onClick={() => removeNotification(notification.id)}
+                      onClick={() => {
+                        // Hide toast immediately and clear timer
+                        setHiddenToasts(prev => new Set(prev).add(notification.id));
+                        if (timersRef.current[notification.id]) {
+                          clearTimeout(timersRef.current[notification.id]);
+                          delete timersRef.current[notification.id];
+                        }
+                      }}
                     >
                       <X className="w-4 h-4" />
                     </button>

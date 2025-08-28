@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   console.log('🔴 LOGIN: Loading');
   const router = useRouter();
-  const { login, isLoading, isAuthenticated, addNotification } = useMissionControlStore();
+  const { login, isLoading, isAuthenticated } = useMissionControlStore();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -57,11 +57,6 @@ useEffect(() => {
     const success = await login(formData.email, formData.password);
     
     if (success) {
-      addNotification({
-        type: 'success',
-        title: 'Welcome Back!',
-        message: 'Successfully logged in to Mission Control.'
-      });
       router.push('/dashboard');
     } else {
       // Display error immediately on login page

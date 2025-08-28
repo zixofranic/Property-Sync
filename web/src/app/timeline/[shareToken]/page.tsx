@@ -752,20 +752,22 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Agent Company Logo - SIMPLEST APPROACH */}
-              <div className="flex-shrink-0 w-20 h-20 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
+              {/* Agent Company Logo */}
+              <div className="flex-shrink-0 w-20 h-20 flex items-center justify-center">
                 {timelineData.agent.logo ? (
                   <img
                     src={timelineData.agent.logo}
                     alt={timelineData.agent.company}
-                    className="w-full h-full object-contain rounded-lg"
+                    className="w-full h-full object-contain"
                   />
                 ) : timelineData.agent.company ? (
-                  <div className="text-xs font-bold text-white text-center leading-tight px-1">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 text-xs font-bold text-white text-center leading-tight px-1">
                     {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
                   </div>
                 ) : (
-                  <Building className="w-8 h-8 text-slate-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
+                    <Building className="w-8 h-8 text-slate-400" />
+                  </div>
                 )}
               </div>
               

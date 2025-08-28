@@ -418,14 +418,6 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
             if (response.error) {
               console.log('Store: Login failed:', response.error);
               set({ authError: response.error, isLoading: false });
-              
-              get().addNotification({
-                type: 'error',
-                title: 'Login Failed',
-                message: response.error,
-                read: false,
-              });
-              
               return false;
             }
 
