@@ -701,7 +701,7 @@ Powered by Property Sync - Making real estate personal
   
   <!-- Footer -->
   <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.9em;">
-    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@propertysync.com" style="color: #3b82f6;">support@propertysync.com</a></p>
+    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@property-sync.com" style="color: #3b82f6;">support@property-sync.com</a></p>
     <p style="margin: 0;">Property Sync - Transforming Real Estate, One Client at a Time 🏡</p>
   </div>
 </body>
@@ -947,7 +947,7 @@ Powered by Property Sync - Making real estate personal
   
   <!-- Footer -->
   <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.9em;">
-    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@propertysync.com" style="color: #10b981;">support@propertysync.com</a></p>
+    <p style="margin: 0 0 10px 0;">Questions? We're here to help at <a href="mailto:support@property-sync.com" style="color: #10b981;">support@property-sync.com</a></p>
     <p style="margin: 0;">Property Sync - Transforming Real Estate, One Client at a Time 🏡</p>
   </div>
 </body>

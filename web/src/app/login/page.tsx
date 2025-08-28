@@ -247,17 +247,6 @@ useEffect(() => {
           </div>
         </motion.div>
 
-        {/* Demo Credentials (Remove in production) */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
-        >
-          <p className="text-blue-300 text-sm text-center">
-            <strong>Demo:</strong> Use any registered email and password to test the backend integration
-          </p>
-        </motion.div>
       </motion.div>
     </div>
   );

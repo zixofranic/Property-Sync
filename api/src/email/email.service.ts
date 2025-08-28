@@ -804,7 +804,7 @@ export class EmailService {
         </div>
         
         <div style="text-align: center; margin-top: 30px; padding: 20px; color: #94a3b8; font-size: 0.9em;">
-          <p>Need help? Contact us at support@propertysync.com</p>
+          <p>Need help? Contact us at support@property-sync.com</p>
           <p style="margin: 5px 0;">Property Sync - Making Real Estate Simple</p>
         </div>
       </body>
@@ -853,7 +853,7 @@ export class EmailService {
         </div>
         
         <div style="text-align: center; margin-top: 30px; padding: 20px; color: #94a3b8; font-size: 0.9em;">
-          <p>Questions? We're here to help at support@propertysync.com</p>
+          <p>Questions? We're here to help at support@property-sync.com</p>
         </div>
       </body>
       </html>

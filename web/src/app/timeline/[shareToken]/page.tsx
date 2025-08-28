@@ -815,12 +815,43 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                           <Bell className="w-5 h-5 mr-2 text-blue-400" />
                           Notifications
                         </h3>
-                        <button
-                          onClick={() => setShowNotificationDropdown(false)}
-                          className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors"
-                        >
-                          <X className="w-4 h-4 text-slate-400 hover:text-white" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {clientMessages.length > 0 && clientMessages.filter(msg => !msg.isRead).length > 0 && (
+                            <motion.button
+                              onClick={() => {
+                                // Mark all messages as read
+                                const updatedMessages = clientMessages.map(msg => ({
+                                  ...msg,
+                                  isRead: true
+                                }));
+                                setClientMessages(updatedMessages);
+                                setUnreadMessageCount(0);
+                                setShowNotificationDropdown(false);
+                              }}
+                              className="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded border border-slate-600 hover:border-slate-400"
+                              initial={{ scale: 1 }}
+                              animate={{ 
+                                scale: showNotificationDropdown && clientMessages.filter(msg => !msg.isRead).length > 0 ? [1, 1.05, 1] : 1,
+                                boxShadow: showNotificationDropdown && clientMessages.filter(msg => !msg.isRead).length > 0 
+                                  ? ['0 0 0 rgba(59,130,246,0)', '0 0 8px rgba(59,130,246,0.4)', '0 0 0 rgba(59,130,246,0)'] 
+                                  : '0 0 0 rgba(59,130,246,0)'
+                              }}
+                              transition={{ 
+                                repeat: showNotificationDropdown && clientMessages.filter(msg => !msg.isRead).length > 0 ? Infinity : 0,
+                                duration: 1.5,
+                                ease: "easeInOut"
+                              }}
+                            >
+                              Clear All
+                            </motion.button>
+                          )}
+                          <button
+                            onClick={() => setShowNotificationDropdown(false)}
+                            className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors"
+                          >
+                            <X className="w-4 h-4 text-slate-400 hover:text-white" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="max-h-96 overflow-y-auto">

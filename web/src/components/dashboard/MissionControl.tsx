@@ -752,11 +752,7 @@ const testProfileAPI = async () => {
               <div className="relative" data-notifications-dropdown>
                 <button
                   onClick={() => {
-                    // Mark all notifications as read when bell is clicked
-                    const unreadNotifications = notifications.filter(n => !n.read);
-                    unreadNotifications.forEach(n => markNotificationAsRead(n.id));
-                    
-                    // Toggle dropdown
+                    // Only toggle dropdown - don't mark as read until Clear All is clicked
                     setShowNotificationsDropdown(!showNotificationsDropdown);
                   }}
                   className="relative p-1"
@@ -797,15 +793,27 @@ const testProfileAPI = async () => {
                     <div className="p-3 border-b border-slate-700 flex items-center justify-between">
                       <h3 className="text-white font-semibold">Notifications</h3>
                       {notifications.length > 0 && (
-                        <button
+                        <motion.button
                           onClick={() => {
                             clearAllNotifications();
                             setShowNotificationsDropdown(false);
                           }}
-                          className="text-xs text-slate-400 hover:text-white transition-colors"
+                          className="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded border border-slate-600 hover:border-slate-400"
+                          initial={{ scale: 1 }}
+                          animate={{ 
+                            scale: showNotificationsDropdown && notifications.filter(n => !n.read).length > 0 ? [1, 1.05, 1] : 1,
+                            boxShadow: showNotificationsDropdown && notifications.filter(n => !n.read).length > 0 
+                              ? ['0 0 0 rgba(239,68,68,0)', '0 0 8px rgba(239,68,68,0.4)', '0 0 0 rgba(239,68,68,0)'] 
+                              : '0 0 0 rgba(239,68,68,0)'
+                          }}
+                          transition={{ 
+                            repeat: showNotificationsDropdown && notifications.filter(n => !n.read).length > 0 ? Infinity : 0,
+                            duration: 1.5,
+                            ease: "easeInOut"
+                          }}
                         >
                           Clear All
-                        </button>
+                        </motion.button>
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
