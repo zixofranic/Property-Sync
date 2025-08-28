@@ -1880,7 +1880,12 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         },
 
         clearAllNotifications: () => {
-          set({ notifications: [] });
+          set((state) => ({
+            notifications: state.notifications.map(notification => ({
+              ...notification,
+              read: true
+            }))
+          }));
         },
         
         // Helper functions for notifications
