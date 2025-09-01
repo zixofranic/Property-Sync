@@ -32,6 +32,8 @@ const nextConfig = {
     // Number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
   },
+  // Output configuration for standalone deployment
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
 }
 
 module.exports = nextConfig

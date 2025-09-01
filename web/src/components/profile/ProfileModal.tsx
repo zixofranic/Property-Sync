@@ -182,53 +182,54 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden"
+            className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden mx-4 sm:mx-0"
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+            {/* Header - Mobile Responsive */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b border-slate-700 gap-4">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Agent Profile</h2>
-                  <p className="text-sm text-slate-400">Manage your professional information</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-white">Agent Profile</h2>
+                  <p className="text-sm text-slate-400 hidden sm:block">Manage your professional information</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3">
                 {!isEditing ? (
                   <>
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                      className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                     >
                       <Edit3 className="w-4 h-4" />
-                      <span>Edit Profile</span>
+                      <span className="hidden sm:inline">Edit Profile</span>
+                      <span className="sm:hidden">Edit</span>
                     </button>
                     
                     {/* Logout Button */}
                     {!showLogoutConfirm ? (
                       <button
                         onClick={() => setShowLogoutConfirm(true)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                        className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>Logout</span>
+                        <span className="hidden sm:inline">Logout</span>
                       </button>
                     ) : (
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-red-400">Confirm logout?</span>
+                        <span className="text-xs sm:text-sm text-red-400 hidden sm:inline">Confirm logout?</span>
                         <button
                           onClick={handleLogout}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                          className="px-2 sm:px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs sm:text-sm transition-colors"
                         >
                           Yes
                         </button>
                         <button
                           onClick={() => setShowLogoutConfirm(false)}
-                          className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm transition-colors"
+                          className="px-2 sm:px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs sm:text-sm transition-colors"
                         >
                           No
                         </button>
@@ -240,30 +241,33 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     <button
                       onClick={handleCancel}
                       disabled={isUpdating}
-                      className="px-4 py-2 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                      className="px-2 sm:px-4 py-2 text-slate-400 hover:text-white transition-colors disabled:opacity-50 text-sm"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSave}
                       disabled={isUpdating}
-                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors"
+                      className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors text-sm"
                     >
                       {isUpdating ? (
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       ) : (
                         <Save className="w-4 h-4" />
                       )}
-                      <span>Save Changes</span>
+                      <span className="hidden sm:inline">Save Changes</span>
+                      <span className="sm:hidden">Save</span>
                     </button>
                   </>
                 )}
                 
+                {/* Close Button - Always Visible */}
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors shrink-0"
+                  aria-label="Close modal"
                 >
-                  <X className="w-5 h-5 text-slate-400" />
+                  <X className="w-5 h-5 text-slate-400 hover:text-white" />
                 </button>
               </div>
             </div>
@@ -291,10 +295,10 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <p className="text-slate-400">No profile data available</p>
                 </div>
               ) : (
-                <div className="p-6 space-y-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
                     {/* Left Column - Avatar & Status */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                     {/* Avatar Section */}
                     <div className="text-center">
                       <div className="relative inline-block mb-4">
@@ -364,14 +368,14 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     </div>
 
                     {/* Right Columns - Form Fields */}
-                    <div className="lg:col-span-2 space-y-8">
+                    <div className="lg:col-span-2 space-y-6 sm:space-y-8">
                       {/* Personal Information */}
                       <div>
                         <h4 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
                           <User className="w-5 h-5 text-blue-400" />
                           <span>Personal Information</span>
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">First Name</label>
                             <input
@@ -428,7 +432,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <Briefcase className="w-5 h-5 text-blue-400" />
                           <span>Professional Information</span>
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">Company/Brokerage</label>
                             <input
@@ -543,7 +547,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                               {filteredSpecialties.map((category) => (
                                 <div key={category.category}>
                                   <h5 className="text-sm font-medium text-slate-300 mb-2">{category.category}</h5>
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {category.items.map((specialty) => (
                                       <label
                                         key={specialty}

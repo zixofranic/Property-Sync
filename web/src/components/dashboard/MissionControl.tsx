@@ -1210,11 +1210,11 @@ const testProfileAPI = async () => {
 
       {/* Prominent Add Property Button - Only show when there are properties */}
       {selectedClient && properties.length > 0 && (
-        <div className="fixed bottom-32 right-20">
+        <div className="fixed bottom-32 right-4 sm:right-20">
           <motion.button
             onClick={() => setActiveModal('add-property')}
             disabled={!isOnline}
-            className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
+            className={`w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
               isOnline
                 ? 'hover:scale-110 cursor-pointer' 
                 : 'opacity-50 cursor-not-allowed'
@@ -1226,7 +1226,7 @@ const testProfileAPI = async () => {
             exit={{ opacity: 0, y: 50 }}
             transition={{ delay: 0.2 }}
           >
-            <Plus className="w-8 h-8 text-white" />
+            <Plus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </motion.button>
         </div>
       )}
@@ -1289,13 +1289,13 @@ const testProfileAPI = async () => {
           key={label}
           onClick={() => !disabled && action()}
           disabled={disabled}
-          className={`p-2 sm:p-3 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
+          className={`p-3 sm:p-4 bg-gradient-to-br ${color} hover:scale-110 transition-all duration-200 rounded-xl shadow-lg group relative ${
             disabled ? 'opacity-50 cursor-not-allowed' : ''
           }`}
           whileHover={{ scale: disabled ? 1 : 1.1 }}
           whileTap={{ scale: disabled ? 1 : 0.95 }}
         >
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           
           {/* Notification Badge for Share Timeline Button - 1/4 inside, 3/4 outside */}
           {isShareButton && hasUnsentProperties && unsentCount > 0 && (

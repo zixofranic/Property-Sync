@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Activity, Heart } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
@@ -24,21 +24,48 @@ const colors = {
 };
 
 export function Notifications() {
+  console.log('🔔 Notifications component rendered');
   const { notifications } = useMissionControlStore();
   const [hiddenToasts, setHiddenToasts] = useState<Set<string>>(new Set());
   const timersRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
+  // Create a dependency that changes when notifications change
+  const notificationKey = notifications?.map(n => `${n.id}-${n.read}`).join(',') || '';
+
   // Auto-hide toasts after 2 seconds
   useEffect(() => {
-    if (!notifications) return;
+    console.log('🔔 useEffect triggered with notifications:', notifications?.length || 0, 'key:', notificationKey);
+    if (!notifications) {
+      console.log('🔔 No notifications, returning');
+      return;
+    }
 
+    console.log('🔔 Processing notifications:', notifications.length);
+    console.log('🔔 Current timers:', Object.keys(timersRef.current));
+    console.log('🔔 Current hiddenToasts:', Array.from(hiddenToasts));
+    
     notifications.forEach(notification => {
+      console.log('🔔 Checking notification:', notification.id, {
+        title: notification.title,
+        read: notification.read,
+        hasTimer: !!timersRef.current[notification.id],
+        isHidden: hiddenToasts.has(notification.id)
+      });
+      
       if (!notification.read && !timersRef.current[notification.id]) {
+        console.log('🔔 Setting timer for:', notification.id, notification.title);
         // Set timer to hide this toast after 2 seconds
         timersRef.current[notification.id] = setTimeout(() => {
-          setHiddenToasts(prev => new Set(prev).add(notification.id));
+          console.log('🔔 Timer fired! Hiding notification:', notification.id, notification.title);
+          setHiddenToasts(prev => {
+            const newHidden = new Set(prev).add(notification.id);
+            console.log('🔔 Hidden toasts updated:', Array.from(newHidden));
+            return newHidden;
+          });
           delete timersRef.current[notification.id];
         }, 2000);
+      } else {
+        console.log('🔔 Skipping notification:', notification.id, 'read:', notification.read, 'hasTimer:', !!timersRef.current[notification.id]);
       }
     });
 
@@ -46,6 +73,7 @@ export function Notifications() {
     Object.keys(timersRef.current).forEach(notificationId => {
       const notification = notifications.find(n => n.id === notificationId);
       if (!notification || notification.read) {
+        console.log('🔔 Cleaning up timer for:', notificationId, !notification ? 'missing' : 'read');
         clearTimeout(timersRef.current[notificationId]);
         delete timersRef.current[notificationId];
       }
@@ -54,12 +82,22 @@ export function Notifications() {
     return () => {
       Object.values(timersRef.current).forEach(timer => clearTimeout(timer));
     };
-  }, [notifications]); // Remove hiddenToasts from dependencies
+  }, [notificationKey]); // Re-run when notification IDs or read states change
 
   // Show only unread notifications that haven't been hidden yet
   const toastNotifications = (notifications || [])
-    .filter(n => !n.read && !hiddenToasts.has(n.id))
+    .filter(n => {
+      const shouldShow = !n.read && !hiddenToasts.has(n.id);
+      if (!shouldShow && hiddenToasts.has(n.id)) {
+        console.log('🔔 Filtering out hidden notification:', n.id, n.title);
+      }
+      return shouldShow;
+    })
     .slice(0, 5);
+
+  console.log('🔔 Current notifications:', notifications?.length || 0);
+  console.log('🔔 Hidden toasts:', Array.from(hiddenToasts));
+  console.log('🔔 Showing toasts:', toastNotifications.length);
 
   return (
     <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
@@ -134,7 +172,12 @@ export function Notifications() {
                       className="inline-flex text-white hover:text-white/80 focus:outline-none"
                       onClick={() => {
                         // Hide toast immediately and clear timer
-                        setHiddenToasts(prev => new Set(prev).add(notification.id));
+                        console.log('🔔 Manual close clicked for:', notification.id, notification.title);
+                        setHiddenToasts(prev => {
+                          const newHidden = new Set(prev).add(notification.id);
+                          console.log('🔔 Hidden toasts now:', Array.from(newHidden));
+                          return newHidden;
+                        });
                         if (timersRef.current[notification.id]) {
                           clearTimeout(timersRef.current[notification.id]);
                           delete timersRef.current[notification.id];

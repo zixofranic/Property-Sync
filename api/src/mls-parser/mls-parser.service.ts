@@ -26,12 +26,52 @@ export class MLSParserService {
     }
   }
 
+  // Temporary test method to verify browser initialization
+  async testBrowserConnection(): Promise<{ success: boolean; message: string; platform: string }> {
+    try {
+      if (!this.browser) {
+        return { success: false, message: 'Browser not initialized', platform: process.platform };
+      }
+
+      const page = await this.browser.newPage();
+      await page.goto('https://www.google.com', { waitUntil: 'networkidle2', timeout: 10000 });
+      const title = await page.title();
+      await page.close();
+
+      return { 
+        success: true, 
+        message: `Browser test successful. Page title: ${title}`, 
+        platform: process.platform 
+      };
+    } catch (error) {
+      this.logger.error('Browser test failed:', error.message);
+      return { 
+        success: false, 
+        message: `Browser test failed: ${error.message}`, 
+        platform: process.platform 
+      };
+    }
+  }
+
   private async initBrowser(): Promise<void> {
     try {
-      // Railway-optimized Puppeteer configuration
+      const isWindows = process.platform === 'win32';
+      
+      // Different configurations for local vs production
       this.browser = await puppeteer.launch({
-        headless: true,
-        args: [
+        headless: true, // Keep headless for both platforms
+        args: isWindows ? [
+          // Windows-compatible configuration
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--no-first-run',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ] : [
+          // Linux/production configuration
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -48,7 +88,7 @@ export class MLSParserService {
         ignoreDefaultArgs: ['--disable-extensions'],
         timeout: 30000,
       });
-      this.logger.log('Browser initialized successfully for MLS parsing');
+      this.logger.log(`Browser initialized successfully for MLS parsing (${isWindows ? 'Windows' : 'Linux'} mode)`);
     } catch (error) {
       this.logger.error('Failed to initialize browser:', error);
       // Don't throw error - allow API to continue without MLS parsing

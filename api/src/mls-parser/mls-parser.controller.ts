@@ -9,17 +9,25 @@ import {
   Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import { MLSParserService } from './mls-parser.service';
 import { ParseMLSUrlsDto, ParseSingleMLSDto } from './dto/parse-mls-urls.dto';
 import { BatchImportPropertiesDto } from './dto/batch-import-properties.dto';
 
 @Controller('api/v1/mls')
-@UseGuards(JwtAuthGuard)
 export class MLSParserController {
   constructor(private readonly mlsParserService: MLSParserService) {}
 
+  // Test browser connection (no auth required)
+  @Public()
+  @Get('test-browser')
+  async testBrowser() {
+    return await this.mlsParserService.testBrowserConnection();
+  }
+
   // Parse a single MLS URL quickly (basic info only)
   @Post('parse-single-quick')
+  @UseGuards(JwtAuthGuard)
   async parseSingleQuick(@Request() req, @Body() parseDto: ParseSingleMLSDto) {
     try {
       const result = await this.mlsParserService.parseQuickMLS(parseDto.mlsUrl);
@@ -72,6 +80,7 @@ export class MLSParserController {
 
   // Parse a single MLS URL (full details)
   @Post('parse-single')
+  @UseGuards(JwtAuthGuard)
   async parseSingle(@Request() req, @Body() parseDto: ParseSingleMLSDto) {
     try {
       const result = await this.mlsParserService.parseSingleMLS(
@@ -125,6 +134,7 @@ export class MLSParserController {
 
   // Parse multiple MLS URLs
   @Post('parse-batch')
+  @UseGuards(JwtAuthGuard)
   async parseBatch(
     @Request() req,
     @Body() parseDto: ParseMLSUrlsDto,
