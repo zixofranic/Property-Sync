@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('api')
 export class HealthController {
@@ -27,36 +28,32 @@ export class HealthController {
     }
   }
 
-  @Public()
+  // REMOVED @Public() - Now requires authentication
   @Get('db-status')
+  @UseGuards(JwtAuthGuard)
   async getDatabaseStatus(): Promise<any> {
     try {
-      // Check if tables exist and get counts
-      const userCount = await this.prisma.user.count();
-      const profileCount = await this.prisma.profile.count();
-      const clientCount = await this.prisma.client.count();
+      // Simple connection test only - no sensitive data exposure
+      await this.prisma.$queryRaw`SELECT 1`;
       
       return {
         status: 'ok',
-        tables: {
-          users: userCount,
-          profiles: profileCount,
-          clients: clientCount,
-        },
-        database: 'tables_exist'
+        database: 'connected',
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Database status error:', error);
       return {
         status: 'error',
-        error: error.message,
-        database: 'tables_missing_or_error'
+        database: 'disconnected',
+        timestamp: new Date().toISOString(),
       };
     }
   }
 
-  @Public()
+  // DANGEROUS: Database initialization - restrict to admins only
   @Get('db-init')
+  @UseGuards(JwtAuthGuard) 
   async initializeDatabase(): Promise<any> {
     try {
       console.log('Creating all required database tables...');

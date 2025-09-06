@@ -52,6 +52,7 @@ model User {
   clients     Client[]
   timelines   Timeline[]
   propertyBatches PropertyBatch[]
+  mlsConnection MLSConnection?
   
   @@map("users")
 }
@@ -405,4 +406,38 @@ model BatchProperty {
   
   @@index([batchId, position])
   @@map("batch_properties")
+}
+
+// NEW: MLS Connection model for Spark API integration
+model MLSConnection {
+  id          String   @id @default(cuid())
+  userId      String   @unique // One MLS connection per user
+  
+  // MLS Details
+  mlsName     String   // e.g., "Greater Louisville AOR" 
+  mlsRegion   String   // e.g., "Kentucky"
+  
+  // Spark API Integration
+  sparkUserId String?  // User ID from Spark/Flexmls
+  accessToken String?  // OAuth access token
+  refreshToken String? // OAuth refresh token
+  tokenExpiry DateTime?
+  
+  // Connection Status
+  isActive    Boolean  @default(false)
+  lastSync    DateTime?
+  syncStatus  String   @default("never") // 'never', 'syncing', 'success', 'failed'
+  syncError   String?
+  
+  // Connection Metadata
+  connectionData Json? // Store additional MLS-specific data
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isActive])
+  @@map("mls_connections")
 }

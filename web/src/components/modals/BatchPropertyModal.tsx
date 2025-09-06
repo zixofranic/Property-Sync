@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { apiClient, BatchProperty, PropertyBatch } from '@/lib/api-client';
+import { useSafeModalClose } from '@/hooks/useSafeModalClose';
 
 interface BatchPropertyModalProps {
   isOpen: boolean;
@@ -41,9 +42,31 @@ export function BatchPropertyModal({ isOpen, onClose, onImportSuccess }: BatchPr
   // Current timeline
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
 
-  // Reset state when modal opens/closes
+  // Check if there's work in progress that shouldn't be lost
+  const hasUnsavedChanges = mlsUrls.length > 0 || 
+                           batch?.properties?.length > 0 || 
+                           isProcessing || 
+                           isImporting ||
+                           Object.keys(editingDescriptions).length > 0;
+
+  console.log('BatchPropertyModal - hasUnsavedChanges:', hasUnsavedChanges, {
+    mlsUrlsLength: mlsUrls.length,
+    batchPropertiesLength: batch?.properties?.length || 0,
+    isProcessing,
+    isImporting,
+    editingDescriptionsCount: Object.keys(editingDescriptions).length
+  });
+
+  const { handleBackdropClick, handleSafeClose } = useSafeModalClose({
+    hasUnsavedChanges,
+    onClose,
+    confirmMessage: 'You have properties ready to import or in progress. Are you sure you want to close and lose this work?'
+  });
+
+  // Reset state only when modal closes (not when it opens)
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      // Only reset when modal is closed
       setCurrentMlsUrl('');
       setMlsUrls([]);
       setBatch(null);
@@ -343,7 +366,7 @@ export function BatchPropertyModal({ isOpen, onClose, onImportSuccess }: BatchPr
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={onClose}
+          onClick={handleBackdropClick}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -364,7 +387,7 @@ export function BatchPropertyModal({ isOpen, onClose, onImportSuccess }: BatchPr
               </div>
               
               <button
-                onClick={onClose}
+                onClick={handleSafeClose}
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
@@ -545,7 +568,7 @@ export function BatchPropertyModal({ isOpen, onClose, onImportSuccess }: BatchPr
                   
                   <div className="flex items-center space-x-4">
                     <button
-                      onClick={onClose}
+                      onClick={handleSafeClose}
                       className="px-6 py-3 text-slate-400 hover:text-white transition-colors"
                     >
                       Cancel

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, MessageCircle, X, ExternalLink, MapPin, DollarSign, ChevronLeft, ChevronRight, Bed, Bath, Square } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
 import { Property } from '@/stores/missionControlStore';
 
 interface PropertyCardProps {
@@ -12,6 +13,7 @@ interface PropertyCardProps {
   onFeedback?: (propertyId: string, feedback: 'love' | 'like' | 'dislike', notes?: string) => void;
   onViewMLS?: (mlsLink: string) => void;
   onDelete?: (propertyId: string) => void;
+  onDeletePhoto?: (propertyId: string, photoUrl: string) => void;
   isClientView?: boolean;
   index: number;
   isAlternating?: boolean;
@@ -22,6 +24,7 @@ export function PropertyCard({
   onFeedback, 
   onViewMLS, 
   onDelete,
+  onDeletePhoto,
   isClientView = false,
   index,
   isAlternating = false
@@ -32,7 +35,10 @@ export function PropertyCard({
     property.clientFeedback || null
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 
   // Get all images (handle both single imageUrl and multiple imageUrls)
   const images = property.imageUrls?.length > 0 
@@ -59,6 +65,29 @@ export function PropertyCard({
       onDelete(property.id);
       setShowDeleteConfirm(false);
     }
+  };
+
+  const handleDeletePhoto = (photoUrl: string) => {
+    setPhotoToDelete(photoUrl);
+    setShowDeletePhotoConfirm(true);
+  };
+
+  const confirmDeletePhoto = () => {
+    if (onDeletePhoto && photoToDelete) {
+      onDeletePhoto(property.id, photoToDelete);
+      setShowDeletePhotoConfirm(false);
+      setPhotoToDelete(null);
+      
+      // Adjust current image index if needed
+      if (currentImageIndex >= images.length - 1 && currentImageIndex > 0) {
+        setCurrentImageIndex(currentImageIndex - 1);
+      }
+    }
+  };
+
+  const cancelDeletePhoto = () => {
+    setShowDeletePhotoConfirm(false);
+    setPhotoToDelete(null);
   };
 
   const formatTimestamp = (dateString: string) => {
@@ -142,12 +171,47 @@ export function PropertyCard({
         whileHover={{ scale: 1.02, x: isAlternating ? 0 : 10 }}
       >
         {/* Property Image - BIGGER WITH OVERLAYS */}
-        <div className="relative h-80 bg-slate-700">
+        <div className="relative h-80 bg-slate-700 group">
+          {/* Clickable overlay for photo viewer - Only when not loading */}
+          {!isLoading && (
+            <div 
+              className="absolute inset-0 z-10 cursor-pointer"
+              onClick={(e) => {
+                // Only open photo viewer if clicking on image background, not on buttons/links
+                if (e.target === e.currentTarget) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  console.log('Image overlay clicked, opening photo viewer');
+                  setShowPhotoViewer(true);
+                }
+              }}
+              title="Click on image background to view in full size"
+            />
+          )}
+          
           <img
             src={images[currentImageIndex]}
             alt={property.address}
             className="w-full h-full object-cover"
           />
+          
+          {/* Photo Delete Button - Only for agents */}
+          {!isClientView && images.length > 1 && !isLoading && (
+            <div className="absolute top-2 right-2 z-30">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeletePhoto(images[currentImageIndex]);
+                }}
+                className="opacity-0 group-hover:opacity-100 bg-red-600/80 hover:bg-red-500 text-white p-2 rounded-full transition-all duration-200 backdrop-blur-sm"
+                title="Delete this photo"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          )}
           
           {/* Loading Overlay */}
           {isLoading && (
@@ -160,31 +224,47 @@ export function PropertyCard({
           {hasMultipleImages && !isLoading && (
             <>
               <button
-                onClick={() => setCurrentImageIndex((prev) => prev === 0 ? images.length - 1 : prev - 1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex((prev) => prev === 0 ? images.length - 1 : prev - 1);
+                }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setCurrentImageIndex((prev) => prev === images.length - 1 ? 0 : prev + 1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex((prev) => prev === images.length - 1 ? 0 : prev + 1);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
               
-              {/* Image Dots Indicator */}
-              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex space-x-2 z-20">
-                {images.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                      index === currentImageIndex 
-                        ? 'bg-white' 
-                        : 'bg-white/50 hover:bg-white/70'
-                    }`}
-                  />
-                ))}
+              {/* Image Dots Indicator - Scrollable for many images */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+                {images.length <= 8 ? (
+                  // Simple dots for 8 or fewer images
+                  <div className="flex space-x-2">
+                    {images.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                          index === currentImageIndex 
+                            ? 'bg-white' 
+                            : 'bg-white/50 hover:bg-white/70'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  // Compact indicator for many images - aligned with View Details button
+                  <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-sm font-medium shadow-lg">
+                    {currentImageIndex + 1} / {images.length}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -193,7 +273,7 @@ export function PropertyCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
           
           {/* Address - Top Left with Google Maps link */}
-          <div className="absolute top-4 left-4">
+          <div className="absolute top-4 left-4 z-20">
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`}
               target="_blank"
@@ -205,7 +285,7 @@ export function PropertyCard({
           </div>
 
           {/* Price - Bottom Right */}
-          <div className="absolute bottom-4 right-4">
+          <div className="absolute bottom-4 right-4 z-20">
             <p className="text-white text-2xl font-bold drop-shadow-lg">
               ${property.price.toLocaleString()}
             </p>
@@ -213,7 +293,7 @@ export function PropertyCard({
 
           {/* View Details Button - Bottom Left */}
           {property.mlsLink && (
-            <div className="absolute bottom-4 left-4">
+            <div className="absolute bottom-4 left-4 z-20">
               <button
                 onClick={() => onViewMLS && onViewMLS(property.mlsLink!)}
                 className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
@@ -224,6 +304,32 @@ export function PropertyCard({
             </div>
           )}
         </div>
+
+        {/* Photo Delete Confirmation Dialog */}
+        {showDeletePhotoConfirm && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
+            <div className="bg-slate-800 border border-slate-600 rounded-xl p-6 max-w-sm mx-4">
+              <h3 className="text-white font-semibold text-lg mb-3">Delete Photo?</h3>
+              <p className="text-slate-300 text-sm mb-6">
+                Are you sure you want to delete this photo? This action cannot be undone.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={confirmDeletePhoto}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={cancelDeletePhoto}
+                  className="flex-1 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Property Details */}
         <div className="p-6">
@@ -411,6 +517,23 @@ export function PropertyCard({
           </div>
         </div>
       </motion.div>
+
+      {/* Photo Viewer Modal */}
+      {console.log('PropertyCard rendering PhotoViewerModal:', { 
+        showPhotoViewer, 
+        imagesCount: images.length, 
+        currentImageIndex,
+        property: property.address 
+      })}
+      <PhotoViewerModal
+        isOpen={showPhotoViewer}
+        onClose={() => setShowPhotoViewer(false)}
+        images={images}
+        initialIndex={currentImageIndex}
+        propertyAddress={property.address}
+        onDeletePhoto={onDeletePhoto ? (photoUrl) => onDeletePhoto(property.id, photoUrl) : undefined}
+        isClientView={isClientView}
+      />
     </motion.div>
   );
 }

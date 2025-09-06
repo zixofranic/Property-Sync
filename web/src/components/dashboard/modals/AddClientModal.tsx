@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, Phone, UserPlus, Heart, Edit3 } from 'lucide-react';
 import { useMissionControlStore, Client } from '@/stores/missionControlStore';
+import { useSafeModalClose } from '@/hooks/useSafeModalClose';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -28,27 +29,60 @@ export function AddClientModal({ isOpen, onClose, editingClient = null }: AddCli
     phone: '',
     spouseEmail: ''
   });
+  const [initialFormData, setInitialFormData] = useState<ClientFormData>({
+    name: '',
+    email: '',
+    phone: '',
+    spouseEmail: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const isEditMode = !!editingClient;
 
+  // Check if form has changes by comparing to initial state
+  const hasUnsavedChanges = 
+    formData.name !== initialFormData.name ||
+    formData.email !== initialFormData.email ||
+    formData.phone !== initialFormData.phone ||
+    formData.spouseEmail !== initialFormData.spouseEmail;
+
+  // Debug logging
+  console.log('AddClientModal - hasUnsavedChanges:', hasUnsavedChanges, {
+    isEditMode,
+    formData,
+    initialFormData,
+    editingClient
+  });
+
+  const { handleBackdropClick, handleSafeClose } = useSafeModalClose({
+    hasUnsavedChanges,
+    onClose,
+    confirmMessage: isEditMode 
+      ? 'You have unsaved changes to this client. Discard changes?' 
+      : 'You have unsaved client information. Discard and close?'
+  });
+
   // Populate form when editing
   useEffect(() => {
     if (editingClient) {
-      setFormData({
+      const clientData = {
         name: editingClient.name || '',
         email: editingClient.email || '',
         phone: editingClient.phone || '',
         spouseEmail: editingClient.spouseEmail || ''
-      });
+      };
+      setFormData(clientData);
+      setInitialFormData(clientData);
     } else {
       // Reset form for add mode
-      setFormData({
+      const emptyData = {
         name: '',
         email: '',
         phone: '',
         spouseEmail: ''
-      });
+      };
+      setFormData(emptyData);
+      setInitialFormData(emptyData);
     }
   }, [editingClient, isOpen]);
 
@@ -141,7 +175,7 @@ export function AddClientModal({ isOpen, onClose, editingClient = null }: AddCli
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={onClose}
+          onClick={handleBackdropClick}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -167,7 +201,7 @@ export function AddClientModal({ isOpen, onClose, editingClient = null }: AddCli
               </div>
               
               <button
-                onClick={onClose}
+                onClick={handleSafeClose}
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
@@ -247,7 +281,7 @@ export function AddClientModal({ isOpen, onClose, editingClient = null }: AddCli
               <div className="flex items-center justify-end space-x-4 pt-4">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleSafeClose}
                   className="px-6 py-3 text-slate-400 hover:text-white transition-colors"
                   disabled={isLoading}
                 >

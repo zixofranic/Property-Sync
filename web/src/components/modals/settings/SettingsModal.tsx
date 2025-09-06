@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { PasswordChangeModal } from '@/components/profile/PasswordChangeModal';
 import { ImageUrlInput } from '@/components/ui/ImageUrlInput';
+import { useSafeModalClose } from '@/hooks/useSafeModalClose';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -68,6 +69,20 @@ export function SettingsModal({
     logo: initialPreferences.logo || ''
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Check if settings have been modified
+  const hasUnsavedChanges = JSON.stringify(preferences) !== JSON.stringify({
+    ...initialPreferences,
+    timezone: initialPreferences.timezone || 'America/New_York',
+    brandColor: initialPreferences.brandColor || '#3b82f6',
+    logo: initialPreferences.logo || ''
+  });
+
+  const { handleBackdropClick, handleSafeClose } = useSafeModalClose({
+    hasUnsavedChanges,
+    onClose,
+    confirmMessage: 'You have unsaved settings changes. Discard changes?'
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
@@ -574,7 +589,7 @@ export function SettingsModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-start lg:items-center justify-center p-2 lg:p-4"
-          onClick={onClose}
+          onClick={handleBackdropClick}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -612,7 +627,7 @@ export function SettingsModal({
                   )}
                   
                   <button
-                    onClick={onClose}
+                    onClick={handleSafeClose}
                     className="p-2 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
                   >
                     <X className="w-5 h-5 text-slate-400" />

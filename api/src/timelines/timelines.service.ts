@@ -272,6 +272,41 @@ export class TimelinesService {
     };
   }
 
+  async deletePropertyPhoto(agentId: string, propertyId: string, photoUrl: string) {
+    // Verify the agent owns this property
+    const property = await this.prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        timeline: { agentId },
+      },
+      include: { timeline: true },
+    });
+
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    // Remove the photo URL from the imageUrls array
+    const currentImages = property.imageUrls || [];
+    const updatedImages = currentImages.filter(url => url !== photoUrl);
+
+    // Update the property with the new image array
+    const updatedProperty = await this.prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        imageUrls: updatedImages,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      message: 'Photo deleted successfully',
+      propertyId,
+      deletedPhotoUrl: photoUrl,
+      remainingPhotos: updatedImages.length,
+    };
+  }
+
   async submitPropertyFeedback(
     shareToken: string,
     propertyId: string,

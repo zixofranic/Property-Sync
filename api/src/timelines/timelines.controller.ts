@@ -84,7 +84,14 @@ export class TimelinesController {
       mlsUrls: string[];
     },
   ) {
-    const agentId = req.user.id;
+    console.log('req.user:', req.user);
+    console.log('req.user.id:', req.user?.id);
+    const agentId = req.user?.id;
+    
+    if (!agentId) {
+      throw new Error('User ID not found in request');
+    }
+    
     return this.timelinesService.createAndParseBatch(
       agentId,
       batchData.clientId,
@@ -241,6 +248,22 @@ export class TimelinesController {
   ) {
     const agentId = req.user.id;
     return this.timelinesService.deleteProperty(agentId, propertyId);
+  }
+
+  // Delete specific photo from property
+  @UseGuards(JwtAuthGuard)
+  @Delete('properties/:propertyId/photos')
+  async deletePropertyPhoto(
+    @Request() req,
+    @Param('propertyId') propertyId: string,
+    @Body() deleteData: { photoUrl: string },
+  ) {
+    const agentId = req.user.id;
+    return this.timelinesService.deletePropertyPhoto(
+      agentId,
+      propertyId,
+      deleteData.photoUrl,
+    );
   }
 
   // Get email state

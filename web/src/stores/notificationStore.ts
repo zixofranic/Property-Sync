@@ -31,6 +31,7 @@ interface NotificationStore {
   settings: NotificationSettings;
   isInitialized: boolean;
   permissionStatus: NotificationPermission;
+  notificationTimers: Map<string, NodeJS.Timeout>;
   
   // Actions
   addNotification: (notification: Omit<TimelineNotification, 'id' | 'createdAt' | 'isRead' | 'isVisible'>) => void;
@@ -69,6 +70,7 @@ export const useNotificationStore = create<NotificationStore>()(
       settings: defaultSettings,
       isInitialized: false,
       permissionStatus: 'default',
+      notificationTimers: new Map(),
 
       // Actions
       addNotification: (notificationData) => {
@@ -86,12 +88,17 @@ export const useNotificationStore = create<NotificationStore>()(
 
         // Auto-hide banner notifications after 10 seconds if not interacted with
         if (notification.type === 'new-properties') {
-          setTimeout(() => {
+          const timer = setTimeout(() => {
             const currentNotification = get().notifications.find(n => n.id === notification.id);
             if (currentNotification && currentNotification.isVisible && !currentNotification.isRead) {
               get().hideNotification(notification.id);
             }
+            // Clean up timer reference
+            get().notificationTimers.delete(notification.id);
           }, 10000);
+          
+          // Store timer reference
+          get().notificationTimers.set(notification.id, timer);
         }
       },
 
@@ -104,12 +111,28 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       dismissNotification: (notificationId) => {
+        // Clear timer if exists
+        const timers = get().notificationTimers;
+        const timer = timers.get(notificationId);
+        if (timer) {
+          clearTimeout(timer);
+          timers.delete(notificationId);
+        }
+        
         set((state) => ({
           notifications: state.notifications.filter(n => n.id !== notificationId)
         }));
       },
 
       hideNotification: (notificationId) => {
+        // Clear timer if exists
+        const timers = get().notificationTimers;
+        const timer = timers.get(notificationId);
+        if (timer) {
+          clearTimeout(timer);
+          timers.delete(notificationId);
+        }
+        
         set((state) => ({
           notifications: state.notifications.map(n =>
             n.id === notificationId ? { ...n, isVisible: false } : n
@@ -118,10 +141,29 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       clearAllNotifications: () => {
+        // Clear all timers
+        const timers = get().notificationTimers;
+        for (const timer of timers.values()) {
+          clearTimeout(timer);
+        }
+        timers.clear();
+        
         set({ notifications: [] });
       },
 
       clearTimelineNotifications: (timelineId) => {
+        // Clear timers for notifications being removed
+        const timers = get().notificationTimers;
+        const notificationsToRemove = get().notifications.filter(n => n.timelineId === timelineId);
+        
+        notificationsToRemove.forEach(notification => {
+          const timer = timers.get(notification.id);
+          if (timer) {
+            clearTimeout(timer);
+            timers.delete(notification.id);
+          }
+        });
+        
         set((state) => ({
           notifications: state.notifications.filter(n => n.timelineId !== timelineId)
         }));
@@ -171,13 +213,14 @@ export const useNotificationStore = create<NotificationStore>()(
     }),
     {
       name: 'property-sync-notifications',
-      // Only persist settings and read status, not the notifications themselves
+      // Only persist settings and read status, not the notifications themselves or timers
       partialize: (state) => ({
         settings: state.settings,
         notifications: state.notifications.map(n => ({
           ...n,
           isVisible: false // Don't persist visibility state
         }))
+        // notificationTimers are excluded from persistence as they can't be serialized
       })
     }
   )

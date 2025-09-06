@@ -248,6 +248,7 @@ interface MissionControlActions extends EmailActions {
   addProperty: (propertyData: Omit<Property, 'id' | 'clientId' | 'addedAt'>) => Promise<void>;
   updateProperty: (propertyId: string, updates: Partial<Property>) => Promise<void>;
   deleteProperty: (propertyId: string) => Promise<void>;
+  deletePropertyPhoto: (propertyId: string, photoUrl: string) => Promise<void>;
   revokeTimelineAccess: (timelineId: string) => Promise<void>;
 
   // Analytics Actions
@@ -1734,6 +1735,66 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           }
         },
 
+        deletePropertyPhoto: async (propertyId: string, photoUrl: string) => {
+          try {
+            console.log('Store: Deleting photo from property:', propertyId);
+            
+            // Optimistically update UI first (remove photo immediately)
+            set((state) => ({
+              activeTimeline: state.activeTimeline ? {
+                ...state.activeTimeline,
+                properties: state.activeTimeline.properties.map((property) =>
+                  property.id === propertyId
+                    ? {
+                        ...property,
+                        imageUrls: property.imageUrls?.filter(url => url !== photoUrl) || []
+                      }
+                    : property
+                ),
+              } : null,
+            }));
+
+            // Then make API call
+            const response = await apiClient.request(`/api/v1/timelines/properties/${propertyId}/photos`, {
+              method: 'DELETE',
+              body: JSON.stringify({ photoUrl })
+            });
+            
+            if (response.error) {
+              // Revert optimistic update on error
+              set((state) => ({
+                activeTimeline: state.activeTimeline ? {
+                  ...state.activeTimeline,
+                  properties: state.activeTimeline.properties.map((property) =>
+                    property.id === propertyId && !property.imageUrls?.includes(photoUrl)
+                      ? {
+                          ...property,
+                          imageUrls: [...(property.imageUrls || []), photoUrl]
+                        }
+                      : property
+                  ),
+                } : null,
+              }));
+              
+              throw new Error(response.error);
+            }
+
+            console.log('Store: Photo deleted successfully');
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to delete photo';
+            console.error('Store: Photo deletion error:', error);
+            
+            get().addNotification({
+              type: 'error',
+              title: 'Delete Failed',
+              message: errorMessage,
+              read: false,
+            });
+            
+            throw error;
+          }
+        },
+
         revokeTimelineAccess: async (timelineId: string) => {
           try {
             console.log('Store: Revoking timeline access for:', timelineId);
@@ -2217,12 +2278,47 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           sidebarOpen: state.sidebarOpen,
           selectedView: state.selectedView,
           userPreferences: state.userPreferences,
+          notifications: state.notifications,
         }),
+        skipHydration: false,
+        // Force synchronization across tabs
+        onRehydrateStorage: (state) => {
+          return (state, error) => {
+            if (error) {
+              console.log('An error happened during hydration', error);
+            } else {
+              console.log('Hydration finished with state:', state?.notifications?.length || 0, 'notifications');
+            }
+          };
+        },
       }
     ),
     { name: 'Mission Control Store' }
   )
 );
+
+// Cross-tab synchronization for notifications
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'mission-control-store' && e.newValue) {
+      try {
+        const newState = JSON.parse(e.newValue);
+        const currentState = useMissionControlStore.getState();
+        
+        // Only sync notifications if they've changed
+        if (newState.state?.notifications && 
+            JSON.stringify(newState.state.notifications) !== JSON.stringify(currentState.notifications)) {
+          console.log('Cross-tab sync: Updating notifications from storage event', newState.state.notifications.length);
+          useMissionControlStore.setState({ 
+            notifications: newState.state.notifications 
+          });
+        }
+      } catch (error) {
+        console.warn('Cross-tab sync: Failed to parse storage event', error);
+      }
+    }
+  });
+}
 
 // API Client Integration Setup
 export const initializeApiClientIntegration = () => {

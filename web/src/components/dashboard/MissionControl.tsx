@@ -30,6 +30,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
+import { useHUD } from '@/providers/HUDProvider';
 import { BatchPropertyModal } from '../modals/BatchPropertyModal';
 import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
@@ -58,6 +59,7 @@ export function MissionControl() {
     markNotificationAsRead,
     clearAllNotifications,
     deleteProperty,
+    deletePropertyPhoto,
     getPropertyById,
     bulkMode,
     sendBulkProperties,
@@ -75,6 +77,7 @@ export function MissionControl() {
     createFeedbackNotification,
   } = useMissionControlStore();
   
+  const { setShowPropertyHUD } = useHUD();
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [mlsModal, setMlsModal] = useState<{ isOpen: boolean; url: string; address: string }>({
     isOpen: false,
@@ -316,6 +319,21 @@ export function MissionControl() {
     const property = getPropertyById(propertyId);
     if (property && confirm(`Delete "${property.address || 'this property'}"?\n\nThis action cannot be undone.`)) {
       deleteProperty(propertyId);
+    }
+  };
+
+  const handleDeletePhoto = async (propertyId: string, photoUrl: string) => {
+    try {
+      await deletePropertyPhoto(propertyId, photoUrl);
+      
+      addNotification({
+        type: 'success',
+        title: 'Photo deleted',
+        message: 'The photo has been successfully removed from the property.',
+      });
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      // Error notification is handled in the store
     }
   };
 
@@ -1129,6 +1147,7 @@ const testProfileAPI = async () => {
                                 onViewMLS={(mlsLink) => handleViewMLS(mlsLink, property.address)}
                                 onEdit={handleEditProperty}
                                 onDelete={handleDeleteProperty}
+                                onDeletePhoto={handleDeletePhoto}
                                 isClientView={false}
                                 index={currentIndex}
                                 isAlternating={true}

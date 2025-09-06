@@ -3,12 +3,13 @@
 
 import { use, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell, Building } from 'lucide-react';
+import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell, Building, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
 import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
 import { initializePushNotifications } from '@/lib/push-notifications';
 import { AgentCard } from '@/components/agent/AgentCard';
+import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
 
 // API Response Types
 interface ClientTimelineData {
@@ -108,6 +109,9 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [showNotificationDropdown, setShowNotificationDropdown] = useState<boolean>(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [clientMessages, setClientMessages] = useState<any[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+  const [photoViewerData, setPhotoViewerData] = useState<{ images: string[]; initialIndex: number; address: string } | null>(null);
 
   // Helper function to manage dismissed notifications in localStorage
   const getDismissedNotifications = () => {
@@ -584,6 +588,31 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
   };
 
+  // Photo viewer handlers
+  const handleImageClick = (property: any, imageIndex: number = 0) => {
+    const images = property.imageUrls?.length > 0 ? property.imageUrls : [property.imageUrls?.[0] || '/api/placeholder/400/300'];
+    setPhotoViewerData({
+      images,
+      initialIndex: imageIndex,
+      address: property.address
+    });
+    setShowPhotoViewer(true);
+  };
+
+  const handlePreviousImage = (propertyId: string, images: string[]) => {
+    setCurrentImageIndex(prev => {
+      const current = prev[propertyId] || 0;
+      return { ...prev, [propertyId]: current === 0 ? images.length - 1 : current - 1 };
+    });
+  };
+
+  const handleNextImage = (propertyId: string, images: string[]) => {
+    setCurrentImageIndex(prev => {
+      const current = prev[propertyId] || 0;
+      return { ...prev, [propertyId]: current === images.length - 1 ? 0 : current + 1 };
+    });
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -1037,18 +1066,94 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                 />
 
                                 {/* Property Image */}
-                                <div className="relative h-64 bg-slate-700">
-                                  <img
-                                    src={property.imageUrls[0] || '/api/placeholder/400/300'}
-                                    alt={property.address}
-                                    className="w-full h-full object-cover"
-                                  />
+                                <div className="relative h-64 bg-slate-700 group">
+                                  {(() => {
+                                    const images = property.imageUrls?.length > 0 ? property.imageUrls : ['/api/placeholder/400/300'];
+                                    const hasMultipleImages = images.length > 1;
+                                    const currentIndex = currentImageIndex[property.id] || 0;
+                                    
+                                    return (
+                                      <>
+                                        {/* Clickable overlay for photo viewer - only in empty areas */}
+                                        <div 
+                                          className="absolute inset-0 z-10 cursor-pointer"
+                                          onClick={(e) => {
+                                            // Only open photo viewer if clicking on image background, not on buttons/links
+                                            if (e.target === e.currentTarget) {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              handleImageClick(property, currentIndex);
+                                            }
+                                          }}
+                                          title="Click on image background to view in full size"
+                                        />
+                                        
+                                        <img
+                                          src={images[currentIndex]}
+                                          alt={property.address}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        
+                                        {/* Image Navigation Arrows */}
+                                        {hasMultipleImages && (
+                                          <>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePreviousImage(property.id, images);
+                                              }}
+                                              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
+                                            >
+                                              <ChevronLeft className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleNextImage(property.id, images);
+                                              }}
+                                              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
+                                            >
+                                              <ChevronRight className="w-5 h-5" />
+                                            </button>
+                                            
+                                            {/* Image Count Indicator */}
+                                            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
+                                              {images.length <= 8 ? (
+                                                // Simple dots for 8 or fewer images
+                                                <div className="flex space-x-2">
+                                                  {images.map((_, index) => (
+                                                    <button
+                                                      key={index}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setCurrentImageIndex(prev => ({ ...prev, [property.id]: index }));
+                                                      }}
+                                                      className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                                                        index === currentIndex 
+                                                          ? 'bg-white' 
+                                                          : 'bg-white/50 hover:bg-white/70'
+                                                      }`}
+                                                    />
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                // Compact indicator for many images
+                                                <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-sm font-medium shadow-lg">
+                                                  {currentIndex + 1} / {images.length}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </>
+                                        )}
+                                      </>
+                                    );
+                                  })()} 
                                   
                                   {/* Dark Gradient Overlay */}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
                                   
                                   {/* Address - Top Left */}
-                                  <div className="absolute top-3 left-3">
+                                  <div className="absolute top-3 left-3 z-20">
                                     <a
                                       href={getGoogleMapsUrl(property.address)}
                                       target="_blank"
@@ -1060,7 +1165,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                   </div>
 
                                   {/* Price - Bottom Right */}
-                                  <div className="absolute bottom-3 right-3">
+                                  <div className="absolute bottom-3 right-3 z-20">
                                     <p className="text-white text-xl font-bold drop-shadow-lg">
                                       ${property.price.toLocaleString()}
                                     </p>
@@ -1068,7 +1173,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
                                   {/* View Details Button - Bottom Left */}
                                   {property.listingUrl && (
-                                    <div className="absolute bottom-3 left-3">
+                                    <div className="absolute bottom-3 left-3 z-20">
                                       <button
                                         onClick={() => handleMLSClick(property)}
                                         className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors shadow-lg text-sm"
@@ -1266,18 +1371,94 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                   />
 
                                   {/* Property Image - ENHANCED WITH OVERLAYS */}
-                                  <div className="relative h-80 bg-slate-700">
-                                    <img
-                                      src={property.imageUrls[0] || '/api/placeholder/400/300'}
-                                      alt={property.address}
-                                      className="w-full h-full object-cover"
-                                    />
+                                  <div className="relative h-80 bg-slate-700 group">
+                                    {(() => {
+                                      const images = property.imageUrls?.length > 0 ? property.imageUrls : ['/api/placeholder/400/300'];
+                                      const hasMultipleImages = images.length > 1;
+                                      const currentIndex = currentImageIndex[property.id] || 0;
+                                      
+                                      return (
+                                        <>
+                                          {/* Clickable overlay for photo viewer - only in empty areas */}
+                                          <div 
+                                            className="absolute inset-0 z-10 cursor-pointer"
+                                            onClick={(e) => {
+                                              // Only open photo viewer if clicking on image background, not on buttons/links
+                                              if (e.target === e.currentTarget) {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleImageClick(property, currentIndex);
+                                              }
+                                            }}
+                                            title="Click on image background to view in full size"
+                                          />
+                                          
+                                          <img
+                                            src={images[currentIndex]}
+                                            alt={property.address}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          
+                                          {/* Image Navigation Arrows */}
+                                          {hasMultipleImages && (
+                                            <>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handlePreviousImage(property.id, images);
+                                                }}
+                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
+                                              >
+                                                <ChevronLeft className="w-5 h-5" />
+                                              </button>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleNextImage(property.id, images);
+                                                }}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all duration-200 z-30"
+                                              >
+                                                <ChevronRight className="w-5 h-5" />
+                                              </button>
+                                              
+                                              {/* Image Count Indicator */}
+                                              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
+                                                {images.length <= 8 ? (
+                                                  // Simple dots for 8 or fewer images
+                                                  <div className="flex space-x-2">
+                                                    {images.map((_, index) => (
+                                                      <button
+                                                        key={index}
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setCurrentImageIndex(prev => ({ ...prev, [property.id]: index }));
+                                                        }}
+                                                        className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                                                          index === currentIndex 
+                                                            ? 'bg-white' 
+                                                            : 'bg-white/50 hover:bg-white/70'
+                                                        }`}
+                                                      />
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  // Compact indicator for many images
+                                                  <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-sm font-medium shadow-lg">
+                                                    {currentIndex + 1} / {images.length}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                     
                                     {/* Dark Gradient Overlay for Text Readability */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
                                     
                                     {/* Address - Top Left with Google Maps link */}
-                                    <div className="absolute top-4 left-4">
+                                    <div className="absolute top-4 left-4 z-20">
                                       <a
                                         href={getGoogleMapsUrl(property.address)}
                                         target="_blank"
@@ -1289,7 +1470,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                     </div>
 
                                     {/* Price - Bottom Right */}
-                                    <div className="absolute bottom-4 right-4">
+                                    <div className="absolute bottom-4 right-4 z-20">
                                       <p className="text-white text-2xl font-bold drop-shadow-lg">
                                         ${property.price.toLocaleString()}
                                       </p>
@@ -1297,7 +1478,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
                                     {/* View Details Button - Bottom Left */}
                                     {property.listingUrl && (
-                                      <div className="absolute bottom-4 left-4">
+                                      <div className="absolute bottom-4 left-4 z-20">
                                         <button
                                           onClick={() => handleMLSClick(property)}
                                           className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
@@ -1592,6 +1773,21 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Photo Viewer Modal */}
+      {photoViewerData && (
+        <PhotoViewerModal
+          isOpen={showPhotoViewer}
+          onClose={() => {
+            setShowPhotoViewer(false);
+            setPhotoViewerData(null);
+          }}
+          images={photoViewerData.images}
+          initialIndex={photoViewerData.initialIndex}
+          propertyAddress={photoViewerData.address}
+          isClientView={true}
+        />
       )}
 
       {/* Sticky Agent Card */}

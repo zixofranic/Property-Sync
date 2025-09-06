@@ -15,6 +15,7 @@ import { AgentModule } from './agent/agent.module'; // Add this import
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { EmailModule } from './email/email.module';
 import { MLSParserModule } from './mls-parser/mls-parser.module';
+import { SparkModule } from './spark/spark.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { MLSParserModule } from './mls-parser/mls-parser.module';
     AgentModule,
     EmailModule,
     MLSParserModule,
+    SparkModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

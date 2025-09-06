@@ -5,11 +5,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, User, Mail, Phone, Building, Globe, Award, Clock, Edit3, Save, Briefcase, Star, Calendar, Search,
-  CheckCircle, AlertCircle, LogOut
+  CheckCircle, AlertCircle, LogOut, Link, Shield
 } from 'lucide-react';
 import { useProfile, useProfileActions, UpdateProfileData } from '@/stores/profileStore';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { ImageUrlInput } from '@/components/ui/ImageUrlInput';
+import { apiClient } from '@/lib/api-client';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -478,6 +479,56 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                               placeholder="https://yourwebsite.com"
                             />
                           </div>
+                        </div>
+                      </div>
+
+                      {/* MLS Connection */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                          <Shield className="w-5 h-5 text-blue-400" />
+                          <span>MLS Connection</span>
+                        </h4>
+                        <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-3 h-3 bg-gray-500 rounded-full" />
+                              <span className="text-slate-300">Not Connected</span>
+                            </div>
+                            <button
+                              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                              onClick={async () => {
+                                try {
+                                  const response = await apiClient.request<{ authUrl: string }>('/api/v1/spark/auth/connect', {
+                                    method: 'GET',
+                                  });
+                                  
+                                  if (response.data?.authUrl) {
+                                    window.location.href = response.data.authUrl;
+                                  } else {
+                                    addNotification({
+                                      type: 'error',
+                                      title: 'Connection Failed',
+                                      message: response.error || 'Failed to connect to MLS. Please try again.',
+                                      read: false,
+                                    });
+                                  }
+                                } catch (error) {
+                                  addNotification({
+                                    type: 'error',
+                                    title: 'Connection Error',
+                                    message: 'Unable to connect to MLS service.',
+                                    read: false,
+                                  });
+                                }
+                              }}
+                            >
+                              <Link className="w-4 h-4" />
+                              <span>Connect MLS Account</span>
+                            </button>
+                          </div>
+                          <p className="text-sm text-slate-400">
+                            Connect your MLS account to automatically sync client lists and property data with PropertySync.
+                          </p>
                         </div>
                       </div>
 
