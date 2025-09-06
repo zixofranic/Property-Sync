@@ -98,8 +98,8 @@ export function HUDProvider({ children }: HUDProviderProps) {
             animate={{ opacity: 1, scale: 1 }}
             title="Open Property Collector"
             style={{ zIndex: 100 }}
-        >
-          <ShoppingBasket className="w-6 h-6" />
+          >
+            <ShoppingBasket className="w-6 h-6" />
           </motion.button>
         </>
       )}
