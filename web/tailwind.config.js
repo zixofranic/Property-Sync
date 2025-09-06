@@ -8,6 +8,51 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        /* ================================
+           UNIVERSAL THEME COLORS
+           ================================ */
+           
+        // Themed Backgrounds
+        'bg-primary': 'var(--bg-primary)',
+        'bg-secondary': 'var(--bg-secondary)',
+        'bg-tertiary': 'var(--bg-tertiary)',
+        'bg-quaternary': 'var(--bg-quaternary)',
+        
+        // Smart Text Colors
+        'text-super-light': 'var(--text-super-light)',
+        'text-light': 'var(--text-light)',
+        'text-neutral': 'var(--text-neutral)',
+        'text-dark': 'var(--text-dark)',
+        'text-super-dark': 'var(--text-super-dark)',
+        
+        // Theme-aware Brand Colors
+        'brand-primary': 'var(--brand-primary)',
+        'brand-primary-dark': 'var(--brand-primary-dark)',
+        'brand-primary-light': 'var(--brand-primary-light)',
+        'brand-secondary': 'var(--brand-secondary)',
+        'brand-secondary-dark': 'var(--brand-secondary-dark)',
+        
+        // Special Accent (for basket button, etc.)
+        'accent-special': 'var(--accent-special)',
+        'accent-special-dark': 'var(--accent-special-dark)',
+        
+        // Fixed Notification Colors
+        'success': 'var(--success)',
+        'success-dark': 'var(--success-dark)',
+        'error': 'var(--error)',
+        'error-dark': 'var(--error-dark)',
+        'warning': 'var(--warning)',
+        'warning-dark': 'var(--warning-dark)',
+        'info': 'var(--info)',
+        'info-dark': 'var(--info-dark)',
+        
+        // Glass Effects
+        'glass-bg': 'var(--glass-bg)',
+        'glass-border': 'var(--glass-border)',
+        
+        /* ================================
+           LEGACY COLORS (shadcn/ui compatibility)
+           ================================ */
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -41,6 +86,11 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+      },
+      backgroundImage: {
+        'gradient-primary': 'var(--gradient-primary)',
+        'gradient-secondary': 'var(--gradient-secondary)',
+        'gradient-special': 'var(--gradient-special)',
       },
       borderRadius: {
         lg: "var(--radius)",

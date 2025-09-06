@@ -91,7 +91,7 @@ export function HUDProvider({ children }: HUDProviderProps) {
               console.log('🛒 Basket button clicked - opening HUD');
               setShowPropertyHUDSynced(true);
               }}
-            className="fixed bottom-4 left-4 z-[100] w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 border-2 border-orange-300/50"
+            className="btn-special fixed bottom-4 left-4 z-[100] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-accent-special/30 hover:border-accent-special/50"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 1, scale: 1 }}

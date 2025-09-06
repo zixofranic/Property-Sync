@@ -3,6 +3,88 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* ================================
+       UNIVERSAL THEME SYSTEM
+       ================================ */
+    
+    /* Base Theme Hue (220 = blue/purple default) */
+    --theme-hue: 220;
+    
+    /* Background System (themed with low saturation) */
+    --bg-primary: hsl(var(--theme-hue), 15%, 8%);    /* Very dark themed */
+    --bg-secondary: hsl(var(--theme-hue), 12%, 12%); /* Dark themed */
+    --bg-tertiary: hsl(var(--theme-hue), 10%, 20%);  /* Medium themed */
+    --bg-quaternary: hsl(var(--theme-hue), 8%, 28%); /* Light themed background */
+    
+    /* Text System (neutral with subtle theme tint) */
+    --text-super-light: hsl(var(--theme-hue), 5%, 98%);  /* Near white */
+    --text-light: hsl(var(--theme-hue), 8%, 85%);        /* Light gray */
+    --text-neutral: hsl(var(--theme-hue), 10%, 65%);     /* Medium gray */
+    --text-dark: hsl(var(--theme-hue), 12%, 35%);        /* Dark gray */
+    --text-super-dark: hsl(var(--theme-hue), 15%, 10%);  /* Near black */
+    
+    /* Brand Colors (fully themed) */
+    --brand-primary: hsl(var(--theme-hue), 70%, 55%);
+    --brand-primary-dark: hsl(var(--theme-hue), 70%, 45%);
+    --brand-primary-light: hsl(var(--theme-hue), 60%, 65%);
+    --brand-secondary: hsl(calc(var(--theme-hue) + 60), 65%, 60%);
+    --brand-secondary-dark: hsl(calc(var(--theme-hue) + 60), 65%, 50%);
+    
+    /* Special Accent (complementary to theme - basket button) */
+    --accent-special: hsl(calc(var(--theme-hue) + 180), 75%, 55%);      /* Complementary hue */
+    --accent-special-dark: hsl(calc(var(--theme-hue) + 180), 75%, 45%); /* Darker variant */
+    
+    /* Fixed Notification Colors (always consistent) */
+    --success: hsl(120, 60%, 50%);    /* Green - always green */
+    --success-dark: hsl(120, 60%, 40%);
+    --error: hsl(0, 70%, 55%);        /* Red - always red */
+    --error-dark: hsl(0, 70%, 45%);
+    --warning: hsl(45, 85%, 55%);     /* Yellow - always yellow */
+    --warning-dark: hsl(45, 85%, 45%);
+    --info: hsl(200, 80%, 60%);       /* Blue - always blue */
+    --info-dark: hsl(200, 80%, 50%);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, 
+      hsl(var(--theme-hue), 70%, 55%) 0%, 
+      hsl(calc(var(--theme-hue) + 30), 65%, 50%) 100%);
+    --gradient-secondary: linear-gradient(135deg, 
+      hsl(var(--theme-hue), 50%, 25%) 0%, 
+      hsl(var(--theme-hue), 40%, 15%) 100%);
+    --gradient-special: linear-gradient(135deg, 
+      var(--accent-special) 0%, 
+      var(--accent-special-dark) 100%);
+    
+    /* Glass Effects */
+    --glass-bg: hsla(var(--theme-hue), 15%, 20%, 0.8);
+    --glass-border: hsla(var(--theme-hue), 20%, 40%, 0.2);
+    
+    /* ================================
+       LEGACY VARIABLES (keep existing)
+       ================================ */
+    --border: hsl(var(--theme-hue), 10%, 20%);
+    --input: hsl(var(--theme-hue), 8%, 15%);
+    --ring: hsl(var(--theme-hue), 70%, 55%);
+    --background: var(--bg-primary);
+    --foreground: var(--text-super-light);
+    --primary: var(--brand-primary);
+    --primary-foreground: var(--text-super-light);
+    --secondary: var(--bg-secondary);
+    --secondary-foreground: var(--text-light);
+    --destructive: var(--error);
+    --destructive-foreground: var(--text-super-light);
+    --muted: var(--bg-tertiary);
+    --muted-foreground: var(--text-neutral);
+    --accent: var(--brand-secondary);
+    --accent-foreground: var(--text-super-light);
+    --popover: var(--bg-secondary);
+    --popover-foreground: var(--text-light);
+    --card: var(--bg-secondary);
+    --card-foreground: var(--text-light);
+    --radius: 0.5rem;
+  }
+
   * {
     @apply border-border;
   }
@@ -18,12 +100,37 @@
 }
 
 @layer components {
+  /* Theme-aware glass effect */
   .glass {
-    @apply bg-white/10 backdrop-blur-md border border-white/20;
+    background: var(--glass-bg);
+    @apply backdrop-blur-md border;
+    border-color: var(--glass-border);
   }
   
+  /* Updated mission control gradient using theme variables */
   .mission-control-gradient {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    background: var(--gradient-secondary);
+  }
+  
+  /* Theme-aware utility classes */
+  .btn-primary {
+    background: var(--brand-primary);
+    color: var(--text-super-light);
+    @apply transition-all duration-200;
+  }
+  
+  .btn-primary:hover {
+    background: var(--brand-primary-dark);
+  }
+  
+  .btn-special {
+    background: var(--gradient-special);
+    color: var(--text-super-light);
+    @apply transition-all duration-200;
+  }
+  
+  .btn-special:hover {
+    background: var(--accent-special-dark);
   }
 }
 
