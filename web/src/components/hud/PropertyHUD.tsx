@@ -180,12 +180,12 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       >
         <button
           onClick={() => setIsMinimized(false)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-colors relative"
+          className="bg-brand-primary hover:bg-brand-primary-dark text-text-super-light rounded-full p-4 shadow-lg transition-colors relative"
           title="PropertySync HUD"
         >
           <ShoppingBasket className="w-6 h-6" />
           {collectedURLs.length > 0 && (
-            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+            <div className="absolute -top-2 -right-2 bg-error text-text-super-light text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
               {collectedURLs.length}
             </div>
           )}
@@ -199,14 +199,14 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       initial={{ x: 400, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 400, opacity: 0 }}
-      className="fixed top-4 right-4 w-96 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl z-50 max-h-[80vh] flex flex-col"
+      className="fixed top-4 right-4 w-96 bg-bg-primary/95 backdrop-blur-sm border border-bg-tertiary rounded-xl shadow-2xl z-50 max-h-[80vh] flex flex-col"
     >
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      <div className="p-4 border-b border-bg-tertiary flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <ShoppingBasket className="w-5 h-5 text-blue-400" />
-          <h3 className="font-semibold text-white">Property Collector</h3>
-          <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+          <ShoppingBasket className="w-5 h-5 text-brand-primary" />
+          <h3 className="font-semibold text-text-super-light">Property Collector</h3>
+          <div className="bg-brand-primary text-text-super-light text-xs px-2 py-1 rounded-full">
             {collectedURLs.length}
           </div>
         </div>
@@ -214,14 +214,14 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-1 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-white"
+            className="p-1 hover:bg-bg-tertiary rounded transition-colors text-text-neutral hover:text-text-super-light"
             title="Minimize"
           >
             <Minimize2 className="w-4 h-4" />
           </button>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-white"
+            className="p-1 hover:bg-bg-tertiary rounded transition-colors text-text-neutral hover:text-text-super-light"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -230,8 +230,8 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       </div>
 
       {/* Client Selection */}
-      <div className="p-4 border-b border-slate-700">
-        <label className="block text-sm text-slate-400 mb-2 flex items-center space-x-2">
+      <div className="p-4 border-b border-bg-tertiary">
+        <label className="block text-sm text-text-neutral mb-2 flex items-center space-x-2">
           <User className="w-4 h-4" />
           <span>Import for client:</span>
         </label>
@@ -241,7 +241,7 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
             const client = clients.find(c => c.id === e.target.value);
             selectClient(client || null);
           }}
-          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+          className="w-full bg-bg-secondary border border-bg-tertiary rounded-lg px-3 py-2 text-text-super-light text-sm"
         >
           <option value="">Select client...</option>
           {clients.map(client => (
@@ -253,7 +253,7 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       </div>
 
       {/* URL Input */}
-      <div className="p-4 border-b border-slate-700">
+      <div className="p-4 border-b border-bg-tertiary">
         <div className="flex space-x-2">
           <input
             type="url"
@@ -261,12 +261,12 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
             onChange={(e) => setCurrentURL(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Paste property URL here..."
-            className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-400 text-sm"
+            className="flex-1 bg-bg-secondary border border-bg-tertiary rounded-lg px-3 py-2 text-text-super-light placeholder-text-neutral text-sm"
           />
           <button
             onClick={addURL}
             disabled={!currentURL.trim()}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white p-2 rounded-lg transition-colors"
+            className="bg-brand-primary hover:bg-brand-primary-dark disabled:bg-bg-quaternary text-text-super-light p-2 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -276,7 +276,7 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       {/* URL List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
         {collectedURLs.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-8 text-text-neutral">
             <ShoppingBasket className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">No URLs collected yet</p>
             <p className="text-xs mt-1">Paste URLs above to get started</p>
@@ -287,24 +287,24 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
               key={item.id}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-800 border border-slate-600 rounded-lg p-3 group"
+              className="bg-bg-secondary border border-bg-tertiary rounded-lg p-3 group"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-blue-400 font-medium truncate">
+                  <p className="text-sm text-brand-primary font-medium truncate">
                     {item.title}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1 truncate">
+                  <p className="text-xs text-text-neutral mt-1 truncate">
                     {item.url}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-text-neutral mt-1">
                     {item.addedAt.toLocaleTimeString()}
                   </p>
                 </div>
                 
                 <button
                   onClick={() => removeURL(item.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-600 rounded transition-all text-red-400 hover:text-white ml-2"
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-error rounded transition-all text-error hover:text-text-super-light ml-2"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -315,11 +315,11 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t border-slate-700 flex items-center justify-between">
+      <div className="p-4 border-t border-bg-tertiary flex items-center justify-between">
         <button
           onClick={clearAll}
           disabled={collectedURLs.length === 0}
-          className="text-xs text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
+          className="text-xs text-text-neutral hover:text-error transition-colors disabled:opacity-50"
         >
           Clear All
         </button>
@@ -327,7 +327,7 @@ export function PropertyHUD({ isVisible, onClose }: PropertyHUDProps) {
         <button
           onClick={handleImport}
           disabled={!selectedClient || collectedURLs.length === 0 || isImporting}
-          className="bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+          className="bg-success hover:bg-success-dark disabled:bg-bg-quaternary text-text-super-light px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
         >
           <Download className="w-4 h-4" />
           <span>
