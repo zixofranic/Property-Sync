@@ -32,57 +32,50 @@ export function Notifications() {
   // Create a dependency that changes when notifications change
   const notificationKey = notifications?.map(n => `${n.id}-${n.read}`).join(',') || '';
 
-  // Auto-hide toasts after 2 seconds
-  useEffect(() => {
-    console.log('🔔 useEffect triggered with notifications:', notifications?.length || 0, 'key:', notificationKey);
-    if (!notifications) {
-      console.log('🔔 No notifications, returning');
-      return;
+  // Auto-hide toasts after 5 seconds with proper timer management
+  const hideNotification = useCallback((notificationId: string) => {
+    console.log('🔔 Hiding notification:', notificationId);
+    setHiddenToasts(prev => new Set(prev).add(notificationId));
+    
+    // Clean up timer
+    if (timersRef.current[notificationId]) {
+      clearTimeout(timersRef.current[notificationId]);
+      delete timersRef.current[notificationId];
     }
+  }, []);
+
+  useEffect(() => {
+    if (!notifications) return;
 
     console.log('🔔 Processing notifications:', notifications.length);
     console.log('🔔 Current timers:', Object.keys(timersRef.current));
-    console.log('🔔 Current hiddenToasts:', Array.from(hiddenToasts));
     
+    // Only handle new notifications that don't have timers yet
     notifications.forEach(notification => {
-      console.log('🔔 Checking notification:', notification.id, {
-        title: notification.title,
-        read: notification.read,
-        hasTimer: !!timersRef.current[notification.id],
-        isHidden: hiddenToasts.has(notification.id)
-      });
+      const hasTimer = !!timersRef.current[notification.id];
+      const isHidden = hiddenToasts.has(notification.id);
       
-      if (!notification.read && !timersRef.current[notification.id]) {
-        console.log('🔔 Setting timer for:', notification.id, notification.title);
-        // Set timer to hide this toast after 2 seconds
+      if (!notification.read && !hasTimer && !isHidden) {
+        console.log('🔔 Setting timer for new notification:', notification.id, notification.title);
+        
         timersRef.current[notification.id] = setTimeout(() => {
-          console.log('🔔 Timer fired! Hiding notification:', notification.id, notification.title);
-          setHiddenToasts(prev => {
-            const newHidden = new Set(prev).add(notification.id);
-            console.log('🔔 Hidden toasts updated:', Array.from(newHidden));
-            return newHidden;
-          });
-          delete timersRef.current[notification.id];
-        }, 2000);
-      } else {
-        console.log('🔔 Skipping notification:', notification.id, 'read:', notification.read, 'hasTimer:', !!timersRef.current[notification.id]);
+          console.log('🔔 Auto-hiding notification:', notification.id);
+          hideNotification(notification.id);
+        }, 5000); // Increased to 5 seconds for better UX
       }
     });
 
-    // Cleanup timers for notifications that no longer exist or are read
+    // Clean up timers for removed or read notifications
     Object.keys(timersRef.current).forEach(notificationId => {
       const notification = notifications.find(n => n.id === notificationId);
       if (!notification || notification.read) {
-        console.log('🔔 Cleaning up timer for:', notificationId, !notification ? 'missing' : 'read');
+        console.log('🔔 Cleaning up timer for:', notificationId);
         clearTimeout(timersRef.current[notificationId]);
         delete timersRef.current[notificationId];
       }
     });
 
-    return () => {
-      Object.values(timersRef.current).forEach(timer => clearTimeout(timer));
-    };
-  }, [notificationKey]); // Re-run when notification IDs or read states change
+  }, [notifications, hiddenToasts, hideNotification]);
 
   // Show only unread notifications that haven't been hidden yet
   const toastNotifications = (notifications || [])
@@ -171,17 +164,8 @@ export function Notifications() {
                     <button
                       className="inline-flex text-white hover:text-white/80 focus:outline-none"
                       onClick={() => {
-                        // Hide toast immediately and clear timer
                         console.log('🔔 Manual close clicked for:', notification.id, notification.title);
-                        setHiddenToasts(prev => {
-                          const newHidden = new Set(prev).add(notification.id);
-                          console.log('🔔 Hidden toasts now:', Array.from(newHidden));
-                          return newHidden;
-                        });
-                        if (timersRef.current[notification.id]) {
-                          clearTimeout(timersRef.current[notification.id]);
-                          delete timersRef.current[notification.id];
-                        }
+                        hideNotification(notification.id);
                       }}
                     >
                       <X className="w-4 h-4" />
@@ -194,8 +178,8 @@ export function Notifications() {
                 className="absolute bottom-0 left-0 h-1 bg-white/30"
                 initial={{ width: '100%' }}
                 animate={{ width: '0%' }}
-                transition={{ duration: 2, ease: 'linear' }}
-                // ✅ CHANGED: duration: 4 → duration: 2 (matches the 2s auto-dismiss)
+                transition={{ duration: 5, ease: 'linear' }}
+                // ✅ CHANGED: duration: 2 → duration: 5 (matches the 5s auto-dismiss)
               />
             </motion.div>
           );

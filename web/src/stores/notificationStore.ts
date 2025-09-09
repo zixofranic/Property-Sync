@@ -88,6 +88,14 @@ export const useNotificationStore = create<NotificationStore>()(
 
         // Auto-hide banner notifications after 10 seconds if not interacted with
         if (notification.type === 'new-properties') {
+          const timers = get().notificationTimers;
+          
+          // Clear any existing timer for this notification ID (safety check)
+          const existingTimer = timers.get(notification.id);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+          }
+          
           const timer = setTimeout(() => {
             const currentNotification = get().notifications.find(n => n.id === notification.id);
             if (currentNotification && currentNotification.isVisible && !currentNotification.isRead) {
@@ -98,7 +106,7 @@ export const useNotificationStore = create<NotificationStore>()(
           }, 10000);
           
           // Store timer reference
-          get().notificationTimers.set(notification.id, timer);
+          timers.set(notification.id, timer);
         }
       },
 

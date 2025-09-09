@@ -82,6 +82,15 @@
 ---
 
 ## 🐛 Bug Fixes
+### Notifications
+- [ ] When more thatn on enotification show up the timer messes up and the notification balloon gets stuck. Scenario: message one in showing,
+and counter is going down, message 2 shows up and messes the timer, message 2 timer strats going down, than message 3 shoes up and the timer starts 
+going down, now message 1 and 2 are stuck and not disapeaing. 
+- [ ] most important element for the client and the agent is the mutual interaction. As in now, the agent is not notified about the client 
+giving a feedback. We need to fix this on 2 layers. 1- he should get a bubble notification and the notification should reside in his notification 
+bell. second, he should have an indicator on the image on the timeline showing (simiilar to new property on client when a new property is added)
+that this property had interaction. 
+
 
 ### Address Parsing
 - [x] Fix duplicate zip codes in property addresses

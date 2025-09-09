@@ -187,16 +187,16 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
             <div 
               className={`absolute inset-0 rounded-full ${
                 isNew 
-                  ? 'bg-green-400 animate-ping' 
-                  : 'bg-yellow-400 animate-pulse'
+                  ? 'bg-success animate-ping' 
+                  : 'bg-warning animate-pulse'
               }`}
             />
             {/* Solid icon */}
             <div 
               className={`relative w-full h-full rounded-full flex items-center justify-center ${
                 isNew 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-yellow-500 text-white'
+                  ? 'bg-success text-white' 
+                  : 'bg-warning text-white'
               }`}
             >
               {isNew ? (
@@ -209,7 +209,7 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
           
           {/* NEW label for new properties only */}
           {isNew && (
-            <div className="bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-bold tracking-wide">
+            <div className="bg-success text-white px-1.5 py-0.5 rounded text-xs font-bold tracking-wide">
               NEW
             </div>
           )}
@@ -224,6 +224,42 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
       initializePushNotifications();
     }
   }, []);
+
+  // Apply agent's brand color as theme hue
+  useEffect(() => {
+    if (timelineData?.agent?.brandColor) {
+      // Convert hex to HSL hue
+      const hexToHue = (hex: string): number => {
+        // Remove # if present
+        const cleanHex = hex.replace('#', '');
+        
+        // Convert to RGB
+        const r = parseInt(cleanHex.substr(0, 2), 16) / 255;
+        const g = parseInt(cleanHex.substr(2, 2), 16) / 255;
+        const b = parseInt(cleanHex.substr(4, 2), 16) / 255;
+        
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const diff = max - min;
+        
+        let hue = 0;
+        if (diff !== 0) {
+          if (max === r) {
+            hue = 60 * (((g - b) / diff) % 6);
+          } else if (max === g) {
+            hue = 60 * ((b - r) / diff + 2);
+          } else {
+            hue = 60 * ((r - g) / diff + 4);
+          }
+        }
+        
+        return Math.round(hue < 0 ? hue + 360 : hue);
+      };
+
+      const hue = hexToHue(timelineData.agent.brandColor);
+      document.documentElement.style.setProperty('--theme-hue', hue.toString());
+    }
+  }, [timelineData?.agent?.brandColor]);
 
   // Handle click outside notification dropdown
   useEffect(() => {
@@ -618,7 +654,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white text-lg">Loading your property timeline...</p>
         </div>
       </div>
@@ -649,8 +685,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/50 rounded-xl p-8"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-blue-400" />
+              <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-brand-primary" />
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">Access Your Timeline</h1>
               <p className="text-slate-400">
@@ -667,7 +703,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   type="text"
                   value={authForm.clientName}
                   onChange={(e) => setAuthForm(prev => ({ ...prev, clientName: e.target.value }))}
-                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50"
                   placeholder="Enter your first name"
                   required
                 />
@@ -681,7 +717,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   type="text"
                   value={authForm.phoneLastFour}
                   onChange={(e) => setAuthForm(prev => ({ ...prev, phoneLastFour: e.target.value.replace(/[^\d]/g, '').slice(0, 4) }))}
-                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50"
                   placeholder="1234"
                   maxLength={4}
                   required
@@ -692,15 +728,15 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 <motion.div 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
+                  className="p-3 bg-error/10 border border-error/20 rounded-lg"
                 >
-                  <p className="text-red-400 text-sm">{authError}</p>
+                  <p className="text-error text-sm">{authError}</p>
                 </motion.div>
               )}
 
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium transition-all duration-200 hover:scale-[1.02] shadow-lg"
+                className="w-full py-3 bg-gradient-to-r from-brand-primary to-brand-primary-dark hover:from-brand-primary-dark hover:to-brand-primary text-white rounded-xl font-medium transition-all duration-200 hover:scale-[1.02] shadow-lg"
               >
                 Access Timeline
               </button>
@@ -843,7 +879,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                     <div className="p-4 border-b border-slate-700/50">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-white flex items-center">
-                          <Bell className="w-5 h-5 mr-2 text-blue-400" />
+                          <Bell className="w-5 h-5 mr-2 text-brand-primary" />
                           Notifications
                         </h3>
                         <div className="flex items-center gap-2">
@@ -891,13 +927,13 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                           <div 
                             key={msg.id}
                             className={`p-4 hover:bg-slate-700/30 transition-colors relative group ${
-                              !msg.isRead ? 'bg-blue-900/20 border-l-2 border-blue-400' : ''
+                              !msg.isRead ? 'bg-brand-primary/20 border-l-2 border-brand-primary' : ''
                             } ${index < clientMessages.length - 1 ? 'border-b border-slate-700/30' : ''}`}
                           >
                             <div className="flex items-start space-x-3 pr-8">
                               <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
                                 msg.type === 'property' ? 'bg-green-400' :
-                                msg.type === 'message' ? 'bg-blue-400' : 'bg-yellow-400'
+                                msg.type === 'message' ? 'bg-brand-primary' : 'bg-warning'
                               }`} />
                               <div className="flex-1">
                                 <p className="text-white text-sm leading-relaxed">{msg.message}</p>
@@ -967,10 +1003,10 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
           {sortedProperties.length > 0 ? (
             <div className="relative">
               {/* Center Timeline Line for Large Screens */}
-              <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 transform -translate-x-1/2" />
+              <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-brand-primary via-brand-secondary to-brand-accent transform -translate-x-1/2" />
               
               {/* Left Timeline Line for Mobile - FIXED POSITION */}
-              <div className="lg:hidden absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500" />
+              <div className="lg:hidden absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-brand-primary via-brand-secondary to-brand-accent" />
 
               {/* Timeline Items - GROUPED BY DATE with proper responsive alignment */}
               <div className="space-y-8 lg:space-y-16 relative">
@@ -988,9 +1024,9 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                       >
                         {/* Mobile: Left-aligned date on timeline - MOVED 50PX LEFT */}
                         <div className="lg:hidden flex items-center">
-                          <div className="hidden xl:block w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 absolute left-2.5 z-20" />
+                          <div className="hidden xl:block w-3 h-3 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full border-2 border-slate-900 absolute left-2.5 z-20" />
                           <div className="ml-8" style={{marginLeft: '22px'}}>
-                            <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg inline-block">
+                            <div className="bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg inline-block">
                               {(() => {
                                 try {
                                   return new Date(dateString).toLocaleDateString('en-US', { 
@@ -1010,7 +1046,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                         {/* Desktop: Centered date */}
                         <div className="hidden lg:flex items-center justify-center">
                           <div className="relative">
-                            <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-xl text-center shadow-2xl border border-white/20 backdrop-blur-sm">
+                            <div className="bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent text-white px-6 py-3 rounded-2xl font-bold text-xl text-center shadow-2xl border border-white/20 backdrop-blur-sm">
                               {(() => {
                                 try {
                                   return new Date(dateString).toLocaleDateString('en-US', { 
@@ -1024,7 +1060,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                 }
                               })()}
                             </div>
-                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 rounded-2xl blur opacity-30" />
+                            <div className="absolute -inset-1 bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent rounded-2xl blur opacity-30" />
                           </div>
                         </div>
                       </motion.div>
@@ -1049,7 +1085,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                             {/* Mobile Layout - Single column with timeline dot */}
                             <div className="lg:hidden flex items-start w-full mb-6">
                               {/* Mobile Timeline Dot - HIDDEN on tablets and phones */}
-                              <div className="hidden xl:flex flex-shrink-0 w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-slate-900 relative z-10 mt-4" style={{marginLeft: '-1px'}}>
+                              <div className="hidden xl:flex flex-shrink-0 w-6 h-6 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full border-2 border-slate-900 relative z-10 mt-4" style={{marginLeft: '-1px'}}>
                                 <div className="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
                               </div>
 
@@ -1158,7 +1194,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                       href={getGoogleMapsUrl(property.address)}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-white font-bold text-base leading-tight drop-shadow-lg hover:text-blue-200 transition-colors inline-block"
+                                      className="text-white font-bold text-base leading-tight drop-shadow-lg hover:text-brand-primary-light transition-colors inline-block"
                                     >
                                       {property.address}
                                     </a>
@@ -1176,7 +1212,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                     <div className="absolute bottom-3 left-3 z-20">
                                       <button
                                         onClick={() => handleMLSClick(property)}
-                                        className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors shadow-lg text-sm"
+                                        className="inline-flex items-center space-x-2 bg-brand-primary hover:bg-brand-primary-dark text-white px-3 py-2 rounded-lg font-medium transition-colors shadow-lg text-sm"
                                       >
                                         <ExternalLink className="w-4 h-4" />
                                         <span>View Details</span>
@@ -1290,9 +1326,9 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                             <motion.div
                                               initial={{ opacity: 0, y: -10 }}
                                               animate={{ opacity: 1, y: 0 }}
-                                              className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                                              className="p-3 bg-brand-primary/10 border border-brand-primary/20 rounded-lg"
                                             >
-                                              <p className="text-blue-400 text-sm text-center">
+                                              <p className="text-brand-primary text-sm text-center">
                                                 💭 Add a note about this property or submit your feedback now!
                                               </p>
                                             </motion.div>
@@ -1308,7 +1344,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               onChange={(e) => setFeedbackNotes(prev => ({ ...prev, [property.id]: e.target.value }))}
                                               placeholder="Share your thoughts about this property..."
                                               rows={3}
-                                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary text-sm"
                                             />
                                             
                                             <motion.button
@@ -1316,7 +1352,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               disabled={!selectedFeedback[property.id]}
                                               className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
                                                 selectedFeedback[property.id]
-                                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                  ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
                                                   : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                                               }`}
                                               whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
@@ -1332,7 +1368,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
 
                                   {/* Property Meta */}
                                   <div className="mt-3 pt-3 border-t border-slate-600 text-xs text-slate-400 text-center">
-                                    <span className="text-blue-400 font-medium">{formatRelativeTime(property.createdAt)}</span>
+                                    <span className="text-brand-primary font-medium">{formatRelativeTime(property.createdAt)}</span>
                                   </div>
                                 </div>
                               </motion.div>
@@ -1347,7 +1383,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                 
                                 {/* Desktop Timeline Dot */}
                                 <div className="absolute left-1/2 top-8 transform -translate-x-1/2 z-20">
-                                  <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
+                                  <div className="w-6 h-6 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full border-4 border-slate-900 flex items-center justify-center">
                                     <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                                   </div>
                                 </div>
@@ -1463,7 +1499,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                         href={getGoogleMapsUrl(property.address)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-white font-bold text-lg leading-tight drop-shadow-lg hover:text-blue-200 transition-colors inline-block"
+                                        className="text-white font-bold text-lg leading-tight drop-shadow-lg hover:text-brand-primary-light transition-colors inline-block"
                                       >
                                         {property.address}
                                       </a>
@@ -1481,7 +1517,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                       <div className="absolute bottom-4 left-4 z-20">
                                         <button
                                           onClick={() => handleMLSClick(property)}
-                                          className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
+                                          className="inline-flex items-center space-x-2 bg-brand-primary hover:bg-brand-primary-dark text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
                                         >
                                           <ExternalLink className="w-4 h-4" />
                                           <span>View Details</span>
@@ -1589,9 +1625,9 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               <motion.div
                                                 initial={{ opacity: 0, y: -10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                                                className="p-3 bg-brand-primary/10 border border-brand-primary/20 rounded-lg"
                                               >
-                                                <p className="text-blue-400 text-sm text-center">
+                                                <p className="text-brand-primary text-sm text-center">
                                                   💭 Add a note about this property or submit your feedback now!
                                                 </p>
                                               </motion.div>
@@ -1607,7 +1643,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                                 onChange={(e) => setFeedbackNotes(prev => ({ ...prev, [property.id]: e.target.value }))}
                                                 placeholder="Share your thoughts about this property..."
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary text-sm"
                                               />
                                               
                                               {/* Submit Feedback Button */}
@@ -1616,7 +1652,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                                 disabled={!selectedFeedback[property.id]}
                                                 className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
                                                   selectedFeedback[property.id]
-                                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                    ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
                                                     : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                                                 }`}
                                                 whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
@@ -1633,7 +1669,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                     {/* Property Meta */}
                                     <div className="mt-4 pt-3 border-t border-slate-600 flex items-center justify-between text-xs text-slate-400">
                                       <div className="flex items-center space-x-4">
-                                        <span className="text-blue-400 font-medium">{formatRelativeTime(property.createdAt)}</span>
+                                        <span className="text-brand-primary font-medium">{formatRelativeTime(property.createdAt)}</span>
                                       </div>
                                     </div>
                                   </div>
