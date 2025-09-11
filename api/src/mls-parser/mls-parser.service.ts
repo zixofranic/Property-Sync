@@ -61,50 +61,44 @@ export class MLSParserService {
       this.logger.log(`Initializing browser - Platform: ${process.platform}, Production: ${isProduction}`);
       
       // Base configuration
-      let launchOptions = {
-        headless: 'new' as const,
+      let launchOptions: any = {
+        headless: true,
         timeout: 60000,
         ignoreDefaultArgs: ['--disable-extensions'],
       };
       
       if (isWindows) {
         // Windows configuration
-        launchOptions = {
-          ...launchOptions,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-gpu',
-            '--no-first-run',
-            '--disable-background-networking',
-            '--disable-background-timer-throttling',
-            '--disable-renderer-backgrounding',
-            '--disable-backgrounding-occluded-windows'
-          ]
-        };
+        launchOptions.args = [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--no-first-run',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ];
       } else {
         // Linux/production configuration for Railway
-        launchOptions = {
-          ...launchOptions,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-background-networking',
-            '--disable-background-timer-throttling',
-            '--disable-renderer-backgrounding',
-            '--disable-backgrounding-occluded-windows',
-            '--memory-pressure-off',
-            '--disable-features=TranslateUI',
-            '--disable-ipc-flooding-protection',
-            '--disable-web-security'
-          ]
-          // Let Puppeteer find Chrome automatically - don't hardcode path
-        };
+        launchOptions.args = [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--memory-pressure-off',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--disable-web-security'
+        ];
+        // Let Puppeteer find Chrome automatically - don't hardcode path
       }
       
       this.logger.log('Browser launch options:', JSON.stringify(launchOptions, null, 2));
@@ -123,7 +117,7 @@ export class MLSParserService {
       try {
         this.logger.log('Attempting fallback browser initialization...');
         this.browser = await puppeteer.launch({
-          headless: 'new' as const,
+          headless: true,
           args: ['--no-sandbox', '--disable-setuid-sandbox', '--single-process'],
           timeout: 30000
         });
