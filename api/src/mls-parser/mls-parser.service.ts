@@ -16,12 +16,8 @@ export class MLSParserService {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Skip browser initialization in production for now - Chrome issues in Railway container
-    if (process.env.NODE_ENV !== 'production') {
-      await this.initBrowser();
-    } else {
-      this.logger.warn('MLS parsing disabled in production - browser initialization skipped');
-    }
+    // Initialize browser on Railway - Railway handles Puppeteer better than Vercel
+    await this.initBrowser();
   }
 
   async onModuleDestroy() {
