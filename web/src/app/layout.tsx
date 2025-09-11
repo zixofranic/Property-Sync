@@ -4,7 +4,6 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { HUDProvider } from '@/providers/HUDProvider';
-import { ThemeTester } from '@/components/ui/ThemeTester';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,7 +25,6 @@ export default function RootLayout({
         <AuthProvider>
           <HUDProvider>
             {children}
-            <ThemeTester />
           </HUDProvider>
         </AuthProvider>
       </body>

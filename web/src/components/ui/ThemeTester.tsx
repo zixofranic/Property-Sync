@@ -25,7 +25,7 @@ export function ThemeTester() {
     return (
       <button
         onClick={() => setIsVisible(true)}
-        className="fixed top-4 right-4 z-50 p-3 bg-brand-primary hover:bg-brand-primary-dark text-text-super-light rounded-xl shadow-lg transition-all duration-200"
+        className="fixed bottom-4 right-4 z-50 p-3 bg-brand-primary hover:bg-brand-primary-dark text-text-super-light rounded-xl shadow-lg transition-all duration-200"
         title="Open Theme Tester"
       >
         <Palette className="w-5 h-5" />
@@ -34,7 +34,7 @@ export function ThemeTester() {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 bg-bg-secondary border border-bg-tertiary rounded-xl p-6 shadow-2xl backdrop-blur-md max-w-sm">
+    <div className="fixed bottom-20 right-4 z-50 bg-bg-secondary border border-bg-tertiary rounded-xl p-6 shadow-2xl backdrop-blur-md max-w-sm">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-text-super-light font-semibold flex items-center gap-2">
           <Palette className="w-4 h-4" />

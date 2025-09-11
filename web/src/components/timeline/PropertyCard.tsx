@@ -150,7 +150,7 @@ export function PropertyCard({
       {/* Timeline Dot */}
       {isAlternating && (
         <div className="hidden lg:flex absolute left-1/2 top-8 transform -translate-x-1/2 z-20">
-          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
+          <div className="w-6 h-6 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full border-4 border-bg-primary flex items-center justify-center">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
           </div>
         </div>
@@ -158,9 +158,9 @@ export function PropertyCard({
 
       {/* Regular Timeline Dot for non-alternating */}
       {!isAlternating && (
-        <div className="relative z-10 flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-lg">
+        <div className="relative z-10 flex items-center justify-center w-16 h-16 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full shadow-lg">
           <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-            <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full" />
+            <div className="w-3 h-3 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full" />
           </div>
         </div>
       )}

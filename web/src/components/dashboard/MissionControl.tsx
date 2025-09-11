@@ -1,7 +1,7 @@
 // apps/web/src/components/dashboard/MissionControl.tsx - ADDED: Loading animations for data retrieval
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -27,7 +27,8 @@ import {
   Mail,
   AlertCircle,
   X,
-  ExternalLink
+  ExternalLink,
+  Palette
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { useHUD } from '@/providers/HUDProvider';
@@ -100,6 +101,9 @@ export function MissionControl() {
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [currentHue, setCurrentHue] = useState(220);
+  const themeInitialized = useRef(false);
   const [emailState, setEmailState] = useState<any>(null);
   const [emailStateLoading, setEmailStateLoading] = useState(false);
   const [dismissedInitialBanner, setDismissedInitialBanner] = useState(false);
@@ -121,25 +125,63 @@ export function MissionControl() {
     // Check initial online status
     setIsOnline(navigator.onLine);
 
+    // Initialize theme hue only once to prevent spam
+    if (!themeInitialized.current) {
+      const savedHue = userPreferences?.themeHue;
+      const initialHue = savedHue || parseInt(getComputedStyle(document.documentElement).getPropertyValue('--theme-hue').trim() || '220');
+      
+      // Initialize without saving to database
+      setCurrentHue(initialHue);
+      document.documentElement.style.setProperty('--theme-hue', initialHue.toString());
+      themeInitialized.current = true;
+    }
+
     // Cleanup
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []); // âœ… FIXED: Empty dependency array, no auth dependencies
+  }, [userPreferences?.themeHue]); // Load saved theme hue when preferences change
 
-  // Close notifications dropdown when clicking outside
+  // Theme update function
+  const updateTheme = async (newHue: number, saveToDatabase: boolean = true) => {
+    setCurrentHue(newHue);
+    document.documentElement.style.setProperty('--theme-hue', newHue.toString());
+    
+    // Only save to database if explicitly requested (not during initialization)
+    if (saveToDatabase && userPreferences?.themeHue !== newHue) {
+      try {
+        const updatedPreferences = {
+          ...userPreferences,
+          themeHue: newHue
+        };
+        await updateUserPreferences(updatedPreferences);
+      } catch (error) {
+        console.error('Failed to save theme preference:', error);
+        addNotification({
+          type: 'error',
+          title: 'Theme Save Failed',
+          message: 'Could not save theme preference to database'
+        });
+      }
+    }
+  };
+
+  // Close notifications dropdown and color picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (showNotificationsDropdown && !target.closest('[data-notifications-dropdown]')) {
         setShowNotificationsDropdown(false);
       }
+      if (showColorPicker && !target.closest('[data-color-picker]')) {
+        setShowColorPicker(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotificationsDropdown]);
+  }, [showNotificationsDropdown, showColorPicker]);
 
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
@@ -535,7 +577,7 @@ const testProfileAPI = async () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-primary">
       {/* âœ… ADDED: Show loading overlay for initial data loading */}
       <AnimatePresence>
         {clientsLoading && clients.length === 0 && (
@@ -558,14 +600,14 @@ const testProfileAPI = async () => {
       )}
 
       {/* Mission Control HUD */}
-      <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/50`}>
+      <div className={`fixed ${!isOnline ? 'top-10' : 'top-0'} left-0 right-0 z-20 bg-bg-secondary/90 backdrop-blur-md border-b border-bg-tertiary`}>
         <div className="flex items-center justify-between p-2 sm:p-4">
           {/* Enhanced Client Selector */}
           <div className="flex items-center space-x-3">
             <div className="relative">
               <motion.button
                 onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
+                className="flex items-center space-x-2 sm:space-x-3 bg-brand-primary hover:bg-brand-primary-dark text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -700,7 +742,7 @@ const testProfileAPI = async () => {
                     window.open(`/timeline/${timeline.shareToken}?client=${selectedClient.name.replace(/\s+/g, '')}`, '_blank');
                   }
                 }}
-                className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] bg-green-600 hover:bg-green-700 text-white rounded-lg sm:rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg border border-green-500"
+                className="h-[44px] w-[44px] sm:h-[52px] sm:w-[52px] bg-brand-secondary hover:bg-brand-secondary-dark text-white rounded-lg sm:rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg border border-brand-secondary"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 title="Preview Client Timeline"
@@ -1108,7 +1150,7 @@ const testProfileAPI = async () => {
                             className="flex items-center justify-center mb-8"
                           >
                             <div className="relative w-full">
-                              <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 text-white px-3 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg md:text-xl shadow-2xl border border-white/20 backdrop-blur-sm text-center">
+                              <div className="bg-gradient-to-r from-brand-primary via-brand-secondary to-accent-special text-text-super-light px-3 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg md:text-xl shadow-2xl border border-white/20 backdrop-blur-sm text-center">
                                 {(() => {
                                   try {
                                     const date = new Date(dateString);
@@ -1130,7 +1172,7 @@ const testProfileAPI = async () => {
                                   }
                                 })()}
                               </div>
-                              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 rounded-xl sm:rounded-2xl blur opacity-30" />
+                              <div className="absolute -inset-1 bg-gradient-to-r from-brand-primary via-brand-secondary to-accent-special rounded-xl sm:rounded-2xl blur opacity-30" />
                             </div>
                           </motion.div>
                           
@@ -1262,7 +1304,7 @@ const testProfileAPI = async () => {
         icon: Users, 
         label: 'Clients', 
         action: () => setActiveModal('clients'), 
-        color: 'from-blue-500 to-cyan-600',
+        color: 'from-brand-primary to-brand-secondary',
         disabled: false 
       },
       { 
@@ -1272,7 +1314,7 @@ const testProfileAPI = async () => {
                emailState?.clientHasSeenNewProperties ? 'Share Timeline (viewed)' :
                'Share Timeline', 
         action: () => setShowShareModal(true),
-        color: (emailState?.canSendInitial || emailState?.canSendReminder) ? 'from-green-500 to-blue-600' : 'from-purple-500 to-pink-600',
+        color: (emailState?.canSendInitial || emailState?.canSendReminder) ? 'from-success to-brand-primary' : 'from-brand-secondary to-accent-special',
         disabled: !selectedClient,
         priority: (emailState?.canSendInitial || emailState?.canSendReminder) ? true : false
       },
@@ -1280,7 +1322,7 @@ const testProfileAPI = async () => {
         icon: BarChart3, 
         label: 'Analytics', 
         action: () => setShowAnalyticsModal(true), 
-        color: 'from-purple-500 to-violet-600',
+        color: 'from-brand-secondary to-accent-special',
         disabled: false 
       },
       { 
@@ -1409,6 +1451,136 @@ const testProfileAPI = async () => {
 
       {/* Notifications */}
       <Notifications />
+
+      {/* Color Picker Button - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-50" data-color-picker>
+        <motion.button
+          onClick={() => setShowColorPicker(!showColorPicker)}
+          className="w-14 h-14 bg-brand-primary hover:bg-brand-primary-dark text-white rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          title="Theme Color Picker"
+          style={{
+            background: `hsl(${currentHue}, 70%, 55%)`
+          }}
+        >
+          <Palette className="w-6 h-6" />
+        </motion.button>
+      </div>
+
+      {/* Color Picker Panel */}
+      <AnimatePresence>
+        {showColorPicker && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, x: -20 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: 20, x: -20 }}
+            className="fixed bottom-20 left-4 z-50 bg-slate-800/95 backdrop-blur-md border border-slate-700/50 rounded-xl p-6 shadow-2xl max-w-sm"
+            data-color-picker
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                Theme Color
+              </h3>
+              <button
+                onClick={() => setShowColorPicker(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Hue Slider */}
+            <div className="mb-6">
+              <label className="block text-slate-300 text-sm mb-2">
+                Hue: {currentHue}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                value={currentHue}
+                onChange={(e) => updateTheme(parseInt(e.target.value))}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, 
+                    hsl(0, 70%, 55%), 
+                    hsl(60, 70%, 55%), 
+                    hsl(120, 70%, 55%), 
+                    hsl(180, 70%, 55%), 
+                    hsl(240, 70%, 55%), 
+                    hsl(300, 70%, 55%), 
+                    hsl(360, 70%, 55%))`
+                }}
+              />
+            </div>
+
+            {/* Color Presets */}
+            <div className="mb-6">
+              <label className="block text-slate-300 text-sm mb-2">Quick Presets:</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { name: 'Ocean Blue', hue: 220 },
+                  { name: 'Forest Green', hue: 120 },
+                  { name: 'Sunset Orange', hue: 30 },
+                  { name: 'Royal Purple', hue: 270 },
+                  { name: 'Rose Pink', hue: 330 },
+                  { name: 'Cyan Blue', hue: 180 },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => updateTheme(preset.hue)}
+                    className="p-2 rounded-lg border border-slate-600 hover:border-brand-primary transition-all duration-200 text-xs text-center"
+                    style={{
+                      backgroundColor: `hsl(${preset.hue}, 15%, 12%)`,
+                      color: 'var(--text-light)'
+                    }}
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full mb-1 mx-auto"
+                      style={{ backgroundColor: `hsl(${preset.hue}, 70%, 55%)` }}
+                    />
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Preview */}
+            <div className="space-y-3">
+              <div className="text-slate-300 text-sm">Live Preview:</div>
+              
+              {/* Background Colors */}
+              <div className="flex gap-2">
+                <div className="flex-1 h-8 rounded bg-bg-primary border border-bg-tertiary flex items-center justify-center text-xs text-text-neutral">
+                  Primary
+                </div>
+                <div className="flex-1 h-8 rounded bg-bg-secondary border border-bg-tertiary flex items-center justify-center text-xs text-text-neutral">
+                  Secondary  
+                </div>
+                <div className="flex-1 h-8 rounded bg-bg-tertiary border border-bg-quaternary flex items-center justify-center text-xs text-text-neutral">
+                  Tertiary
+                </div>
+              </div>
+
+              {/* Brand Colors */}
+              <div className="flex gap-2">
+                <div className="flex-1 h-8 rounded bg-brand-primary flex items-center justify-center text-xs text-text-super-light font-medium">
+                  Primary
+                </div>
+                <div className="flex-1 h-8 rounded bg-brand-secondary flex items-center justify-center text-xs text-text-super-light font-medium">
+                  Secondary
+                </div>
+                <div className="flex-1 h-8 rounded bg-accent-special flex items-center justify-center text-xs text-text-super-light font-medium">
+                  Special
+                </div>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Click outside to close dropdown */}
       {isClientDropdownOpen && (

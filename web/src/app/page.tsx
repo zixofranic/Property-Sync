@@ -3,7 +3,7 @@ import { ArrowRight, Home, Users, Share2, BarChart3, CheckCircle } from "lucide-
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-bg-primary via-brand-primary/20 to-bg-primary">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Navigation */}
       <nav className="relative z-10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

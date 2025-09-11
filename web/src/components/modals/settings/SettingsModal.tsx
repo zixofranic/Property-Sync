@@ -178,6 +178,123 @@ export function SettingsModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Universal Theme Hue */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Universal Theme Hue</label>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Control the overall color scheme of the entire application. This affects backgrounds, buttons, and UI elements.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    {/* Hue Slider */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm text-slate-400">
+                        <span>Hue: {(() => {
+                          const currentHue = getComputedStyle(document.documentElement).getPropertyValue('--theme-hue').trim() || '220';
+                          return currentHue;
+                        })()}°</span>
+                        <span>Live Preview</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        value={(() => {
+                          const currentHue = getComputedStyle(document.documentElement).getPropertyValue('--theme-hue').trim() || '220';
+                          return parseInt(currentHue);
+                        })()}
+                        onChange={(e) => {
+                          const newHue = e.target.value;
+                          document.documentElement.style.setProperty('--theme-hue', newHue);
+                        }}
+                        className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, 
+                            hsl(0, 70%, 55%), 
+                            hsl(60, 70%, 55%), 
+                            hsl(120, 70%, 55%), 
+                            hsl(180, 70%, 55%), 
+                            hsl(240, 70%, 55%), 
+                            hsl(300, 70%, 55%), 
+                            hsl(360, 70%, 55%))`
+                        }}
+                      />
+                    </div>
+
+                    {/* Quick Color Presets */}
+                    <div>
+                      <div className="text-sm text-slate-400 mb-2">Quick Presets:</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { name: 'Ocean Blue', hue: 220 },
+                          { name: 'Forest Green', hue: 120 },
+                          { name: 'Sunset Orange', hue: 30 },
+                          { name: 'Royal Purple', hue: 270 },
+                          { name: 'Rose Pink', hue: 330 },
+                          { name: 'Cyan Blue', hue: 180 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.name}
+                            onClick={() => document.documentElement.style.setProperty('--theme-hue', preset.hue.toString())}
+                            className="p-2 rounded-lg border border-slate-600 hover:border-brand-primary transition-all duration-200 text-xs text-center"
+                            style={{
+                              backgroundColor: `hsl(${preset.hue}, 15%, 12%)`,
+                              color: 'var(--text-light)'
+                            }}
+                          >
+                            <div 
+                              className="w-full h-3 rounded-full mb-1"
+                              style={{ backgroundColor: `hsl(${preset.hue}, 70%, 55%)` }}
+                            />
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Live Color Preview */}
+                    <div className="border border-slate-600 rounded-lg p-4 bg-slate-800/50">
+                      <div className="text-sm text-slate-400 mb-3">Live Theme Preview:</div>
+                      
+                      {/* Background Colors */}
+                      <div className="flex gap-2 mb-3">
+                        <div className="flex-1 h-8 rounded bg-bg-primary border border-bg-tertiary flex items-center justify-center text-xs text-text-neutral">
+                          Primary
+                        </div>
+                        <div className="flex-1 h-8 rounded bg-bg-secondary border border-bg-tertiary flex items-center justify-center text-xs text-text-neutral">
+                          Secondary  
+                        </div>
+                        <div className="flex-1 h-8 rounded bg-bg-tertiary border border-bg-quaternary flex items-center justify-center text-xs text-text-neutral">
+                          Tertiary
+                        </div>
+                      </div>
+
+                      {/* Brand Colors */}
+                      <div className="flex gap-2 mb-3">
+                        <div className="flex-1 h-8 rounded bg-brand-primary flex items-center justify-center text-xs text-text-super-light font-medium">
+                          Primary
+                        </div>
+                        <div className="flex-1 h-8 rounded bg-brand-secondary flex items-center justify-center text-xs text-text-super-light font-medium">
+                          Secondary
+                        </div>
+                        <div className="flex-1 h-8 rounded bg-accent-special flex items-center justify-center text-xs text-text-super-light font-medium">
+                          Special
+                        </div>
+                      </div>
+
+                      {/* Sample Buttons */}
+                      <div className="flex gap-2">
+                        <button className="btn-primary px-3 py-1 rounded text-xs font-medium">
+                          Primary Button
+                        </button>
+                        <button className="btn-special px-3 py-1 rounded text-xs font-medium">
+                          Special Button
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

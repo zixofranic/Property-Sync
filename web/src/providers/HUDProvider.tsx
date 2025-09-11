@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PropertyHUD } from '@/components/hud/PropertyHUD';
-import { ShoppingBasket } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface HUDContextType {
   showPropertyHUD: boolean;
@@ -82,27 +80,6 @@ export function HUDProvider({ children }: HUDProviderProps) {
     <HUDContext.Provider value={{ showPropertyHUD, setShowPropertyHUD: setShowPropertyHUDSynced }}>
       {children}
       
-      {/* Global floating toggle button - always visible */}
-      {!showPropertyHUD && (
-        <>
-          {console.log('🟠 RENDERING BASKET BUTTON - should be visible!', { isClient, showPropertyHUD })}
-          <motion.button
-            onClick={() => {
-              console.log('🛒 Basket button clicked - opening HUD');
-              setShowPropertyHUDSynced(true);
-              }}
-            className="btn-special fixed bottom-4 left-4 z-[100] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-accent-special/30 hover:border-accent-special/50"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            initial={{ opacity: 1, scale: 1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            title="Open Property Collector"
-            style={{ zIndex: 100 }}
-          >
-            <ShoppingBasket className="w-6 h-6" />
-          </motion.button>
-        </>
-      )}
       
       {/* Global Property HUD - persists across all pages */}
       {isClient && (
