@@ -16,8 +16,12 @@ export class MLSParserService {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Initialize browser on Railway - Railway handles Puppeteer better than Vercel
-    await this.initBrowser();
+    // Skip browser initialization in production for now - Chrome issues in Railway container
+    if (process.env.NODE_ENV !== 'production') {
+      await this.initBrowser();
+    } else {
+      this.logger.warn('MLS parsing disabled in production - browser initialization skipped');
+    }
   }
 
   async onModuleDestroy() {
@@ -71,19 +75,12 @@ export class MLSParserService {
           '--disable-renderer-backgrounding',
           '--disable-backgrounding-occluded-windows'
         ] : [
-          // Linux/production configuration
+          // Linux/production configuration - minimal for Railway
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-background-networking',
-          '--disable-background-timer-throttling',
-          '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows',
-          '--memory-pressure-off'
+          '--no-first-run'
         ],
         ignoreDefaultArgs: ['--disable-extensions'],
         timeout: 30000,
