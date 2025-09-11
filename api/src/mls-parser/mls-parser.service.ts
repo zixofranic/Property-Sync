@@ -56,20 +56,12 @@ export class MLSParserService {
   private async initBrowser(): Promise<void> {
     try {
       const isWindows = process.platform === 'win32';
-      const isProduction = process.env.NODE_ENV === 'production';
       
-      this.logger.log(`Initializing browser - Platform: ${process.platform}, Production: ${isProduction}`);
-      
-      // Base configuration
-      let launchOptions: any = {
-        headless: true,
-        timeout: 60000,
-        ignoreDefaultArgs: ['--disable-extensions'],
-      };
-      
-      if (isWindows) {
-        // Windows configuration
-        launchOptions.args = [
+      // Different configurations for local vs production
+      this.browser = await puppeteer.launch({
+        headless: true, // Keep headless for both platforms
+        args: isWindows ? [
+          // Windows-compatible configuration
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-gpu',
@@ -78,10 +70,8 @@ export class MLSParserService {
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
           '--disable-backgrounding-occluded-windows'
-        ];
-      } else {
-        // Linux/production configuration for Railway
-        launchOptions.args = [
+        ] : [
+          // Linux/production configuration
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -93,44 +83,16 @@ export class MLSParserService {
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
           '--disable-backgrounding-occluded-windows',
-          '--memory-pressure-off',
-          '--disable-features=TranslateUI',
-          '--disable-ipc-flooding-protection',
-          '--disable-web-security'
-        ];
-        // Let Puppeteer find Chrome automatically - don't hardcode path
-      }
-      
-      this.logger.log('Browser launch options:', JSON.stringify(launchOptions, null, 2));
-      
-      this.browser = await puppeteer.launch(launchOptions);
-      
-      // Test browser functionality
-      const page = await this.browser.newPage();
-      await page.close();
-      
+          '--memory-pressure-off'
+        ],
+        ignoreDefaultArgs: ['--disable-extensions'],
+        timeout: 30000,
+      });
       this.logger.log(`Browser initialized successfully for MLS parsing (${isWindows ? 'Windows' : 'Linux'} mode)`);
     } catch (error) {
       this.logger.error('Failed to initialize browser:', error);
-      
-      // Fallback: Try with minimal configuration
-      try {
-        this.logger.log('Attempting fallback browser initialization...');
-        this.browser = await puppeteer.launch({
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--single-process'],
-          timeout: 30000
-        });
-        
-        // Test fallback browser
-        const page = await this.browser.newPage();
-        await page.close();
-        
-        this.logger.log('Fallback browser initialization successful');
-      } catch (fallbackError) {
-        this.logger.error('Fallback browser initialization failed:', fallbackError);
-        this.browser = null;
-      }
+      // Don't throw error - allow API to continue without MLS parsing
+      this.browser = null;
     }
   }
 
