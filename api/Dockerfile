@@ -19,16 +19,24 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY prisma ./prisma
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
-# Copy application code
+# Copy application code (including updated schema)
 COPY . .
 
-# Generate Prisma client after copying schema
-RUN npx prisma generate
+# Debug: Check if schema file exists and show content
+RUN ls -la prisma/ && head -20 prisma/schema.prisma
+
+# Ensure we're using the correct schema with V2 messaging models
+RUN echo "Verifying schema contains V2 models..." && grep -c "PropertyConversation\|MessageV2" prisma/schema.prisma
+
+# Generate Prisma client with debug info (explicitly use schema.prisma)
+RUN npx prisma generate --schema=./prisma/schema.prisma
+
+# Verify client was generated with V2 models
+RUN ls -la node_modules/.prisma/client/ && echo "Checking for V2 models in generated client..." && grep -c "propertyConversation\|messageV2" node_modules/.prisma/client/index.d.ts
 
 # Build the application
 RUN npm run build
