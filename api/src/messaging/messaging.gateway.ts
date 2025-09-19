@@ -12,7 +12,7 @@ import { Logger } from '@nestjs/common';
 import { MessagingService, CreateMessageDto } from './messaging.service';
 import { JwtService } from '@nestjs/jwt';
 
-interface AuthenticatedSocket extends Socket {
+type AuthenticatedSocket = Socket & {
   userId?: string;
   userType?: 'agent' | 'client';
   clientInfo?: {
