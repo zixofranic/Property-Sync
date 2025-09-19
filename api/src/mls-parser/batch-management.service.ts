@@ -2,12 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MLSParserService } from './mls-parser.service';
 import { ParsedMLSProperty } from './interfaces/mls-property.interface';
+import { MessagingService } from '../messaging/messaging.service';
+import { ConversationV2Service } from '../messaging/conversation-v2.service';
 
 @Injectable()
 export class BatchManagementService {
   constructor(
     private prisma: PrismaService,
     private mlsParser: MLSParserService,
+    private messagingService: MessagingService,
+    private conversationV2Service: ConversationV2Service,
   ) {}
 
   // Create a new property batch
@@ -151,9 +155,9 @@ export class BatchManagementService {
             description:
               (result.data.propertyDetails as any)?.description ||
               'No description available',
-            imageUrls: result.data.images?.map((img) => img.url) || [
+            imageUrls: JSON.stringify(result.data.images?.map((img) => img.url) || [
               'https://via.placeholder.com/400x300/e2e8f0/64748b?text=No+Image',
-            ],
+            ]),
             listingUrl: batchProperty.mlsUrl,
             position: batchProperty.position,
             batchId: batchId,
@@ -178,9 +182,9 @@ export class BatchManagementService {
             bathrooms: null,
             squareFootage: null,
             description: 'Property details could not be loaded',
-            imageUrls: [
+            imageUrls: JSON.stringify([
               'https://via.placeholder.com/400x300/e2e8f0/64748b?text=Loading+Image',
-            ],
+            ]),
             listingUrl: batchProperty.mlsUrl,
             position: batchProperty.position,
             batchId: batchId,
@@ -335,9 +339,9 @@ export class BatchManagementService {
                 : null,
               description: 'Loading property details...',
               propertyType: result.data.propertyDetails?.propertyType || null,
-              imageUrls: result.data.images?.map((img) => img.url) || [
+              imageUrls: JSON.stringify(result.data.images?.map((img) => img.url) || [
                 'https://via.placeholder.com/400x300/e2e8f0/64748b?text=No+Image',
-              ],
+              ]),
               imageCount: result.data.images?.length || 0,
               parsedData: result.data as any,
               isFullyParsed: true,
@@ -563,7 +567,7 @@ export class BatchManagementService {
         squareFootage: quickData.propertyDetails?.sqft
           ? parseInt(quickData.propertyDetails.sqft.replace(/[^0-9]/g, ''))
           : null,
-        imageUrls: quickData.images?.map((img) => img.url) || [],
+        imageUrls: JSON.stringify(quickData.images?.map((img) => img.url) || []),
         listingUrl: batchProperty.mlsUrl,
         position: batchProperty.position,
         batchId: batchId,
@@ -608,7 +612,7 @@ export class BatchManagementService {
           ? parseInt(fullData.propertyDetails.sqft.replace(/[^0-9]/g, ''))
           : null,
         propertyType: fullData.propertyDetails?.propertyType || null,
-        imageUrls: fullData.images?.map((img) => img.url) || [],
+        imageUrls: JSON.stringify(fullData.images?.map((img) => img.url) || []),
         imageCount: fullData.images?.length || 0,
         parsedData: fullData,
         isFullyParsed: true,
@@ -842,7 +846,7 @@ export class BatchManagementService {
             description:
               importData.customDescription ||
               `${importData.customBeds || parsedData.propertyDetails.beds || ''} bed${(importData.customBeds || parsedData.propertyDetails.beds) !== '1' ? 's' : ''}, ${importData.customBaths || parsedData.propertyDetails.baths || ''} bath${(importData.customBaths || parsedData.propertyDetails.baths) !== '1' ? 's' : ''}, ${importData.customSqft || parsedData.propertyDetails.sqft || ''} sqft`,
-            imageUrls: parsedData.images.map((img) => img.url),
+            imageUrls: JSON.stringify(parsedData.images.map((img) => img.url)),
             listingUrl: parsedData.sourceUrl,
 
             // MLS metadata
@@ -867,6 +871,21 @@ export class BatchManagementService {
           },
         });
 
+        // Create V2 conversation for this property automatically
+        let conversationId: string | null = null;
+        try {
+          const conversation = await this.conversationV2Service.getOrCreatePropertyConversation({
+            propertyId: newProperty.id,
+            timelineId: batch.timelineId,
+            agentId: batch.agentId,
+            clientId: batch.clientId,
+          });
+          conversationId = conversation.id;
+          console.log(`✅ Created PropertyConversation ${conversationId} for property ${newProperty.id} during batch import`);
+        } catch (error) {
+          console.warn('Conversation creation failed during batch import:', error.message);
+        }
+
         // Update batch property
         await this.prisma.batchProperty.update({
           where: { id: batchProperty.id },
@@ -881,6 +900,7 @@ export class BatchManagementService {
           success: true,
           propertyId: newProperty.id,
           address: newProperty.address,
+          conversationId: conversationId,
         });
       } catch (error) {
         importResults.push({

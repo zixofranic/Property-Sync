@@ -12,6 +12,7 @@ import { UsersService } from '../users/users.service';
 import { AppConfigService } from '../config/app.config';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { PropertyFeedbackDto } from './dto/property-feedback.dto';
+import { MessagingService } from '../messaging/messaging.service';
 
 @Injectable()
 export class TimelinesService {
@@ -22,6 +23,7 @@ export class TimelinesService {
     private batchService: BatchManagementService,
     private usersService: UsersService,
     private appConfig: AppConfigService,
+    private messagingService: MessagingService,
   ) {}
 
   // Keep all existing methods unchanged until sendTimelineEmail
@@ -39,6 +41,10 @@ export class TimelinesService {
             feedback: {
               orderBy: { createdAt: 'desc' },
               take: 1,
+            },
+            conversations: {
+              take: 1,
+              orderBy: { createdAt: 'desc' },
             },
           },
         },
@@ -195,12 +201,27 @@ export class TimelinesService {
         address: propertyData.address,
         price: propertyData.price,
         description: propertyData.description,
-        imageUrls: [propertyData.imageUrl],
+        imageUrls: JSON.stringify([propertyData.imageUrl]),
         listingUrl: propertyData.mlsLink || null,
         timelineId,
         position: (await this.getLastPropertyPosition(timelineId)) + 1,
       },
     });
+
+    // Create conversation for this property automatically
+    let conversationId: string | null = null;
+    try {
+      const conversation = await this.messagingService.createOrGetConversation({
+        agentId,
+        clientId: timeline.clientId,
+        timelineId,
+        propertyId: newProperty.id,
+      });
+      conversationId = conversation.id;
+      console.log(`Created conversation ${conversationId} for property ${newProperty.id}`);
+    } catch (error) {
+      console.warn('Conversation creation failed:', error.message);
+    }
 
     // FIXED: Correct method call with proper parameters
     try {
@@ -209,7 +230,14 @@ export class TimelinesService {
       console.warn('Property notification failed:', error.message);
     }
 
-    return this.formatPropertyResponse(newProperty, timeline.clientId);
+    const formattedProperty = this.formatPropertyResponse(newProperty, timeline.clientId);
+
+    // Add conversationId to the response
+    if (conversationId) {
+      formattedProperty.conversationId = conversationId;
+    }
+
+    return formattedProperty;
   }
 
   async updateProperty(agentId: string, propertyId: string, updateData: any) {
@@ -287,14 +315,23 @@ export class TimelinesService {
     }
 
     // Remove the photo URL from the imageUrls array
-    const currentImages = property.imageUrls || [];
+    let currentImages: string[] = [];
+    try {
+      currentImages = property.imageUrls ? JSON.parse(property.imageUrls) : [];
+      // Ensure it's an array
+      if (!Array.isArray(currentImages)) {
+        currentImages = [];
+      }
+    } catch (error) {
+      currentImages = [];
+    }
     const updatedImages = currentImages.filter(url => url !== photoUrl);
 
     // Update the property with the new image array
     const updatedProperty = await this.prisma.property.update({
       where: { id: propertyId },
       data: {
-        imageUrls: updatedImages,
+        imageUrls: JSON.stringify(updatedImages),
         updatedAt: new Date(),
       },
     });
@@ -1038,6 +1075,11 @@ export class TimelinesService {
         ? property.feedback[0]
         : null;
 
+    const latestConversation =
+      property.conversations && property.conversations.length > 0
+        ? property.conversations[0]
+        : null;
+
     return {
       id: property.id,
       clientId: clientId,
@@ -1075,6 +1117,7 @@ export class TimelinesService {
             createdAt: latestFeedback.createdAt.toISOString(),
           }
         : undefined,
+      conversationId: latestConversation?.id || undefined,
     };
   }
 
