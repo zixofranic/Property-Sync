@@ -14,7 +14,7 @@ import { MessageV2Service } from './message-v2.service';
 import { ConversationV2Service } from './conversation-v2.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-interface AuthenticatedSocket extends Socket {
+type AuthenticatedSocket = Socket & {
   userId?: string;
   userType?: 'AGENT' | 'CLIENT';
   timelineId?: string;
