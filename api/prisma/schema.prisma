@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 enum Plan {
@@ -53,7 +53,9 @@ model User {
   timelines   Timeline[]
   propertyBatches PropertyBatch[]
   mlsConnection MLSConnection?
-  
+  agentConversations Conversation[] @relation("AgentConversations")
+  agentConversationsV2 PropertyConversation[] @relation("AgentConversationsV2")
+
   @@map("users")
 }
 
@@ -70,7 +72,7 @@ model Profile {
   avatar       String?    // Profile photo URL
   bio          String?    // Professional description
   timezone     String?    // User timezone
-  specialties  String[]   // Real estate specialties
+  specialties  String?    // Real estate specialties (JSON string)
   yearsExperience Int?    // Years in real estate
   notifications Json?     // Email/SMS preferences
   onboardingComplete Boolean @default(false)
@@ -149,7 +151,9 @@ model Client {
   timelines   Timeline[]
   feedback    Feedback[]
   propertyBatches PropertyBatch[]
-  
+  clientConversations Conversation[] @relation("ClientConversations")
+  clientConversationsV2 PropertyConversation[] @relation("ClientConversationsV2")
+
   @@map("clients")
 }
 
@@ -186,7 +190,9 @@ model Timeline {
   clientAuth  ClientAuth[]
   analytics   ClientAnalytics[]
   propertyBatches PropertyBatch[]
-  
+  conversations Conversation[] @relation("TimelineConversations")
+  conversationsV2 PropertyConversation[] @relation("TimelineConversationsV2")
+
   @@map("timelines")
 }
 
@@ -203,7 +209,7 @@ model Property {
   squareFootage   Int?
   propertyType    String?  // House, Condo, Townhome
   description     String?  // Property description
-  imageUrls       String[] // Array of image URLs
+  imageUrls       String   @default("") // JSON string of image URLs
   listingUrl      String?  // MLS link
   
   // NEW: MLS Parser Integration Fields
@@ -212,7 +218,7 @@ model Property {
   parsedData      Json?     // Raw parsed data from MLS parser
   parseTimestamp  DateTime? // When this property was parsed
   imageCount      Int       @default(0) // Number of images parsed
-  parseErrors     String[]  // Any errors during parsing
+  parseErrors     String   @default("") // JSON string of parse errors
   
   // NEW: Enhanced Duplicate Detection
   addressNormalized String? // Normalized address for similarity matching
@@ -249,8 +255,10 @@ model Property {
   timelineId      String
   timeline        Timeline   @relation(fields: [timelineId], references: [id], onDelete: Cascade)
   feedback        Feedback[]
+  conversations   Conversation[] @relation("PropertyConversations")
+  conversationV2  PropertyConversation? @relation("PropertyConversationV2")
   batchProperty   BatchProperty? // Link to batch queue item
-  
+
   @@map("properties")
 }
 
@@ -316,7 +324,7 @@ model EmailTemplate {
   htmlContent String
   textContent String?
   isDefault   Boolean @default(false)
-  planAccess  Plan[]  // Which plans can use this template
+  planAccess  String  @default("") // JSON string of plan access
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -440,4 +448,155 @@ model MLSConnection {
   
   @@index([userId, isActive])
   @@map("mls_connections")
+}
+
+// NEW: Messaging System Models
+model Conversation {
+  id              String   @id @default(cuid())
+  agentId         String
+  clientId        String
+  timelineId      String
+  propertyId      String?  // Optional property ID for property-specific conversations
+
+  // Conversation metadata
+  isActive        Boolean  @default(true)
+  lastMessageAt   DateTime @default(now())
+  agentUnreadCount Int     @default(0)
+  clientUnreadCount Int    @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  agent           User     @relation("AgentConversations", fields: [agentId], references: [id], onDelete: Cascade)
+  client          Client   @relation("ClientConversations", fields: [clientId], references: [id], onDelete: Cascade)
+  timeline        Timeline @relation("TimelineConversations", fields: [timelineId], references: [id], onDelete: Cascade)
+  property        Property? @relation("PropertyConversations", fields: [propertyId], references: [id], onDelete: Cascade)
+  messages        Message[]
+
+  @@unique([agentId, clientId, timelineId, propertyId])
+  @@index([agentId])
+  @@index([clientId])
+  @@index([timelineId])
+  @@index([propertyId])
+  @@map("conversations")
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String
+  senderId        String   // Either agentId or clientId
+  senderType      String   // 'agent' or 'client'
+  content         String
+
+  // Message metadata
+  isRead          Boolean  @default(false)
+  readAt          DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// 🆕 MESSAGING SYSTEM V2 - NEW MODELS FOR PROPERTY-SPECIFIC CONVERSATIONS
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+  CLOSED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  PROPERTY_VIEWED
+  PROPERTY_FEEDBACK
+  TIMELINE_SHARED
+}
+
+enum UserType {
+  AGENT
+  CLIENT
+}
+
+// NEW MODEL: PropertyConversation (1:1 with Property)
+model PropertyConversation {
+  id                String    @id @default(cuid())
+  propertyId        String    @unique  // ONE conversation per property - FIXES THE ISOLATION ISSUE
+  timelineId        String
+  agentId          String
+  clientId         String
+  status           ConversationStatus @default(ACTIVE)
+  unreadAgentCount Int       @default(0)
+  unreadClientCount Int      @default(0)
+  lastMessageAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  property         Property   @relation("PropertyConversationV2", fields: [propertyId], references: [id], onDelete: Cascade)
+  timeline         Timeline   @relation("TimelineConversationsV2", fields: [timelineId], references: [id], onDelete: Cascade)
+  agent           User       @relation("AgentConversationsV2", fields: [agentId], references: [id])
+  client          Client     @relation("ClientConversationsV2", fields: [clientId], references: [id])
+  messages        MessageV2[]
+  notifications   NotificationV2[]
+
+  @@index([agentId, status])
+  @@index([clientId, status])
+  @@index([timelineId])
+  @@map("property_conversations")
+}
+
+// NEW MODEL: MessageV2 (scoped to PropertyConversation)
+model MessageV2 {
+  id                    String    @id @default(cuid())
+  conversationId        String
+  senderId              String
+  senderType            UserType  // AGENT | CLIENT
+  content               String
+  type                  MessageType @default(TEXT)
+  isRead                Boolean   @default(false)
+  readAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  conversation          PropertyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages_v2")
+}
+
+// NEW MODEL: NotificationV2 (property-specific notifications)
+model NotificationV2 {
+  id                String    @id @default(cuid())
+  conversationId    String
+  recipientId       String
+  type              NotificationType
+  title             String
+  message           String
+  isRead            Boolean   @default(false)
+  readAt            DateTime?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  conversation      PropertyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead])
+  @@index([conversationId])
+  @@map("notifications_v2")
 }
