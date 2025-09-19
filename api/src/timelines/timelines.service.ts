@@ -234,7 +234,7 @@ export class TimelinesService {
 
     // Add conversationId to the response
     if (conversationId) {
-      formattedProperty.conversationId = conversationId;
+      (formattedProperty as any).conversationId = conversationId;
     }
 
     return formattedProperty;
@@ -1118,7 +1118,7 @@ export class TimelinesService {
           }
         : undefined,
       conversationId: latestConversation?.id || undefined,
-    };
+    } as PropertyResponseDto;
   }
 
   private async trackTimelineView(timelineId: string) {
