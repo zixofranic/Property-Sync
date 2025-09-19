@@ -235,10 +235,9 @@ export class PushNotificationManager {
       // Register service worker
       result.registration = await this.registerServiceWorker();
 
-      // Request permission if not already granted
-      if (this.permission === 'default') {
-        result.permission = await this.requestPermission();
-      }
+      // Don't automatically request permission during initialization
+      // Permission will be requested later during user interaction
+      result.permission = this.permission;
 
       console.log('Push notifications initialized:', result);
       return result;
