@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MLSParserService } from './mls-parser.service';
 import { ParsedMLSProperty } from './interfaces/mls-property.interface';
-import { MessagingService } from '../messaging/messaging.service';
 import { ConversationV2Service } from '../messaging/conversation-v2.service';
 
 @Injectable()
@@ -10,7 +9,6 @@ export class BatchManagementService {
   constructor(
     private prisma: PrismaService,
     private mlsParser: MLSParserService,
-    private messagingService: MessagingService,
     private conversationV2Service: ConversationV2Service,
   ) {}
 
