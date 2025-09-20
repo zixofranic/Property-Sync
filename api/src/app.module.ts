@@ -12,6 +12,7 @@ import { TimelinesModule } from './timelines/timelines.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ShareModule } from './share/share.module';
 import { AgentModule } from './agent/agent.module'; // Add this import
+import { MessagingModule } from './messaging/messaging.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { EmailModule } from './email/email.module';
 import { MLSParserModule } from './mls-parser/mls-parser.module';
@@ -26,11 +27,12 @@ import { SparkModule } from './spark/spark.module';
     AuthModule,
     UsersModule,
     ClientsModule,
+    EmailModule,
+    MessagingModule,
     TimelinesModule,
     AnalyticsModule,
     ShareModule,
     AgentModule,
-    EmailModule,
     MLSParserModule,
     SparkModule,
   ],
@@ -44,3 +46,4 @@ import { SparkModule } from './spark/spark.module';
   ],
 })
 export class AppModule {}
+// Trigger restart
