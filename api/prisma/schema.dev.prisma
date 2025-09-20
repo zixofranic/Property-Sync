@@ -1,0 +1,525 @@
+// Property Sync - Master Database Schema (Single Source of Truth)
+// This schema includes all documented models and fields from CHATTING_SYSTEM_STUDY.md
+// Environment-specific schemas are generated from this master schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note: datasource will be overridden by environment-specific schemas
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================================================================
+// ENUMS
+// ====================================================================
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+  ENTERPRISE
+}
+
+enum FeedbackType {
+  love
+  like
+  dislike
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PENDING
+  TRIAL
+}
+
+enum MessageSenderType {
+  USER
+  CLIENT
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  IMAGE
+  SYSTEM_MESSAGE
+  PROPERTY_REFERENCE
+  FEEDBACK_ALERT
+}
+
+enum ParticipantType {
+  AGENT
+  CLIENT
+  SYSTEM
+}
+
+// ====================================================================
+// CORE USER MODELS
+// ====================================================================
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  isActive    Boolean  @default(true)
+  
+  // Email verification system
+  emailVerified Boolean @default(false)
+  verificationToken String? @unique
+  verificationExpiry DateTime?
+  
+  // Password reset system
+  resetToken String? @unique
+  resetExpiry DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Profile information
+  firstName   String
+  lastName    String
+  phoneNumber String?
+  
+  // Plan and billing
+  currentPlan Plan @default(FREE)
+  planStartDate DateTime?
+  planEndDate DateTime?
+  
+  // Email preferences
+  emailNotifications Boolean @default(true)
+  marketingEmails Boolean @default(false)
+  
+  // User settings
+  timezone String @default("America/New_York")
+  
+  // Relationships
+  clients      Client[]
+  timelines    Timeline[]
+  profile      Profile?
+  
+  // Messages (from CHATTING_SYSTEM_STUDY.md design)
+  sentMessages     Message[]
+  messageReads     MessageRead[]
+  participantIn    ConversationParticipant[]
+  
+  // Payment history
+  paymentHistory   PaymentHistory[]
+  
+  // Usage tracking
+  usageEvents      UsageEvent[]
+  
+  @@map("users")
+}
+
+model Profile {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Profile fields
+  firstName   String?
+  lastName    String?
+  bio         String?
+  company     String?
+  licenseNumber String?
+  website     String?
+  photoUrl    String?
+  avatar      String?
+  logo        String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  timezone    String?
+  phone       String?
+  specialties String? // JSON string for SQLite compatibility // PostgreSQL native arrays
+  yearsExperience Int?
+  brandColor  String?
+  plan        String?
+  onboardingComplete Boolean @default(false)
+  
+  // Billing fields (from compilation errors analysis)
+  stripeCustomerId     String?
+  subscriptionId       String?
+  subscriptionItemId   String?
+  subscriptionStatus   String?
+  stripePriceId        String?
+  billingCycleStart    DateTime?
+  billingCycleEnd      DateTime?
+  trialEnd            DateTime?
+  cancelAtPeriodEnd   Boolean @default(false)
+  lastPaymentDate     DateTime?
+  nextBillingDate     DateTime?
+  paymentFailures     Int @default(0)
+  lastPaymentAmount   Int?
+  lastUsageReset      DateTime?
+  currentMonthParsed  Int @default(0)
+  currentMonthProperties Int @default(0)
+  totalLifetimeProperties Int @default(0)
+  totalLifetimeParsed Int @default(0)
+  propertyLimit       Int?
+  clientLimit         Int?
+  preferredEmailTemplate String? // Email template preference
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("profiles")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id])
+  
+  firstName     String
+  lastName      String
+  email         String
+  phoneNumber   String?
+  phone         String? // Alternative field name used in code
+  spouseEmail   String?
+  notes         String? // Client notes
+  
+  // Address information
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  
+  // Preferences
+  priceMin      Int?
+  priceMax      Int?
+  bedrooms      Int?
+  bathrooms     Int?
+  sqftMin       Int?
+  sqftMax       Int?
+  propertyType  String?
+  
+  // Status
+  isActive  Boolean  @default(true)
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  timelines Timeline[]
+  participantIn ConversationParticipant[]
+  
+  @@unique([agentId, email])
+  @@map("clients")
+}
+
+// ====================================================================
+// TIMELINE & PROPERTY MODELS
+// ====================================================================
+
+model Timeline {
+  id          String @id @default(cuid())
+  agentId     String
+  clientId    String
+  shareToken  String @unique // Required field from compilation errors
+  
+  agent  User   @relation(fields: [agentId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  
+  // Timeline details
+  title       String
+  description String?
+  
+  // Email settings
+  emailSent     Boolean   @default(false)
+  emailSentAt   DateTime?
+  lastNotificationSent DateTime?
+  
+  // Analytics fields
+  totalViews   Int @default(0)
+  lastViewed   DateTime?
+  
+  // Status
+  isActive    Boolean   @default(true)
+  accessExpiry DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  properties      Property[]
+  conversations   Conversation[] // From CHATTING_SYSTEM_STUDY.md
+  analytics       ClientAnalytics[]
+  
+  @@map("timelines")
+}
+
+model Property {
+  id          String @id @default(cuid())
+  timelineId  String
+  timeline    Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  // Property details
+  address         String
+  city            String
+  state           String
+  zipCode         String?
+  price           Int?
+  bedrooms        Int?
+  bathrooms       Float?
+  sqft            Int?
+  lotSize         Float?
+  yearBuilt       Int?
+  propertyType    String?
+  description     String?
+  
+  // Images stored as arrays in PostgreSQL
+  imageUrls String? // JSON array as string
+  listingUrl      String?
+  
+  // MLS Information
+  mlsNumber       String?
+  listingStatus   String?
+  daysOnMarket    Int?
+  imageCount      Int @default(0)
+  
+  // Parse errors stored as arrays in PostgreSQL  
+  parseErrors String? // JSON array as string
+  
+  // Analytics
+  isViewed        Boolean @default(false)
+  viewedAt        DateTime?
+  
+  // Property feedback
+  feedback PropertyFeedback[]
+  
+  // Conversations about this property
+  conversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("properties")
+}
+
+model PropertyFeedback {
+  id         String      @id @default(cuid())
+  propertyId String
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  feedbackType FeedbackType
+  comment      String?
+  submittedBy  String
+  
+  createdAt DateTime @default(now())
+  
+  @@map("property_feedback")
+}
+
+// ====================================================================
+// MESSAGING SYSTEM MODELS (from CHATTING_SYSTEM_STUDY.md)
+// ====================================================================
+
+model Conversation {
+  id          String @id @default(cuid())
+  timelineId  String?
+  propertyId  String? // For property-specific conversations
+  title       String?
+  description String? // Added from compilation errors
+  lastMessageAt DateTime? // Added from compilation errors
+  isActive    Boolean @default(true) // Added from compilation errors
+  
+  timeline    Timeline? @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  messages    Message[]
+  participants ConversationParticipant[]
+  
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String @id @default(cuid())
+  conversationId String
+  userId         String?
+  clientId       String?
+  participantType ParticipantType
+  userType       String? // Alternative field name from compilation errors
+  isActive       Boolean @default(true) // Added from compilation errors
+  lastReadAt     DateTime? // Added from compilation errors
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  joinedAt       DateTime @default(now())
+  leftAt         DateTime?
+  
+  @@unique([conversationId, userId])
+  @@unique([conversationId, clientId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  senderId       String
+  senderType     MessageSenderType
+  messageType    MessageType @default(TEXT)
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  content        String
+  fileUrl        String?
+  fileName       String?
+  metadata       String? // JSON metadata for message
+  
+  isEdited       Boolean @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean @default(false)
+  deletedAt      DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  reads          MessageRead[]
+  
+  @@map("messages")
+}
+
+model MessageRead {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  readAt    DateTime @default(now())
+  
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
+
+// ====================================================================
+// ANALYTICS & TRACKING MODELS
+// ====================================================================
+
+model ClientAnalytics {
+  id          String @id @default(cuid())
+  timelineId  String
+  timeline    Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  sessionId   String?
+  ipAddress   String?
+  userAgent   String?
+  propertyId  String? // Added from compilation errors
+  event       String
+  eventType   String?
+  data        String?
+  timestamp   DateTime @default(now())
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("client_analytics")
+}
+
+model PaymentHistory {
+  id            String @id @default(cuid())
+  userId        String
+  user          User   @relation(fields: [userId], references: [id])
+  
+  amount        Int
+  currency      String @default("usd")
+  status        String
+  stripeChargeId String?
+  stripePaymentId String?
+  stripePriceId String?
+  billingPeriodStart DateTime? // Added from compilation errors
+  billingPeriodEnd DateTime? // Added for billing period tracking
+  plan          String? // Plan information
+  stripeInvoiceId String? // Stripe invoice ID
+  invoiceUrl    String? // Stripe invoice URL
+  receiptUrl    String? // Stripe receipt URL
+  failureReason String? // Payment failure reason
+  description   String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("payment_history")
+}
+
+model Feedback {
+  id          String @id @default(cuid())
+  propertyId  String
+  
+  type        String
+  feedback    String // Alternative field name from compilation errors
+  comment     String?
+  submittedBy String
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("feedback")
+}
+
+model UsageEvent {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  
+  eventType String
+  metadata  String?
+  eventData String? // Added from compilation errors
+  timestamp DateTime @default(now()) // Added from compilation errors
+  propertyCount Int @default(1) // Added from compilation errors
+  creditCost Int @default(0) // Added from compilation errors
+  billingPeriod String? // Added for billing period tracking
+  plan      String? // Added for plan tracking
+  
+  createdAt DateTime @default(now())
+  
+  @@map("usage_events")
+}
+
+// ====================================================================
+// CONFIGURATION MODELS
+// ====================================================================
+
+model EmailTemplate {
+  id          String @id @default(cuid())
+  name        String @unique
+  subject     String
+  htmlContent String
+  textContent String?
+  isDefault   Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("email_templates")
+}
+
+model PlanFeature {
+  id              String @id @default(cuid())
+  name            String @unique
+  description     String
+  featureKey      String @unique
+  
+  propertyLimit   Int?
+  clientLimit     Int?
+  emailLimit      Int?
+  storageLimit    Int?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("plan_features")
+}

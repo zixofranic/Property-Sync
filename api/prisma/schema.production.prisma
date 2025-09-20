@@ -1,0 +1,358 @@
+// Property Sync - Production Database Schema (PostgreSQL)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  FREE         // 5 properties/month, 1 client - Limited features
+  STARTER      // $49/month - 50 properties/month, 3 clients
+  PROFESSIONAL // $149/month - 200 properties/month, 10 clients  
+  BUSINESS     // $299/month - 500 properties/month, 25 clients
+  ENTERPRISE   // Custom pricing - Unlimited
+}
+
+enum FeedbackType {
+  love     
+  like     
+  dislike  
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PENDING
+  TRIAL
+}
+
+enum MessageSenderType {
+  USER
+  CLIENT
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM_MESSAGE
+}
+
+enum ParticipantType {
+  AGENT
+  CLIENT
+  SYSTEM
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  isActive    Boolean  @default(true)
+  
+  // Email verification system
+  emailVerified Boolean @default(false)
+  verificationToken String? @unique
+  verificationExpiry DateTime?
+  
+  // Password reset system (for future)
+  resetToken String? @unique
+  resetExpiry DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Profile information
+  firstName   String
+  lastName    String
+  phoneNumber String?
+  
+  // Plan and billing
+  currentPlan Plan @default(FREE)
+  planStartDate DateTime? // When current plan started
+  planEndDate DateTime? // When current plan expires (if applicable)
+  
+  // Email preferences
+  emailNotifications Boolean @default(true)
+  marketingEmails Boolean @default(false)
+  
+  // User settings
+  timezone String @default("America/New_York")
+  
+  // Relationships
+  clients      Client[]
+  timelines    Timeline[]
+  profile      Profile?
+  
+  // Messages
+  sentMessages     Message[]
+  messageReads     MessageRead[]
+  participantIn    ConversationParticipant[]
+  
+  @@map("users")
+}
+
+model Profile {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Profile fields
+  bio          String?
+  company      String?
+  licenseNumber String?
+  website      String?
+  photoUrl     String?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  timezone     String?
+  specialties  String[]   // PostgreSQL supports arrays
+  yearsExperience Int?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("profiles")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  agentId   String   // References User.id
+  agent     User     @relation(fields: [agentId], references: [id])
+  
+  firstName     String
+  lastName      String
+  email         String
+  phoneNumber   String?
+  spouseEmail   String?
+  
+  // Address information
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  
+  // Preferences
+  priceMin      Int?
+  priceMax      Int?
+  bedrooms      Int?
+  bathrooms     Int?
+  sqftMin       Int?
+  sqftMax       Int?
+  propertyType  String?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  timelines Timeline[]
+  participantIn ConversationParticipant[]
+  
+  @@unique([agentId, email])
+  @@map("clients")
+}
+
+model Timeline {
+  id          String @id @default(cuid())
+  agentId     String // References User.id
+  clientId    String // References Client.id
+  shareToken  String @unique // For sharing with clients
+  
+  agent  User   @relation(fields: [agentId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  
+  // Timeline details
+  title       String
+  description String?
+  
+  // Email settings
+  emailSent     Boolean   @default(false)
+  emailSentAt   DateTime?
+  lastNotificationSent DateTime?
+  
+  // Status
+  isActive    Boolean   @default(true)
+  accessExpiry DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  properties      Property[]
+  conversations   Conversation[]
+  
+  @@map("timelines")
+}
+
+model Property {
+  id          String @id @default(cuid())
+  timelineId  String
+  timeline    Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  // Property details
+  address         String
+  city            String
+  state           String
+  zipCode         String?
+  price           Int?
+  bedrooms        Int?
+  bathrooms       Float?
+  sqft            Int?
+  lotSize         Float?
+  yearBuilt       Int?
+  propertyType    String?
+  description     String?
+  imageUrls       String[] // PostgreSQL supports arrays
+  listingUrl      String?
+  
+  // MLS Information
+  mlsNumber       String?
+  listingStatus   String?
+  daysOnMarket    Int?
+  imageCount      Int       @default(0)
+  parseErrors     String[]  // PostgreSQL supports arrays
+  
+  // Property feedback
+  feedback PropertyFeedback[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("properties")
+}
+
+model PropertyFeedback {
+  id         String      @id @default(cuid())
+  propertyId String
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  feedbackType FeedbackType
+  comment      String?
+  submittedBy  String      // Client name or identifier
+  
+  createdAt DateTime @default(now())
+  
+  @@map("property_feedback")
+}
+
+// Messaging System Models
+model Conversation {
+  id          String @id @default(cuid())
+  timelineId  String?
+  propertyId  String? // For property-specific conversations
+  title       String?
+  
+  timeline    Timeline? @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  messages    Message[]
+  participants ConversationParticipant[]
+  
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String @id @default(cuid())
+  conversationId String
+  userId         String?
+  clientId       String?
+  participantType ParticipantType
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  joinedAt       DateTime @default(now())
+  leftAt         DateTime?
+  
+  @@unique([conversationId, userId])
+  @@unique([conversationId, clientId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  senderId       String
+  senderType     MessageSenderType
+  messageType    MessageType @default(TEXT)
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  content        String
+  fileUrl        String?
+  fileName       String?
+  
+  isEdited       Boolean @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean @default(false)
+  deletedAt      DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  reads          MessageRead[]
+  
+  @@map("messages")
+}
+
+model MessageRead {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  readAt    DateTime @default(now())
+  
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
+
+model EmailTemplate {
+  id          String @id @default(cuid())
+  name        String @unique
+  subject     String
+  htmlContent String
+  textContent String?
+  isDefault   Boolean @default(false)
+  planAccess  Plan[]  // PostgreSQL supports arrays
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("email_templates")
+}
+
+model PlanFeature {
+  id              String @id @default(cuid())
+  name            String @unique
+  description     String
+  featureKey      String @unique // For programmatic access
+  
+  // Limits
+  propertyLimit   Int? // Properties per month
+  clientLimit     Int? // Max clients
+  emailLimit      Int? // Emails per month
+  storageLimit    Int? // Storage in MB
+  
+  // Plan access
+  availablePlans Plan[] // PostgreSQL supports arrays
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("plan_features")
+}
