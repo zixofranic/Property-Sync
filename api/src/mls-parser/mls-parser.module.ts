@@ -4,9 +4,12 @@ import { MLSParserController } from './mls-parser.controller';
 import { BatchController } from './batch.controller';
 import { BatchManagementService } from './batch-management.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MessagingModule } from '../messaging/messaging.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  providers: [MLSParserService, BatchManagementService, PrismaService],
+  imports: [MessagingModule, PrismaModule],
+  providers: [MLSParserService, BatchManagementService],
   controllers: [MLSParserController, BatchController],
   exports: [MLSParserService, BatchManagementService],
 })
