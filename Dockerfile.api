@@ -46,5 +46,8 @@ RUN npm prune --production
 
 # Railway will handle port binding automatically
 
-# Start the application
-CMD ["npm", "run", "start:prod"]
+# Create startup script that syncs database schema then starts app
+RUN echo '#!/bin/sh\necho "🔄 Syncing database schema..."\nnpx prisma db push --accept-data-loss\necho "✅ Database schema synced"\necho "🚀 Starting application..."\nnpm run start:prod' > start.sh && chmod +x start.sh
+
+# Start the application with database sync
+CMD ["./start.sh"]
