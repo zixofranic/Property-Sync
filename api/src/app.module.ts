@@ -28,7 +28,7 @@ import { SparkModule } from './spark/spark.module';
     UsersModule,
     ClientsModule,
     EmailModule,
-    MessagingModule,
+    MessagingModule.forRoot(),
     TimelinesModule,
     AnalyticsModule,
     ShareModule,

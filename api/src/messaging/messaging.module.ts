@@ -28,4 +28,11 @@ import { PrismaModule } from '../prisma/prisma.module';
   ],
   exports: [MessagingService, ConversationV2Service, MessageV2Service],
 })
-export class MessagingModule {}
+export class MessagingModule {
+  static forRoot() {
+    return {
+      module: MessagingModule,
+      global: true,
+    };
+  }
+}
