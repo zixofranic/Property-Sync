@@ -1,0 +1,16 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "api/Dockerfile"
+
+[deploy]
+startCommand = "npm run start:prod"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+
+[environments.production]
+# These will be automatically provided by Railway
+variables = { NODE_ENV = "production" }
+
+[environments.development]
+variables = { NODE_ENV = "development" }
