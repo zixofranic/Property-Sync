@@ -71,12 +71,7 @@ export class AuthController {
     return req.user;
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Patch('profile')
-  async updateProfile(@Request() req, @Body() updateData: any) {
-    const userId = req.user.sub;
-    return this.authService.updateProfile(userId, updateData);
-  }
+  // Profile updates moved to UsersController to avoid conflicts
 
   @UseGuards(JwtAuthGuard)
   @Patch('preferences')
