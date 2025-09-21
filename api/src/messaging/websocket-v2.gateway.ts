@@ -405,6 +405,15 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         type: data.type || 'TEXT',
       });
 
+      // Debug logging for message broadcast
+      this.logger.log(`📤 Broadcasting message from ${client.userType} ${client.userId}:`, {
+        messageId: message.id,
+        senderType: message.senderType,
+        content: message.content.substring(0, 20),
+        conversationId: conversation.id,
+        propertyId: data.propertyId
+      });
+
       // Broadcast to conversation room and property room
       this.server.to(`conversation:${conversation.id}`).emit('new-message', message);
       this.server.to(`property:${data.propertyId}`).emit('new-message', message);
@@ -451,6 +460,14 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         senderType: client.userType,
         content: data.content,
         type: data.type || 'TEXT',
+      });
+
+      // Debug logging for regular message broadcast
+      this.logger.log(`📤 Broadcasting conversation message from ${client.userType} ${client.userId}:`, {
+        messageId: message.id,
+        senderType: message.senderType,
+        content: message.content.substring(0, 20),
+        conversationId: data.conversationId
       });
 
       // Broadcast to conversation room

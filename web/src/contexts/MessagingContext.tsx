@@ -273,7 +273,15 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
     // Handle new messages from V2 system
     newSocket.on('new-message', (message: any) => {
-      console.log('📨 V2 new message:', message);
+      console.log('📨 V2 new message received:', {
+        messageId: message.id,
+        senderType: message.senderType,
+        senderId: message.senderId,
+        content: message.content?.substring(0, 20),
+        currentUserId: currentUserId,
+        currentUserType: currentUserType,
+        fullMessage: message
+      });
 
       // Extract property ID from the message's conversation
       const propertyId = message.conversation?.propertyId || message.propertyId;
