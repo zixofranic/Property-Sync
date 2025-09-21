@@ -310,7 +310,11 @@ export class UsersService {
       updatedAt: user.updatedAt,
       bio: user.profile?.bio || '',
       yearsExperience: user.profile?.yearsExperience || 0,
-      specialties: user.profile?.specialties || null,
+      specialties: user.profile?.specialties
+        ? (typeof user.profile.specialties === 'string'
+           ? JSON.parse(user.profile.specialties)
+           : user.profile.specialties)
+        : [],
       avatar: user.profile?.avatar || '',
       timezone: user.profile?.timezone || '',
     };
