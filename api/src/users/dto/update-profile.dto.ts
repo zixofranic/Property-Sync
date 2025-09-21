@@ -49,6 +49,12 @@ export class UpdateProfileDto {
   timezone?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return value;
+  })
   @IsString()
   specialties?: string;
 

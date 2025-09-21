@@ -33,7 +33,7 @@ export class UsersController {
   @Patch('profile')
   async updateProfile(
     @CurrentUser() user: any,
-    @Body() updateProfileDto: any, // Temporarily use any to see raw data
+    @Body() updateProfileDto: UpdateProfileDto,
   ) {
     try {
       console.log('🔧 Profile update request - FULL DATA:', {
