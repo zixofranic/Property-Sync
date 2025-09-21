@@ -28,9 +28,7 @@ export class UpdateProfileDto {
   phone?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === '' || value === null ? null : value)
-  @ValidateIf((o, value) => value !== null)
-  @IsUrl({}, { message: 'Website must be a valid URL' })
+  @IsString()
   website?: string;
 
   @IsOptional()
