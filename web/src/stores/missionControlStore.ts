@@ -445,9 +445,16 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                 read: false,
               });
 
+              // Clear any previous login error notifications
+              const notifications = get().notifications;
+              const loginErrorNotifications = notifications.filter(n =>
+                n.type === 'error' && n.title === 'Login Error'
+              );
+              loginErrorNotifications.forEach(n => get().removeNotification(n.id));
+
               // Reset tracker on new login
               loadingTracker.reset();
-              
+
               // Load initial data once
               get().loadInitialData();
 
