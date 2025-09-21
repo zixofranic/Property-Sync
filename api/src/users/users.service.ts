@@ -137,7 +137,11 @@ export class UsersService {
         logo: updatedProfile.logo || '',
         bio: updatedProfile.bio || '',
         yearsExperience: updatedProfile.yearsExperience || 0,
-        specialties: updatedProfile.specialties || null,
+        specialties: updatedProfile.specialties
+          ? (typeof updatedProfile.specialties === 'string'
+             ? JSON.parse(updatedProfile.specialties)
+             : updatedProfile.specialties)
+          : [],
         avatar: updatedProfile.avatar || '',
         timezone: updatedProfile.timezone || 'America/New_York',
         createdAt: user.createdAt,

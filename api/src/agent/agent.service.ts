@@ -57,7 +57,11 @@ export class AgentService {
       logo: profile?.logo || '',
       bio: profile?.bio || '',
       timezone: profile?.timezone || '',
-      specialties: profile?.specialties || [],
+      specialties: profile?.specialties
+        ? (typeof profile.specialties === 'string'
+           ? JSON.parse(profile.specialties)
+           : profile.specialties)
+        : [],
       yearsExperience: profile?.yearsExperience || 0,
       brandColor: profile?.brandColor || '#1e90ff',
       plan: profile?.plan || 'FREE',

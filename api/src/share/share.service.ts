@@ -192,7 +192,11 @@ export class ShareService {
         logo: timeline.agent.profile?.logo,
         brandColor: timeline.agent.profile?.brandColor,
         yearsExperience: timeline.agent.profile?.yearsExperience,
-        specialties: timeline.agent.profile?.specialties,
+        specialties: timeline.agent.profile?.specialties
+          ? (typeof timeline.agent.profile.specialties === 'string'
+             ? JSON.parse(timeline.agent.profile.specialties)
+             : timeline.agent.profile.specialties)
+          : [],
         bio: timeline.agent.profile?.bio,
         license: timeline.agent.profile?.licenseNumber,
         website: timeline.agent.profile?.website,
