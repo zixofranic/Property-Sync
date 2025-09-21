@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { useRouter } from 'next/navigation';
+import ClientOnly from '@/components/ClientOnly';
 
 export default function LoginPage() {
   console.log('🔴 LOGIN: Loading');
@@ -110,116 +111,130 @@ useEffect(() => {
           transition={{ delay: 0.2 }}
           className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8"
         >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={formData.email}
-                  onChange={handleInputChange('email')}
-                  className={`w-full pl-12 pr-4 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
-                    errors.email
-                      ? 'border-red-500 focus:ring-red-500/20'
-                      : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
-                  placeholder="Enter your email"
-                  disabled={isLoading}
-                />
+          <ClientOnly fallback={
+            <div className="space-y-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-slate-700 rounded mb-2"></div>
+                <div className="h-12 bg-slate-700 rounded"></div>
               </div>
-              {errors.email && (
-                <motion.p
+              <div className="animate-pulse">
+                <div className="h-4 bg-slate-700 rounded mb-2"></div>
+                <div className="h-12 bg-slate-700 rounded"></div>
+              </div>
+              <div className="h-12 bg-slate-700 rounded animate-pulse"></div>
+            </div>
+          }>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Email Field */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={formData.email}
+                    onChange={handleInputChange('email')}
+                    className={`w-full pl-12 pr-4 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      errors.email
+                        ? 'border-red-500 focus:ring-red-500/20'
+                        : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
+                    placeholder="Enter your email"
+                    disabled={isLoading}
+                  />
+                </div>
+                {errors.email && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 text-sm text-red-400 flex items-center"
+                  >
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.email}
+                  </motion.p>
+                )}
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={formData.password}
+                    onChange={handleInputChange('password')}
+                    className={`w-full pl-12 pr-12 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      errors.password
+                        ? 'border-red-500 focus:ring-red-500/20'
+                        : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
+                    placeholder="Enter your password"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 text-sm text-red-400 flex items-center"
+                  >
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.password}
+                  </motion.p>
+                )}
+              </div>
+
+              {/* Login Error Display */}
+              {loginError && (
+                <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-sm text-red-400 flex items-center"
+                  className="bg-red-500/20 border border-red-500/30 rounded-lg p-3"
                 >
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.email}
-                </motion.p>
+                  <p className="text-red-400 text-sm flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    {loginError}
+                  </p>
+                </motion.div>
               )}
-            </div>
 
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={formData.password}
-                  onChange={handleInputChange('password')}
-                  className={`w-full pl-12 pr-12 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
-                    errors.password
-                      ? 'border-red-500 focus:ring-red-500/20'
-                      : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
-                  placeholder="Enter your password"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                  disabled={isLoading}
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {errors.password && (
-                <motion.p
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-sm text-red-400 flex items-center"
-                >
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.password}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Login Error Display */}
-            {loginError && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-500/20 border border-red-500/30 rounded-lg p-3"
+              {/* Submit Button */}
+              <motion.button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-slate-600 disabled:to-slate-600 text-white py-3 px-6 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center"
+                whileHover={{ scale: isLoading ? 1 : 1.02 }}
+                whileTap={{ scale: isLoading ? 1 : 0.98 }}
               >
-                <p className="text-red-400 text-sm flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  {loginError}
-                </p>
-              </motion.div>
-            )}
-
-            {/* Submit Button */}
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-slate-600 disabled:to-slate-600 text-white py-3 px-6 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center"
-              whileHover={{ scale: isLoading ? 1 : 1.02 }}
-              whileTap={{ scale: isLoading ? 1 : 0.98 }}
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Signing In...
-                </>
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </>
-              )}
-            </motion.button>
-          </form>
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Signing In...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </>
+                )}
+              </motion.button>
+            </form>
+          </ClientOnly>
 
           {/* Footer Links */}
           <div className="mt-6 text-center space-y-4">

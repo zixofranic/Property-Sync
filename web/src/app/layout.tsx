@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { HUDProvider } from '@/providers/HUDProvider';
+import { MessagingProvider } from '@/contexts/MessagingContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,14 +18,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  console.log('🔵 LAYOUT: Loading with AuthProvider');
+  console.log('🔵 LAYOUT: Loading with V2 messaging only');
 
   return (
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning={true}>
         <AuthProvider>
           <HUDProvider>
-            {children}
+            <MessagingProvider>
+              {children}
+            </MessagingProvider>
           </HUDProvider>
         </AuthProvider>
       </body>

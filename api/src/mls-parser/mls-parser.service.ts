@@ -1240,18 +1240,81 @@ export class MLSParserService {
       
       // Clean up any duplicate zip codes or city names in the full address
       let fullAddress = `${streetAddress}, ${city}, ${state} ${zipCode}`;
-      
-      // Remove duplicate city names - more specific pattern
+
+      // Remove duplicate city names - handle both consecutive and non-consecutive duplicates
       if (city) {
         const escapedCity = city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special regex chars
-        const cityDuplicateRegex = new RegExp(`(${escapedCity}[,\\s]+)+${escapedCity}`, 'gi');
-        fullAddress = fullAddress.replace(cityDuplicateRegex, city);
+
+        // First, remove consecutive duplicates
+        const cityConsecutiveRegex = new RegExp(`(${escapedCity}[,\\s]+)+${escapedCity}`, 'gi');
+        fullAddress = fullAddress.replace(cityConsecutiveRegex, city);
+
+        // Then, remove non-consecutive duplicates by checking if city appears twice
+        const cityOccurrences = (fullAddress.match(new RegExp(escapedCity, 'gi')) || []).length;
+        if (cityOccurrences > 1) {
+          // Split address by commas and remove duplicate city entries
+          const addressParts = fullAddress.split(',').map(part => part.trim());
+          const uniqueParts: string[] = [];
+          let seenCity = false;
+
+          for (const part of addressParts) {
+            if (part.toLowerCase() === city.toLowerCase()) {
+              if (!seenCity) {
+                uniqueParts.push(part);
+                seenCity = true;
+              }
+            } else {
+              uniqueParts.push(part);
+            }
+          }
+          fullAddress = uniqueParts.join(', ');
+        }
       }
-      
-      // Remove duplicate zip codes - more specific pattern
+
+      // Remove duplicate zip codes - handle both consecutive and non-consecutive duplicates
       if (zipCode) {
-        const zipDuplicateRegex = new RegExp(`(${zipCode}[,\\s]+)+${zipCode}`, 'g');
-        fullAddress = fullAddress.replace(zipDuplicateRegex, zipCode);
+        const escapedZip = zipCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // First, remove consecutive duplicates
+        const zipConsecutiveRegex = new RegExp(`(${escapedZip}[,\\s]+)+${escapedZip}`, 'g');
+        fullAddress = fullAddress.replace(zipConsecutiveRegex, zipCode);
+
+        // Then, remove non-consecutive duplicates
+        const zipOccurrences = (fullAddress.match(new RegExp(`\\b${escapedZip}\\b`, 'g')) || []).length;
+        if (zipOccurrences > 1) {
+          // Remove all zip codes and add only one at the end
+          const zipRemovalRegex = new RegExp(`\\b${escapedZip}\\b`, 'g');
+          let tempAddress = fullAddress.replace(zipRemovalRegex, '').trim();
+
+          // Clean up extra spaces/commas and append single zip
+          tempAddress = tempAddress.replace(/,\s*$/, ''); // Remove trailing comma
+          fullAddress = `${tempAddress} ${zipCode}`;
+        }
+      }
+
+      // Remove duplicate state names
+      if (state) {
+        const escapedState = state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const stateOccurrences = (fullAddress.match(new RegExp(`\\b${escapedState}\\b`, 'gi')) || []).length;
+        if (stateOccurrences > 1) {
+          // Remove all states except the last one
+          const stateRegex = new RegExp(`\\b${escapedState}\\b`, 'gi');
+          const matches = [...fullAddress.matchAll(new RegExp(`\\b${escapedState}\\b`, 'gi'))];
+
+          if (matches.length > 1) {
+            // Remove all but the last occurrence
+            for (let i = 0; i < matches.length - 1; i++) {
+              const match = matches[i];
+              fullAddress = fullAddress.substring(0, match.index) +
+                          fullAddress.substring(match.index + match[0].length);
+
+              // Adjust indices for subsequent matches
+              for (let j = i + 1; j < matches.length; j++) {
+                matches[j].index -= match[0].length;
+              }
+            }
+          }
+        }
       }
       
       // Clean up any extra commas, spaces, and normalize formatting

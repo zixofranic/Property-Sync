@@ -101,7 +101,7 @@ export function Notifications() {
 
           return (
             <motion.div
-              key={notification.id}
+              key={notification.id || `notification-${Date.now()}-${Math.random()}`}
               initial={{ opacity: 0, x: 300, scale: 0.3 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 300, scale: 0.5, transition: { duration: 0.2 } }}

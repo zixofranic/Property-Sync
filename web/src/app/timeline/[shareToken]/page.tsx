@@ -10,6 +10,8 @@ import { useNotificationStore, createNewPropertiesNotification } from '@/stores/
 import { initializePushNotifications } from '@/lib/push-notifications';
 import { AgentCard } from '@/components/agent/AgentCard';
 import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
+import ChatInterface from '@/components/messaging/ChatInterface';
+import { useMessaging } from '@/contexts/MessagingContext';
 
 // API Response Types
 interface ClientTimelineData {
@@ -52,6 +54,7 @@ interface ClientTimelineData {
     isViewed: boolean;
     viewedAt?: string;
     createdAt: string;
+    conversationId?: string;
     feedback: Array<{
       id: string;
       feedback: 'love' | 'like' | 'dislike';
@@ -105,6 +108,9 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [previousPropertyCount, setPreviousPropertyCount] = useState<number>(0);
   const [showNewPropertiesBanner, setShowNewPropertiesBanner] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
+
+  // V2 Messaging context for real-time notifications
+  const messaging = useMessaging();
   const [newPropertyCount, setNewPropertyCount] = useState<number>(0);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState<boolean>(false);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -112,6 +118,8 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const [photoViewerData, setPhotoViewerData] = useState<{ images: string[]; initialIndex: number; address: string } | null>(null);
+  const [propertyChats, setPropertyChats] = useState<Record<string, boolean>>({});
+  const [activePropertyChat, setActivePropertyChat] = useState<{propertyId: string, address: string} | null>(null);
 
   // Helper function to manage dismissed notifications in localStorage
   const getDismissedNotifications = () => {
@@ -445,6 +453,8 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
       }
 
       setSessionToken(response.data.sessionToken);
+      // Store session token for MessagingContext
+      localStorage.setItem('clientSessionToken', response.data.sessionToken);
       setIsAuthenticated(true);
       
     } catch (error) {
@@ -529,6 +539,21 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
         address: property.address
       });
     }
+  };
+
+  // Handle property chat click
+  const handlePropertyChatClick = (property: any) => {
+    setActivePropertyChat({
+      propertyId: property.id,
+      address: property.address
+    });
+    setPropertyChats(prev => ({
+      ...prev,
+      [property.id]: true
+    }));
+
+    // Clear property-specific notifications when opening chat
+    messaging.clearPropertyNotifications(property.id);
   };
 
   // Smart email handling with fallback
@@ -866,11 +891,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <Bell className="w-5 h-5 text-slate-300" />
-                  {clientMessages.filter(msg => !msg.isRead).length > 0 && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
-                      {clientMessages.filter(msg => !msg.isRead).length}
-                    </div>
-                  )}
+                  {/* Timeline page doesn't need total unread count - simplified for V2 */}
                 </button>
                 
                 {/* Notification Dropdown */}
@@ -925,7 +946,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                       {clientMessages.length > 0 ? (
                         clientMessages.map((msg, index) => (
                           <div 
-                            key={msg.id}
+                            key={msg.id || `msg-${Date.now()}-${Math.random()}`}
                             className={`p-4 hover:bg-slate-700/30 transition-colors relative group ${
                               !msg.isRead ? 'bg-brand-primary/20 border-l-2 border-brand-primary' : ''
                             } ${index < clientMessages.length - 1 ? 'border-b border-slate-700/30' : ''}`}
@@ -1258,6 +1279,28 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                           {latestFeedback.notes && (
                                             <p className="text-sm text-slate-300 italic">"{latestFeedback.notes}"</p>
                                           )}
+
+                                          {/* Chat Button - Only shown after feedback */}
+                                          <div className="mt-3 pt-3 border-t border-slate-600/50">
+                                            <motion.button
+                                              onClick={() => handlePropertyChatClick(property)}
+                                              className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors flex items-center justify-center space-x-2 relative"
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.98 }}
+                                            >
+                                              <MessageSquare className="w-4 h-4" />
+                                              <span>Chat about this property</span>
+                                              {messaging.getPropertyNotificationCount(property.id) > 0 && (
+                                                <motion.span
+                                                  initial={{ scale: 0 }}
+                                                  animate={{ scale: 1 }}
+                                                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse"
+                                                >
+                                                  {messaging.getPropertyNotificationCount(property.id)}
+                                                </motion.span>
+                                              )}
+                                            </motion.button>
+                                          </div>
                                         </div>
                                       ) : (
                                         <div className="space-y-3">
@@ -1347,19 +1390,40 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary text-sm"
                                             />
                                             
-                                            <motion.button
-                                              onClick={() => handleSubmitFeedback(property.id)}
-                                              disabled={!selectedFeedback[property.id]}
-                                              className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
-                                                selectedFeedback[property.id]
-                                                  ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
-                                                  : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                                              }`}
-                                              whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
-                                              whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
-                                            >
-                                              💾 Share Your Feedback
-                                            </motion.button>
+                                            <div className="flex space-x-2">
+                                              <motion.button
+                                                onClick={() => handleSubmitFeedback(property.id)}
+                                                disabled={!selectedFeedback[property.id]}
+                                                className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors flex-1 ${
+                                                  selectedFeedback[property.id]
+                                                    ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
+                                                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                                whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
+                                                whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
+                                              >
+                                                💾 Share Feedback
+                                              </motion.button>
+
+                                              <motion.button
+                                                onClick={() => handlePropertyChatClick(property)}
+                                                className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors flex items-center space-x-1 relative"
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                              >
+                                                <MessageSquare className="w-3 h-3" />
+                                                <span>Chat</span>
+                                                {messaging.getPropertyNotificationCount(property.id) > 0 && (
+                                                  <motion.span
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse"
+                                                  >
+                                                    {messaging.getPropertyNotificationCount(property.id)}
+                                                  </motion.span>
+                                                )}
+                                              </motion.button>
+                                            </div>
                                           </div>
                                         </div>
                                       )}
@@ -1563,6 +1627,28 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                             {latestFeedback.notes && (
                                               <p className="text-sm text-slate-300 italic">"{latestFeedback.notes}"</p>
                                             )}
+
+                                            {/* Chat Button - Only shown after feedback */}
+                                            <div className="mt-3 pt-3 border-t border-slate-600/50">
+                                              <motion.button
+                                                onClick={() => handlePropertyChatClick(property)}
+                                                className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors flex items-center justify-center space-x-2 relative"
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                              >
+                                                <MessageSquare className="w-4 h-4" />
+                                                <span>Chat about this property</span>
+                                                {messaging.getPropertyNotificationCount(property.id) > 0 && (
+                                                  <motion.span
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse"
+                                                  >
+                                                    {messaging.getPropertyNotificationCount(property.id)}
+                                                  </motion.span>
+                                                )}
+                                              </motion.button>
+                                            </div>
                                           </div>
                                         ) : (
                                           <div className="space-y-4">
@@ -1646,20 +1732,41 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                                                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary text-sm"
                                               />
                                               
-                                              {/* Submit Feedback Button */}
-                                              <motion.button
-                                                onClick={() => handleSubmitFeedback(property.id)}
-                                                disabled={!selectedFeedback[property.id]}
-                                                className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors w-full ${
-                                                  selectedFeedback[property.id]
-                                                    ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
-                                                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                                                }`}
-                                                whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
-                                                whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
-                                              >
-                                                💾 Share Your Feedback
-                                              </motion.button>
+                                              {/* Submit Feedback and Chat Buttons */}
+                                              <div className="flex space-x-2">
+                                                <motion.button
+                                                  onClick={() => handleSubmitFeedback(property.id)}
+                                                  disabled={!selectedFeedback[property.id]}
+                                                  className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors flex-1 ${
+                                                    selectedFeedback[property.id]
+                                                      ? 'bg-brand-primary hover:bg-brand-primary-dark text-white'
+                                                      : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                                  }`}
+                                                  whileHover={{ scale: selectedFeedback[property.id] ? 1.02 : 1 }}
+                                                  whileTap={{ scale: selectedFeedback[property.id] ? 0.98 : 1 }}
+                                                >
+                                                  💾 Share Feedback
+                                                </motion.button>
+
+                                                <motion.button
+                                                  onClick={() => handlePropertyChatClick(property)}
+                                                  className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors flex items-center space-x-1 relative"
+                                                  whileHover={{ scale: 1.02 }}
+                                                  whileTap={{ scale: 0.98 }}
+                                                >
+                                                  <MessageSquare className="w-3 h-3" />
+                                                  <span>Chat</span>
+                                                  {messaging.getPropertyNotificationCount(property.id) > 0 && (
+                                                    <motion.span
+                                                      initial={{ scale: 0 }}
+                                                      animate={{ scale: 1 }}
+                                                      className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse"
+                                                    >
+                                                      {messaging.getPropertyNotificationCount(property.id)}
+                                                    </motion.span>
+                                                  )}
+                                                </motion.button>
+                                              </div>
                                             </div>
                                           </div>
                                         )}
@@ -1849,6 +1956,38 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
           isSticky={true}
         />
       )}
+
+
+      {/* Property-Specific Chat Interface Modal */}
+      {activePropertyChat && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setActivePropertyChat(null)} />
+          <div className="relative bg-slate-800 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md h-[600px] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div>
+                <h3 className="text-white font-semibold">Property Chat</h3>
+                <p className="text-slate-400 text-sm">{activePropertyChat.address}</p>
+                {timelineData?.agent?.firstName && (
+                  <p className="text-slate-400 text-xs">with {timelineData.agent.firstName}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setActivePropertyChat(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatInterface
+                timelineId={timelineData?.timeline.id || ''}
+                propertyId={activePropertyChat.propertyId}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

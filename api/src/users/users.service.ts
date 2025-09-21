@@ -629,14 +629,14 @@ export class UsersService {
 
   async checkCanAddClients(userId: string, clientCount = 1): Promise<{ canAdd: boolean; reason?: string }> {
     const validation = await this.validateCurrentUsage(userId);
-    
+
     // Check against database limits directly
     const newClientTotal = validation.usage.clients + clientCount;
     const canAdd = newClientTotal <= validation.limits.clientLimit;
 
     return {
       canAdd,
-      reason: !canAdd 
+      reason: !canAdd
         ? `Adding ${clientCount} client(s) would exceed your limit of ${validation.limits.clientLimit} clients. Current: ${validation.usage.clients}/${validation.limits.clientLimit}`
         : undefined,
     };

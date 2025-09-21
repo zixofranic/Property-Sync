@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { useHUD } from '@/providers/HUDProvider';
+import { useMessaging } from '@/contexts/MessagingContext';
 import { BatchPropertyModal } from '../modals/BatchPropertyModal';
 import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
@@ -45,10 +46,10 @@ import { AnalyticsModal } from '@/components/modals/AnalyticsModal';
 
 
 export function MissionControl() {
-  const { 
-    selectedClient, 
-    clients, 
-    selectClient, 
+  const {
+    selectedClient,
+    clients,
+    selectClient,
     getClientTimeline,
     activeModal,
     setActiveModal,
@@ -77,8 +78,20 @@ export function MissionControl() {
     hasUnreadFeedbackNotifications,
     createFeedbackNotification,
   } = useMissionControlStore();
-  
+
   const { setShowPropertyHUD } = useHUD();
+
+  // V2 messaging
+  const messaging = useMessaging();
+
+  // Calculate total unread count across all properties
+  const getUnreadCount = () => {
+    const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
+    const properties = currentTimeline?.properties || [];
+    return properties.reduce((total, property) => {
+      return total + (messaging.getPropertyUnreadCount(property.id) || 0);
+    }, 0);
+  };
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [mlsModal, setMlsModal] = useState<{ isOpen: boolean; url: string; address: string }>({
     isOpen: false,
@@ -186,6 +199,9 @@ export function MissionControl() {
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
   const properties = currentTimeline?.properties || [];
+
+  // Get total unread messaging notifications
+  const messagingUnreadCount = getUnreadCount();
 
   // Fetch email state for timeline - moved before useEffect
   const fetchEmailState = useCallback(async (timelineId: string) => {
@@ -607,7 +623,7 @@ const testProfileAPI = async () => {
             <div className="relative">
               <motion.button
                 onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                className="flex items-center space-x-2 sm:space-x-3 bg-brand-primary hover:bg-brand-primary-dark text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200"
+                className="flex items-center space-x-2 sm:space-x-3 bg-brand-primary hover:bg-brand-primary-dark text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-lg transition-all duration-200 relative"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -621,6 +637,34 @@ const testProfileAPI = async () => {
                 </div>
               </div>
               <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+
+              {/* Global Messaging Notification Badge */}
+              {messagingUnreadCount > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg z-10"
+                >
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      boxShadow: [
+                        '0 0 0 0 rgba(249, 115, 22, 0.7)',
+                        '0 0 0 4px rgba(249, 115, 22, 0)',
+                        '0 0 0 0 rgba(249, 115, 22, 0)'
+                      ]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="flex items-center justify-center w-full h-full rounded-full"
+                  >
+                    {messagingUnreadCount > 99 ? '99+' : messagingUnreadCount}
+                  </motion.div>
+                </motion.div>
+              )}
             </motion.button>
 
             <AnimatePresence>
@@ -1193,6 +1237,8 @@ const testProfileAPI = async () => {
                                 isClientView={false}
                                 index={currentIndex}
                                 isAlternating={true}
+                                timelineId={currentTimeline?.id}
+                                agentName={user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : user?.email}
                               />
                             );
                           })}
@@ -1592,10 +1638,11 @@ const testProfileAPI = async () => {
           }}
         />
       )}
-      <ProfileModal 
-  isOpen={showProfileModal} 
-  onClose={() => setShowProfileModal(false)} 
+      <ProfileModal
+  isOpen={showProfileModal}
+  onClose={() => setShowProfileModal(false)}
 />
+
     </div>
   );
 }

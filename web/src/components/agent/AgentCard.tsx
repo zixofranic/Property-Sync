@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, MapPin, Share2, User, Building, Star, Award, Globe } from 'lucide-react';
+import { Phone, Mail, MapPin, Share2, User, Building, Star, Award, Globe, MessageSquare } from 'lucide-react';
 import { AgentIdentityCardModal } from './AgentIdentityCardModal';
 import { apiClient } from '@/lib/api-client';
 
@@ -35,9 +35,9 @@ interface AgentCardProps {
   clientName?: string;
 }
 
-export function AgentCard({ 
-  agent, 
-  isSticky = false, 
+export function AgentCard({
+  agent,
+  isSticky = false,
   variant = 'dashboard',
   className = '',
   shareToken,

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { devtools, persist, subscribeWithSelector } from 'zustand/middleware';
 import { apiClient, type ClientResponse, type TimelineResponse, type AnalyticsDashboard } from '@/lib/api-client';
 import { generateUUID } from '@/lib/uuid';
+import { transformTimeline } from '@/lib/data-transformers';
 
 // Store Types
 export interface User {
@@ -74,10 +75,11 @@ export interface Property {
   bathrooms?: number;
   squareFootage?: number;
   beds?: number;  // Computed property for backward compatibility
-  baths?: number; // Computed property for backward compatibility  
+  baths?: number; // Computed property for backward compatibility
   sqft?: number;  // Computed property for backward compatibility
   loadingProgress?: number;
   isFullyParsed?: boolean;
+  conversationId?: string; // Pre-created conversation ID for property-specific messaging
 }
 
 // MLS Batch Import Interfaces
@@ -180,6 +182,9 @@ interface MissionControlState extends EmailState {
 
   // Notifications
   notifications: Notification[];
+  processedActivityIds: Set<string>;
+  lastTimelineViewNotifications: Map<string, number>;
+  lastFeedbackNotifications: Map<string, number>;
 
   // Activity Polling
   lastActivityCheck: string | null;
@@ -383,6 +388,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         notifications: [],
         processedActivityIds: new Set(), // Track processed activities to prevent duplicates
         lastTimelineViewNotifications: new Map(), // Track last timeline view notification per client
+        lastFeedbackNotifications: new Map(), // Track last feedback notification per client+property
 
         // Initial Activity Polling State
         lastActivityCheck: null,
@@ -1081,17 +1087,55 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
               case 'feedback_submit':
                 if (preferences.notificationFeedback) {
+                  // Smart throttling for feedback events (prevent spam)
+                  const propertyIdFromActivity = activity.metadata?.propertyId || activity.propertyId;
+                  const now = Date.now();
+                  const FEEDBACK_THROTTLE_WINDOW = 5 * 60 * 1000; // 5 minutes
+
+                  // Create unique key for this feedback combination
+                  const feedbackKey = `${clientId}-${propertyIdFromActivity}`;
+
+                  // Get last feedback notification time for this client+property
+                  const lastFeedbackNotificationMap = get().lastFeedbackNotifications || new Map();
+                  const lastFeedbackTime = lastFeedbackNotificationMap.get(feedbackKey) || 0;
+
+                  // If we sent a feedback notification for this client+property within the throttle window, skip
+                  if (now - lastFeedbackTime < FEEDBACK_THROTTLE_WINDOW) {
+                    console.log(`⏰ Throttling feedback notification for client ${clientId} property ${propertyIdFromActivity} (last sent ${Math.round((now - lastFeedbackTime) / 1000 / 60)} min ago)`);
+                    processedActivityIds.add(activityId);
+                    return;
+                  }
+
+                  // Also check for unread feedback notifications as backup
+                  const recentFeedbackNotifications = get().notifications.filter(n =>
+                    n.type === 'feedback' &&
+                    n.clientId === clientId &&
+                    n.propertyId === propertyIdFromActivity &&
+                    n.metadata?.eventType === 'feedback_submit' &&
+                    !n.read
+                  );
+
+                  if (recentFeedbackNotifications.length > 0) {
+                    console.log(`⏭️ Skipping duplicate unread feedback notification for client ${clientId} property ${propertyIdFromActivity}`);
+                    processedActivityIds.add(activityId);
+                    return;
+                  }
+
+                  // Update the last feedback notification time for this client+property
+                  lastFeedbackNotificationMap.set(feedbackKey, now);
+                  set({ lastFeedbackNotifications: lastFeedbackNotificationMap });
+
                   // Map backend feedback types to frontend types
                   const backendType = activity.metadata?.feedbackType || activity.feedbackType || activity.type;
                   let feedbackType: 'love' | 'like' | 'dislike' = 'like';
-                  
+
                   if (backendType === 'LOVE_IT' || backendType === 'love') feedbackType = 'love';
                   else if (backendType === 'DISLIKE_IT' || backendType === 'dislike') feedbackType = 'dislike';
                   else if (backendType === 'LIKE_IT' || backendType === 'like') feedbackType = 'like';
-                  
+
                   const feedbackEmoji = feedbackType === 'love' ? '❤️' : feedbackType === 'like' ? '👍' : '👎';
                   const feedbackAction = feedbackType === 'love' ? 'loves' : feedbackType === 'like' ? 'likes' : 'dislikes';
-                  
+
                   notification = {
                     type: 'feedback',
                     title: `${feedbackEmoji} Client Feedback`,
@@ -1099,7 +1143,7 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
                     read: false,
                     clientId,
                     clientName,
-                    propertyId,
+                    propertyId: propertyIdFromActivity,
                     propertyAddress,
                     feedbackType,
                     metadata: {
@@ -1485,15 +1529,18 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
 
             if (response.data) {
               console.log('Store: Timeline loaded successfully');
-              
+
+              // Transform the response to parse JSON strings back to arrays
+              const transformedResponse = transformTimeline(response.data);
+
               const transformedTimeline: Timeline = {
-                id: response.data.id,
-                clientId: response.data.clientId,
-                properties: response.data.properties,
-                createdAt: response.data.createdAt,
-                updatedAt: response.data.updatedAt,
-                shareToken: response.data.shareToken,
-                isPublic: response.data.isPublic,
+                id: transformedResponse.id,
+                clientId: transformedResponse.clientId,
+                properties: transformedResponse.properties,
+                createdAt: transformedResponse.createdAt,
+                updatedAt: transformedResponse.updatedAt,
+                shareToken: transformedResponse.shareToken,
+                isPublic: transformedResponse.isPublic,
               };
 
               set({

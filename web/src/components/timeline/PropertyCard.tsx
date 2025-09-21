@@ -3,7 +3,9 @@
 // apps/web/src/components/timeline/PropertyCard.tsx
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, X, ExternalLink, MapPin, DollarSign, ChevronLeft, ChevronRight, Bed, Bath, Square } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, X, ExternalLink, MapPin, DollarSign, ChevronLeft, ChevronRight, Bed, Bath, Square } from 'lucide-react';
+import { ChatInterfaceV2 } from '@/components/messaging/ChatInterfaceV2';
+import { useMessaging } from '@/contexts/MessagingContext';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
 import { Property } from '@/stores/missionControlStore';
@@ -17,17 +19,21 @@ interface PropertyCardProps {
   isClientView?: boolean;
   index: number;
   isAlternating?: boolean;
+  timelineId?: string;
+  agentName?: string;
 }
 
-export function PropertyCard({ 
-  property, 
-  onFeedback, 
-  onViewMLS, 
+export function PropertyCard({
+  property,
+  onFeedback,
+  onViewMLS,
   onDelete,
   onDeletePhoto,
   isClientView = false,
   index,
-  isAlternating = false
+  isAlternating = false,
+  timelineId,
+  agentName
 }: PropertyCardProps) {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackNotes, setFeedbackNotes] = useState(property.notes || '');
@@ -39,6 +45,13 @@ export function PropertyCard({
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+
+  // V2 messaging hooks for notifications
+  const messaging = useMessaging();
+
+  // Get unread count for this property
+  const unreadCount = messaging.getPropertyNotificationCount(property.id) || 0;
 
   // Get all images (handle both single imageUrl and multiple imageUrls)
   const images = property.imageUrls?.length > 0 
@@ -242,8 +255,8 @@ export function PropertyCard({
                 <ChevronRight className="w-5 h-5" />
               </button>
               
-              {/* Image Dots Indicator - Scrollable for many images */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+              {/* Image Dots Indicator - Scrollable for many images - Hidden for agents */}
+              <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-20 ${!isClientView ? 'hidden' : ''}`}>
                 {images.length <= 8 ? (
                   // Simple dots for 8 or fewer images
                   <div className="flex space-x-2">
@@ -292,8 +305,8 @@ export function PropertyCard({
           </div>
 
           {/* View Details Button - Bottom Left */}
-          {property.mlsLink && (
-            <div className="absolute bottom-4 left-4 z-20">
+          <div className="absolute bottom-4 left-4 z-20 flex items-center space-x-2 flex-wrap">
+            {property.mlsLink && (
               <button
                 onClick={() => onViewMLS && onViewMLS(property.mlsLink!)}
                 className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
@@ -301,8 +314,18 @@ export function PropertyCard({
                 <ExternalLink className="w-4 h-4" />
                 <span>View Details</span>
               </button>
-            </div>
-          )}
+            )}
+
+            {/* Photo Counter - Only show for agents with multiple images */}
+            {!isClientView && hasMultipleImages && (
+              <div className="inline-flex items-center space-x-1 bg-slate-700/80 text-white px-3 py-2 rounded-lg font-medium shadow-lg">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{currentImageIndex + 1}/{images.length}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Photo Delete Confirmation Dialog */}
@@ -476,6 +499,53 @@ export function PropertyCard({
             </div>
           )}
 
+          {/* Property Chat Section - Available for Both Agent and Client */}
+          {(
+            <div className="border-t border-slate-600 pt-4 mt-4">
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowChat(true);
+                }}
+                className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2 shadow-lg relative"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                title={`Chat about ${property.address}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Chat about this property</span>
+
+                {/* Notification Badge */}
+                {unreadCount > 0 && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg"
+                  >
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.2, 1],
+                        boxShadow: [
+                          '0 0 0 0 rgba(239, 68, 68, 0.7)',
+                          '0 0 0 4px rgba(239, 68, 68, 0)',
+                          '0 0 0 0 rgba(239, 68, 68, 0)'
+                        ]
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="flex items-center justify-center w-full h-full rounded-full"
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </motion.div>
+                  </motion.div>
+                )}
+              </motion.button>
+            </div>
+          )}
+
           {/* Property Meta */}
           <div className="mt-4 pt-3 border-t border-slate-600 flex items-center justify-between text-xs text-slate-400">
             <div className="flex items-center space-x-4">
@@ -518,12 +588,42 @@ export function PropertyCard({
         </div>
       </motion.div>
 
+      {/* Chat Interface Modal */}
+      {showChat && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowChat(false)} />
+          <div className="relative bg-slate-800 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md h-[600px] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div>
+                <h3 className="text-white font-semibold">Property Chat</h3>
+                <p className="text-slate-400 text-sm">{property.address}</p>
+                {agentName && (
+                  <p className="text-slate-400 text-xs">with {agentName}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowChat(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatInterfaceV2
+                timelineId={timelineId}
+                propertyId={property.id}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Photo Viewer Modal */}
-      {console.log('PropertyCard rendering PhotoViewerModal:', { 
-        showPhotoViewer, 
-        imagesCount: images.length, 
+      {console.log('PropertyCard rendering PhotoViewerModal:', {
+        showPhotoViewer,
+        imagesCount: images.length,
         currentImageIndex,
-        property: property.address 
+        property: property.address
       })}
       <PhotoViewerModal
         isOpen={showPhotoViewer}

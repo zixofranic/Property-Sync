@@ -32,6 +32,9 @@ export class PropertyResponseDto {
   loadingProgress: number; // 0-100 parsing progress
   isFullyParsed: boolean; // Whether property is fully parsed
 
+  // 🆕 MESSAGING DATA
+  conversationId?: string; // Pre-created conversation ID for property-specific messaging
+
   // 🆕 FEEDBACK DATA
   feedback?: {
     id: string;

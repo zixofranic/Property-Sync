@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Client Messaging Test</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Client Messaging Connection Test</h1>
+    <div id="status">Disconnected</div>
+    <div id="logs"></div>
+    <input type="text" id="sessionToken" placeholder="Enter sessionToken">
+    <input type="text" id="shareToken" placeholder="Enter shareToken">
+    <button onclick="connectClient()">Connect as Client</button>
+    <br><br>
+    <input type="text" id="messageText" placeholder="Type a message">
+    <button onclick="sendMessage()">Send Message</button>
+
+    <script>
+        let socket = null;
+        let logs = document.getElementById('logs');
+        let status = document.getElementById('status');
+
+        function log(message) {
+            logs.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+
+        function connectClient() {
+            const sessionToken = document.getElementById('sessionToken').value || 'test-session-token';
+            const shareToken = document.getElementById('shareToken').value || 'test-share-token';
+
+            log('Attempting to connect as client with sessionToken: ' + sessionToken + ', shareToken: ' + shareToken);
+
+            socket = io('http://localhost:3004/messaging', {
+                auth: {
+                    sessionToken: sessionToken,
+                    shareToken: shareToken,
+                },
+                transports: ['websocket', 'polling'],
+                upgrade: true,
+            });
+
+            socket.on('connect', () => {
+                log('✅ Connected to messaging server!');
+                status.textContent = 'Connected';
+                status.style.color = 'green';
+            });
+
+            socket.on('disconnect', (reason) => {
+                log('❌ Disconnected: ' + reason);
+                status.textContent = 'Disconnected';
+                status.style.color = 'red';
+            });
+
+            socket.on('error', (error) => {
+                log('🔥 Error: ' + JSON.stringify(error));
+            });
+
+            socket.on('new-message', (message) => {
+                log('📨 New message: ' + message.content);
+            });
+
+            socket.on('message-notification', (notification) => {
+                log('🔔 Message notification: ' + notification.content);
+            });
+        }
+
+        function sendMessage() {
+            const messageText = document.getElementById('messageText').value;
+            if (!messageText || !socket) return;
+
+            log('Sending message: ' + messageText);
+            socket.emit('send-message', {
+                content: messageText,
+                timelineId: 'test-timeline',
+                propertyId: 'test-property'
+            });
+            document.getElementById('messageText').value = '';
+        }
+    </script>
+</body>
+</html>

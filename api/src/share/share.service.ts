@@ -210,7 +210,17 @@ export class ShareService {
         squareFootage: property.squareFootage,
         propertyType: property.propertyType,
         description: property.description,
-        imageUrls: property.imageUrls,
+        imageUrls: property.imageUrls ? (
+          typeof property.imageUrls === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(property.imageUrls);
+                } catch {
+                  return [property.imageUrls]; // fallback for non-JSON strings
+                }
+              })()
+            : property.imageUrls
+        ) : [],
         listingUrl: property.listingUrl,
         isViewed: property.isViewed,
         viewedAt: property.viewedAt,

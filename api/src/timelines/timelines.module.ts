@@ -6,9 +6,10 @@ import { EmailModule } from '../email/email.module';
 import { MLSParserModule } from '../mls-parser/mls-parser.module';
 import { UsersModule } from '../users/users.module';
 import { AppConfigModule } from '../config/config.module';
+import { MessagingModule } from '../messaging/messaging.module';
 
 @Module({
-  imports: [PrismaModule, EmailModule, MLSParserModule, UsersModule, AppConfigModule],
+  imports: [PrismaModule, EmailModule, MLSParserModule, UsersModule, AppConfigModule, MessagingModule],
   controllers: [TimelinesController],
   providers: [TimelinesService],
   exports: [TimelinesService],
