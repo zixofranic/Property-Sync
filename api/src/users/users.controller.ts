@@ -33,24 +33,29 @@ export class UsersController {
   @Patch('profile')
   async updateProfile(
     @CurrentUser() user: any,
-    @Body() updateProfileDto: UpdateProfileDto,
+    @Body() updateProfileDto: any, // Temporarily use any to see raw data
   ) {
     try {
-      console.log('🔧 Profile update request:', {
+      console.log('🔧 Profile update request - FULL DATA:', {
         userId: user?.id,
-        dataKeys: Object.keys(updateProfileDto),
-        avatar: updateProfileDto.avatar ? 'Present' : 'None'
+        rawRequestBody: updateProfileDto,
+        dataKeys: Object.keys(updateProfileDto || {}),
+        specialtiesType: Array.isArray(updateProfileDto?.specialties) ? 'array' : typeof updateProfileDto?.specialties,
+        specialtiesValue: updateProfileDto?.specialties
       });
 
       const result = await this.usersService.updateProfile(user.id, updateProfileDto);
       console.log('✅ Profile update successful');
       return result;
     } catch (error) {
-      console.error('❌ Profile update failed:', {
-        error: error.message,
-        stack: error.stack,
+      console.error('❌ Profile update failed - COMPLETE ERROR:', {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
         userId: user?.id,
-        data: updateProfileDto
+        requestData: updateProfileDto,
+        isPrismaError: error.name?.includes('Prisma'),
+        fullError: error
       });
       throw error;
     }
