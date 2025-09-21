@@ -52,8 +52,8 @@ export class UpdateProfileDto {
   timezone?: string;
 
   @IsOptional()
-  @IsArray()
-  specialties?: string[];
+  @IsString()
+  specialties?: string;
 
   @IsOptional()
   @IsNumber()
