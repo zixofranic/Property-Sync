@@ -3,7 +3,7 @@
 
 import { use, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell, Building, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, Lock, Heart, MessageSquare, X, Phone, Mail, MapPin, ExternalLink, Eye, Calendar, Clock, Sparkles, Bell, Building, ChevronLeft, ChevronRight, Palette } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { NewPropertiesNotification } from '@/components/notifications/NewPropertiesNotification';
 import { useNotificationStore, createNewPropertiesNotification } from '@/stores/notificationStore';
@@ -120,6 +120,16 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
   const [photoViewerData, setPhotoViewerData] = useState<{ images: string[]; initialIndex: number; address: string } | null>(null);
   const [propertyChats, setPropertyChats] = useState<Record<string, boolean>>({});
   const [activePropertyChat, setActivePropertyChat] = useState<{propertyId: string, address: string} | null>(null);
+
+  // Color picker state
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [currentHue, setCurrentHue] = useState(220);
+
+  // Theme update function for color picker
+  const updateTheme = (newHue: number) => {
+    setCurrentHue(newHue);
+    document.documentElement.style.setProperty('--theme-hue', newHue.toString());
+  };
 
   // Helper function to manage dismissed notifications in localStorage
   const getDismissedNotifications = () => {
@@ -265,26 +275,33 @@ export default function ClientTimelineView({ params }: { params: Promise<{ share
       };
 
       const hue = hexToHue(timelineData.agent.brandColor);
+      setCurrentHue(hue);
       document.documentElement.style.setProperty('--theme-hue', hue.toString());
     }
   }, [timelineData?.agent?.brandColor]);
 
-  // Handle click outside notification dropdown
+  // Handle click outside dropdown elements
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (notificationRef.current && !notificationRef.current.contains(target)) {
         setShowNotificationDropdown(false);
+      }
+
+      if (showColorPicker && !target.closest('[data-color-picker]')) {
+        setShowColorPicker(false);
       }
     };
 
-    if (showNotificationDropdown) {
+    if (showNotificationDropdown || showColorPicker) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showNotificationDropdown]);
+  }, [showNotificationDropdown, showColorPicker]);
 
   // Fetch timeline data function (extracted for reuse)
   const fetchTimelineData = async (isInitialLoad = false) => {
@@ -1987,6 +2004,123 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
           </div>
         </div>
       )}
+
+      {/* Color Picker Button - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-50" data-color-picker>
+        <motion.button
+          onClick={() => setShowColorPicker(!showColorPicker)}
+          className="w-14 h-14 bg-brand-primary hover:bg-brand-primary-dark text-white rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          title="Theme Color Picker"
+          style={{
+            background: `hsl(${currentHue}, 70%, 55%)`
+          }}
+        >
+          <Palette className="w-6 h-6" />
+        </motion.button>
+      </div>
+
+      {/* Color Picker Panel */}
+      <AnimatePresence>
+        {showColorPicker && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, x: -20 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: 20, x: -20 }}
+            className="fixed bottom-20 left-4 z-50 bg-slate-800/95 backdrop-blur-md border border-slate-700/50 rounded-xl p-6 shadow-2xl max-w-sm"
+            data-color-picker
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                Theme Color
+              </h3>
+              <button
+                onClick={() => setShowColorPicker(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Hue Slider */}
+            <div className="mb-6">
+              <label className="block text-slate-300 text-sm mb-2">
+                Hue: {currentHue}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                value={currentHue}
+                onChange={(e) => updateTheme(parseInt(e.target.value))}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right,
+                    hsl(0, 70%, 55%),
+                    hsl(60, 70%, 55%),
+                    hsl(120, 70%, 55%),
+                    hsl(180, 70%, 55%),
+                    hsl(240, 70%, 55%),
+                    hsl(300, 70%, 55%),
+                    hsl(360, 70%, 55%))`
+                }}
+              />
+            </div>
+
+            {/* Color Presets */}
+            <div className="mb-6">
+              <label className="block text-slate-300 text-sm mb-2">Quick Presets:</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { name: 'Ocean Blue', hue: 220 },
+                  { name: 'Forest Green', hue: 120 },
+                  { name: 'Sunset Orange', hue: 30 },
+                  { name: 'Royal Purple', hue: 270 },
+                  { name: 'Rose Pink', hue: 330 },
+                  { name: 'Cyan Blue', hue: 180 },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => updateTheme(preset.hue)}
+                    className="p-2 rounded-lg border border-slate-600 hover:border-brand-primary transition-all duration-200 text-xs text-center"
+                    style={{
+                      backgroundColor: `hsl(${preset.hue}, 15%, 12%)`,
+                      color: 'var(--text-light)'
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full mb-1 mx-auto"
+                      style={{ backgroundColor: `hsl(${preset.hue}, 70%, 55%)` }}
+                    />
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Preview */}
+            <div className="space-y-3">
+              <div className="text-slate-300 text-sm">Live Preview:</div>
+
+              {/* Preview Elements */}
+              <div className="flex gap-2">
+                <div className="flex-1 h-8 rounded bg-brand-primary flex items-center justify-center text-xs text-white font-medium">
+                  Primary
+                </div>
+                <div className="flex-1 h-8 rounded bg-brand-secondary flex items-center justify-center text-xs text-slate-900 font-medium">
+                  Secondary
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-400 text-center">
+                Changes apply instantly to the timeline theme
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
