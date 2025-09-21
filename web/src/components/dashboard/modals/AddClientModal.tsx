@@ -133,16 +133,10 @@ export function AddClientModal({ isOpen, onClose, editingClient = null }: AddCli
 
         const success = await addClient(clientData);
 
-        if (success) {
-          addNotification({
-            type: 'success',
-            title: 'Client Added',
-            message: `${formData.name} has been added to your client list.`,
-            read: false
-          });
-        } else {
+        if (!success) {
           throw new Error('Failed to create client');
         }
+        // Note: Success notification is handled by the store
       }
 
       // Reset form and close
