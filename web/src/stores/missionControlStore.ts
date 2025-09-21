@@ -271,6 +271,8 @@ interface MissionControlActions extends EmailActions {
   removeNotification: (id: string) => void;
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
+  removeAllNotifications: () => void;
+  markAllNotificationsAsRead: () => void;
   
   // Helper functions for notifications
   getUnreadNotificationsForClient: (clientId: string) => Notification[];
@@ -1987,6 +1989,19 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
         },
 
         clearAllNotifications: () => {
+          set((state) => ({
+            notifications: state.notifications.map(notification => ({
+              ...notification,
+              read: true
+            }))
+          }));
+        },
+
+        removeAllNotifications: () => {
+          set({ notifications: [] });
+        },
+
+        markAllNotificationsAsRead: () => {
           set((state) => ({
             notifications: state.notifications.map(notification => ({
               ...notification,

@@ -60,6 +60,8 @@ export function MissionControl() {
     removeNotification,
     markNotificationAsRead,
     clearAllNotifications,
+    removeAllNotifications,
+    markAllNotificationsAsRead,
     deleteProperty,
     deletePropertyPhoto,
     getPropertyById,
@@ -856,8 +858,12 @@ const testProfileAPI = async () => {
               <div className="relative" data-notifications-dropdown>
                 <button
                   onClick={() => {
-                    // Only toggle dropdown - don't mark as read until Clear All is clicked
+                    const wasOpen = showNotificationsDropdown;
                     setShowNotificationsDropdown(!showNotificationsDropdown);
+                    // Auto-mark all notifications as read when opening dropdown
+                    if (!wasOpen && notifications.some(n => !n.read)) {
+                      setTimeout(() => markAllNotificationsAsRead(), 100);
+                    }
                   }}
                   className="relative p-1"
                   title={`Notifications ${notifications.filter(n => !n.read).length > 0 ? `(${notifications.filter(n => !n.read).length} unread)` : ''}`}
@@ -900,7 +906,7 @@ const testProfileAPI = async () => {
                       {notifications.length > 0 && (
                         <motion.button
                           onClick={() => {
-                            clearAllNotifications();
+                            removeAllNotifications();
                             setShowNotificationsDropdown(false);
                           }}
                           className="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded border border-slate-600 hover:border-slate-400"
@@ -960,20 +966,11 @@ const testProfileAPI = async () => {
                                   {new Date(notification.timestamp).toLocaleString()}
                                 </p>
                               </div>
-                              <div className="flex items-center space-x-1 ml-2">
-                                {!notification.read && (
-                                  <button
-                                    onClick={() => markNotificationAsRead(notification.id)}
-                                    className="w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors"
-                                    title="Mark as read"
-                                  >
-                                    <span className="text-xs text-white">✓</span>
-                                  </button>
-                                )}
+                              <div className="flex items-center ml-2">
                                 <button
                                   onClick={() => removeNotification(notification.id)}
-                                  className="w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-colors"
-                                  title="Remove"
+                                  className="w-6 h-6 bg-slate-600 hover:bg-red-500 rounded-full flex items-center justify-center transition-colors"
+                                  title="Remove notification"
                                 >
                                   <span className="text-xs text-white">×</span>
                                 </button>
