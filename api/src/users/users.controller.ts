@@ -35,7 +35,25 @@ export class UsersController {
     @CurrentUser() user: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    return this.usersService.updateProfile(user.id, updateProfileDto);
+    try {
+      console.log('🔧 Profile update request:', {
+        userId: user?.id,
+        dataKeys: Object.keys(updateProfileDto),
+        avatar: updateProfileDto.avatar ? 'Present' : 'None'
+      });
+
+      const result = await this.usersService.updateProfile(user.id, updateProfileDto);
+      console.log('✅ Profile update successful');
+      return result;
+    } catch (error) {
+      console.error('❌ Profile update failed:', {
+        error: error.message,
+        stack: error.stack,
+        userId: user?.id,
+        data: updateProfileDto
+      });
+      throw error;
+    }
   }
 
   @Post('change-password')

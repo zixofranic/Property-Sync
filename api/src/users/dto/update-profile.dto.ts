@@ -39,8 +39,7 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @Transform(({ value }) => value === '' || value === null ? null : value)
-  @ValidateIf((o, value) => value !== null)
-  @IsUrl({}, { message: 'Avatar must be a valid URL' })
+  @IsString()
   avatar?: string;
 
   @IsOptional()
@@ -71,8 +70,7 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @Transform(({ value }) => value === '' || value === null ? null : value)
-  @ValidateIf((o, value) => value !== null)
-  @IsUrl({}, { message: 'Logo must be a valid URL' })
+  @IsString()
   logo?: string;
 
   @IsOptional()

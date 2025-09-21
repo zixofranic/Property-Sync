@@ -64,7 +64,10 @@
       "Bash(sed:*)",
       "Read(//c/Users/ziadf/Downloads/**)",
       "Bash(wmic process where:*)",
-      "Bash(del /q node_modules.prismaclientquery_engine-windows.dll.node)"
+      "Bash(del /q node_modules.prismaclientquery_engine-windows.dll.node)",
+      "Bash(railway whoami:*)",
+      "Bash(railway:*)",
+      "WebFetch(domain:grateful-laughter-production-b148.up.railway.app)"
     ],
     "deny": [],
     "ask": [],
