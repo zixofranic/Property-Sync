@@ -125,6 +125,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
   const [propertyNotificationCounts, setPropertyNotificationCounts] = useState<Record<string, number>>({});
 
+  // EMERGENCY DUPLICATE PREVENTION: Track recently processed messages
+  const [recentlyProcessedMessages, setRecentlyProcessedMessages] = useState<Set<string>>(new Set());
+
   // Initialize socket connection to V2 namespace
   useEffect(() => {
     if (socket) return; // Prevent duplicate connections
@@ -293,6 +296,31 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // EMERGENCY DUPLICATE PREVENTION: Check if we recently processed this exact message
+      const messageKey = `${message.id}-${message.content.substring(0, 50)}-${message.createdAt}`;
+      if (recentlyProcessedMessages.has(messageKey)) {
+        console.warn('🚨 BLOCKING: Recently processed message detected', {
+          messageId: message.id,
+          messageKey: messageKey.substring(0, 100)
+        });
+        return;
+      }
+
+      // Add to recently processed (keep for 30 seconds)
+      setRecentlyProcessedMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.add(messageKey);
+        // Clean up old entries after 30 seconds
+        setTimeout(() => {
+          setRecentlyProcessedMessages(current => {
+            const updated = new Set(current);
+            updated.delete(messageKey);
+            return updated;
+          });
+        }, 30000);
+        return newSet;
+      });
+
       // Extract property ID from the message's conversation
       const propertyId = message.conversation?.propertyId || message.propertyId;
 
@@ -325,10 +353,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       setMessages(prev => {
         const existingMessages = prev[propertyId] || [];
 
-        // Check if we already have this message (either by real ID or temp ID being replaced)
+        // AGGRESSIVE DUPLICATE PREVENTION: Check if we already have this message
         const isDuplicate = existingMessages.some(existingMsg =>
           // Exact ID match (real message duplicate)
           existingMsg.id === transformedMessage.id ||
+          // Exact content and timestamp match (prevent immediate duplicates)
+          (existingMsg.content.trim() === transformedMessage.content.trim() &&
+           Math.abs(new Date(existingMsg.createdAt).getTime() - new Date(transformedMessage.createdAt).getTime()) < 5000) ||
           // Temp message replacement (optimistic message being replaced by real one)
           (existingMsg.id.startsWith('temp-') &&
            existingMsg.content === transformedMessage.content &&
