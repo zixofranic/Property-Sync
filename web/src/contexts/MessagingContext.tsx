@@ -43,6 +43,12 @@ interface MessagingContextV2Type {
   // Actions - SIMPLIFIED
   sendMessage: (propertyId: string, content: string) => Promise<void>;
   joinPropertyConversation: (propertyId: string) => void;
+
+  // Utility functions that were missing
+  getPropertyUnreadCount: (propertyId: string) => number;
+  getPropertyNotificationCount: (propertyId: string) => number;
+  clearPropertyNotifications: (propertyId: string) => void;
+  markMessagesAsRead: (propertyId: string) => Promise<void>;
 }
 
 const MessagingContext = createContext<MessagingContextV2Type | null>(null);
@@ -56,6 +62,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<Record<string, MessageV2[]>>({});
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
+  const [propertyNotificationCounts, setPropertyNotificationCounts] = useState<Record<string, number>>({});
 
   // SIMPLE USER IDENTIFICATION - Use what we already know
   const currentUserId = user?.id || null;
@@ -132,6 +139,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
       // Simple notification for messages not from current user
       if (transformedMessage.senderId !== currentUserId) {
+        // Increment notification count
+        setPropertyNotificationCounts(prev => ({
+          ...prev,
+          [propertyId]: (prev[propertyId] || 0) + 1,
+        }));
+
         addNotification({
           type: 'info',
           title: 'New message',
@@ -226,6 +239,42 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     setActivePropertyId(propertyId);
   }, [socket, isConnected]);
 
+  // SIMPLE UTILITY FUNCTIONS
+  const getPropertyUnreadCount = useCallback((propertyId: string) => {
+    const propertyMessages = messages[propertyId] || [];
+    return propertyMessages.filter(msg =>
+      msg.senderId !== currentUserId &&
+      !msg.reads?.some(read => read.userId === currentUserId)
+    ).length;
+  }, [messages, currentUserId]);
+
+  const getPropertyNotificationCount = useCallback((propertyId: string) => {
+    return propertyNotificationCounts[propertyId] || 0;
+  }, [propertyNotificationCounts]);
+
+  const clearPropertyNotifications = useCallback((propertyId: string) => {
+    setPropertyNotificationCounts(prev => ({
+      ...prev,
+      [propertyId]: 0,
+    }));
+  }, []);
+
+  const markMessagesAsRead = useCallback(async (propertyId: string) => {
+    if (!socket || !isConnected) return;
+
+    console.log('📖 Marking messages as read:', propertyId);
+
+    // Clear notification count
+    clearPropertyNotifications(propertyId);
+
+    // Send read event to server
+    if (currentUserType === 'AGENT') {
+      socket.emit('mark-messages-read', { propertyId });
+    } else {
+      socket.emit('mark-read', { propertyId });
+    }
+  }, [socket, isConnected, currentUserType, clearPropertyNotifications]);
+
   const value: MessagingContextV2Type = {
     socket,
     isConnected,
@@ -236,6 +285,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     setActivePropertyId,
     sendMessage,
     joinPropertyConversation,
+    getPropertyUnreadCount,
+    getPropertyNotificationCount,
+    clearPropertyNotifications,
+    markMessagesAsRead,
   };
 
   return (
