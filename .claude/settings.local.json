@@ -67,7 +67,9 @@
       "Bash(del /q node_modules.prismaclientquery_engine-windows.dll.node)",
       "Bash(railway whoami:*)",
       "Bash(railway:*)",
-      "WebFetch(domain:grateful-laughter-production-b148.up.railway.app)"
+      "WebFetch(domain:grateful-laughter-production-b148.up.railway.app)",
+      "Bash(dir \"C:\\Users\\ziadf\\Documents\\Projects\\property_sync\\api\")",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": [],
