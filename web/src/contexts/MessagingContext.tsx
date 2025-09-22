@@ -165,6 +165,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const connectWithAgentAuth = (token: string) => {
     setIsConnecting(true);
 
+    // CRITICAL FIX: Set authentication state immediately for agents
+    if (user && isAuthenticated) {
+      setCurrentUserId(user.id);
+      setCurrentUserType('AGENT');
+      console.log('🔧 IMMEDIATE AUTH: Setting agent auth state before WebSocket connection:', {
+        userId: user.id,
+        userType: 'AGENT'
+      });
+    }
+
     const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/messaging-v2`, {
       auth: {
         token: token,
@@ -285,14 +295,17 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         fullMessage: message
       });
 
-      // CRITICAL FIX: Don't process messages if authentication is not complete
-      if (currentUserId === null || currentUserType === null) {
-        console.warn('⚠️ Received message before authentication complete, queuing for later processing:', {
+      // CRITICAL FIX: Don't process INCOMING messages if authentication is not complete
+      // But allow optimistic messages (temp IDs) to pass through
+      const isOptimisticMessage = message.id && message.id.toString().startsWith('temp-');
+
+      if (!isOptimisticMessage && (currentUserId === null || currentUserType === null)) {
+        console.warn('⚠️ Received incoming message before authentication complete, blocking:', {
           messageId: message.id,
+          isOptimistic: isOptimisticMessage,
           currentUserId,
           currentUserType
         });
-        // TODO: Could implement message queuing here if needed
         return;
       }
 
@@ -723,9 +736,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
     console.log(`📤 Sending message to property ${propertyId}: "${content}"`);
 
-    // Use the user type and ID from the WebSocket server connection
-    const userType = currentUserType || 'CLIENT';
-    const clientId = currentUserId || 'fallback-user';
+    // CRITICAL FIX: Determine user type correctly for optimistic messages
+    // If we have a user from mission control store, we're an AGENT regardless of WebSocket state
+    const userType = (isAuthenticated && user) ? 'AGENT' : (currentUserType || 'CLIENT');
+    const clientId = (isAuthenticated && user) ? user.id : (currentUserId || 'fallback-user');
 
     // Debug logging for send message
     console.log('🔍 Send message debug:', {
