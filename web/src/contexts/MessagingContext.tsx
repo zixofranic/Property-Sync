@@ -26,10 +26,25 @@ interface MessageV2 {
   }>;
 }
 
+interface PropertyConversation {
+  id: string;
+  propertyId: string;
+  timelineId: string;
+  agentId: string;
+  clientId: string;
+  status: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
+  unreadAgentCount: number;
+  unreadClientCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+  lastMessageAt: Date | null;
+}
+
 interface MessagingContextV2Type {
   // Connection state
   socket: Socket | null;
   isConnected: boolean;
+  onlineUsers: string[];
 
   // Current user info - SIMPLIFIED
   currentUserId: string | null;
@@ -40,15 +55,24 @@ interface MessagingContextV2Type {
   activePropertyId: string | null;
   setActivePropertyId: (propertyId: string | null) => void;
 
+  // Property conversations
+  propertyConversations: Record<string, PropertyConversation>;
+
   // Actions - SIMPLIFIED
   sendMessage: (propertyId: string, content: string) => Promise<void>;
   joinPropertyConversation: (propertyId: string) => void;
+  getOrCreatePropertyConversation: (propertyId: string, timelineId: string) => Promise<PropertyConversation>;
 
   // Utility functions that were missing
   getPropertyUnreadCount: (propertyId: string) => number;
   getPropertyNotificationCount: (propertyId: string) => number;
   clearPropertyNotifications: (propertyId: string) => void;
   markMessagesAsRead: (propertyId: string) => Promise<void>;
+
+  // Typing indicators
+  typingUsers: Record<string, string[]>; // propertyId -> userIds
+  startTyping: (propertyId: string) => void;
+  stopTyping: (propertyId: string) => void;
 }
 
 const MessagingContext = createContext<MessagingContextV2Type | null>(null);
@@ -63,6 +87,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Record<string, MessageV2[]>>({});
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
   const [propertyNotificationCounts, setPropertyNotificationCounts] = useState<Record<string, number>>({});
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [propertyConversations, setPropertyConversations] = useState<Record<string, PropertyConversation>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
 
   // SIMPLE USER IDENTIFICATION - Use what we already know
   const currentUserId = user?.id || null;
@@ -94,6 +121,34 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     newSocket.on('disconnect', () => {
       console.log('❌ Disconnected from messaging');
       setIsConnected(false);
+    });
+
+    // Handle online users
+    newSocket.on('user_online', (data: any) => {
+      setOnlineUsers(prev => [...prev.filter(id => id !== data.userId), data.userId]);
+    });
+
+    newSocket.on('user_offline', (data: any) => {
+      setOnlineUsers(prev => prev.filter(id => id !== data.userId));
+    });
+
+    // Handle typing indicators
+    newSocket.on('user-typing', (data: { userId: string; propertyId: string; isTyping: boolean }) => {
+      const { userId, propertyId, isTyping } = data;
+      setTypingUsers(prev => {
+        const current = prev[propertyId] || [];
+        if (isTyping) {
+          return {
+            ...prev,
+            [propertyId]: current.includes(userId) ? current : [...current, userId],
+          };
+        } else {
+          return {
+            ...prev,
+            [propertyId]: current.filter(id => id !== userId),
+          };
+        }
+      });
     });
 
     // SIMPLE MESSAGE HANDLER - No optimistic updates, no complex duplicate detection
@@ -275,20 +330,82 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [socket, isConnected, currentUserType, clearPropertyNotifications]);
 
+  const getOrCreatePropertyConversation = useCallback(async (propertyId: string, timelineId: string): Promise<PropertyConversation> => {
+    // Check if conversation already exists
+    if (propertyConversations[propertyId]) {
+      return propertyConversations[propertyId];
+    }
+
+    // Simple conversation creation
+    if (socket && isConnected) {
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout creating conversation'));
+        }, 10000);
+
+        socket.once('property-conversation-joined', (data: any) => {
+          clearTimeout(timeout);
+          if (data.propertyId === propertyId) {
+            const conversation: PropertyConversation = {
+              id: data.conversationId || `conv-${propertyId}`,
+              propertyId,
+              timelineId,
+              agentId: currentUserType === 'AGENT' ? (currentUserId || '') : '',
+              clientId: currentUserType === 'CLIENT' ? (currentUserId || '') : '',
+              status: 'ACTIVE',
+              unreadAgentCount: 0,
+              unreadClientCount: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              lastMessageAt: null,
+            };
+
+            setPropertyConversations(prev => ({
+              ...prev,
+              [propertyId]: conversation,
+            }));
+
+            resolve(conversation);
+          }
+        });
+
+        socket.emit('join-property-conversation', { propertyId });
+      });
+    }
+
+    throw new Error('Socket not connected');
+  }, [propertyConversations, socket, isConnected, currentUserType, currentUserId]);
+
+  const startTyping = useCallback((propertyId: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit('typing-start', { propertyId });
+  }, [socket, isConnected]);
+
+  const stopTyping = useCallback((propertyId: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit('typing-stop', { propertyId });
+  }, [socket, isConnected]);
+
   const value: MessagingContextV2Type = {
     socket,
     isConnected,
+    onlineUsers,
     currentUserId,
     currentUserType,
     messages,
     activePropertyId,
     setActivePropertyId,
+    propertyConversations,
     sendMessage,
     joinPropertyConversation,
+    getOrCreatePropertyConversation,
     getPropertyUnreadCount,
     getPropertyNotificationCount,
     clearPropertyNotifications,
     markMessagesAsRead,
+    typingUsers,
+    startTyping,
+    stopTyping,
   };
 
   return (
