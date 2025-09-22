@@ -234,25 +234,23 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
       setOnlineUsers(data.onlineUsers || []);
 
-      // Set current user info - but determine type based on context, not server
-      if (data.userId) {
-        setCurrentUserId(data.userId);
+      // CRITICAL FIX: Set current user info immediately from server response
+      if (data.userId && data.userType) {
+        console.log('🔧 FIXING: Setting currentUserId and currentUserType from server:', {
+          userId: data.userId,
+          userType: data.userType
+        });
 
-        // Use server-provided user type as source of truth
+        setCurrentUserId(data.userId);
         setCurrentUserType(data.userType);
 
-        console.log('🔵 Current user set:', {
+        console.log('✅ Current user authentication state fixed:', {
           userId: data.userId,
-          serverType: data.userType,
-          using: data.userType,
-          pathname: typeof window !== 'undefined' ? window.location.pathname : 'SSR'
+          userType: data.userType,
+          serverResponse: data
         });
-        console.log('🔍 User ID comparison:', {
-          serverUserId: data.userId,
-          localAgentId: user?.id,
-          isAuthenticated,
-          match: data.userId === user?.id
-        });
+      } else {
+        console.error('❌ Server did not provide userId or userType:', data);
       }
     });
 
@@ -280,8 +278,20 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         content: message.content?.substring(0, 20),
         currentUserId: currentUserId,
         currentUserType: currentUserType,
+        authenticationComplete: currentUserId !== null && currentUserType !== null,
         fullMessage: message
       });
+
+      // CRITICAL FIX: Don't process messages if authentication is not complete
+      if (currentUserId === null || currentUserType === null) {
+        console.warn('⚠️ Received message before authentication complete, queuing for later processing:', {
+          messageId: message.id,
+          currentUserId,
+          currentUserType
+        });
+        // TODO: Could implement message queuing here if needed
+        return;
+      }
 
       // Extract property ID from the message's conversation
       const propertyId = message.conversation?.propertyId || message.propertyId;
@@ -325,21 +335,26 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
            Math.abs(new Date(existingMsg.createdAt).getTime() - new Date(transformedMessage.createdAt).getTime()) < 10000)
         );
 
-        // Debug duplicate detection
-        if (transformedMessage.content.includes('test') || transformedMessage.content.includes('hello')) {
-          console.log('🔍 Duplicate check:', {
-            newMessageId: transformedMessage.id,
-            newSenderType: transformedMessage.senderType,
-            newContent: transformedMessage.content.substring(0, 20),
-            isDuplicate,
-            existingMessages: existingMessages.map(m => ({
-              id: m.id,
-              senderType: m.senderType,
-              content: m.content.substring(0, 20),
-              isTemp: m.id.startsWith('temp-')
-            }))
-          });
-        }
+        // Enhanced debug duplicate detection
+        console.log('🔍 DUPLICATE CHECK for message:', {
+          messageId: transformedMessage.id,
+          senderType: transformedMessage.senderType,
+          senderId: transformedMessage.senderId,
+          content: transformedMessage.content.substring(0, 30),
+          currentUserId,
+          currentUserType,
+          isFromCurrentUser: transformedMessage.senderId === currentUserId,
+          isDuplicate,
+          existingCount: existingMessages.length,
+          existingMessages: existingMessages.map(m => ({
+            id: m.id,
+            senderType: m.senderType,
+            senderId: m.senderId,
+            content: m.content.substring(0, 20),
+            isTemp: m.id.startsWith('temp-'),
+            isFromCurrentUser: m.senderId === currentUserId
+          }))
+        });
 
         if (isDuplicate) {
           console.log('🔄 Skipping duplicate message:', transformedMessage.id);
@@ -376,12 +391,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         currentUserType,
         isFromCurrentUser,
         isOptimisticMessage,
-        willShowNotification: !isFromCurrentUser && !isOptimisticMessage && currentUserId
+        currentUserIdIsNull: currentUserId === null,
+        willShowNotification: !isFromCurrentUser && !isOptimisticMessage && currentUserId !== null
       });
 
-      // Additional safety check: if currentUserId is null/undefined, don't show notifications
-      // This prevents showing notifications when user authentication is lost (e.g., expired JWT)
-      if (!isFromCurrentUser && !isOptimisticMessage && currentUserId) {
+      // CRITICAL FIX: Don't show notifications if currentUserId is null (authentication not complete)
+      // This prevents notifications when WebSocket connection is established but user auth is pending
+      if (!isFromCurrentUser && !isOptimisticMessage && currentUserId !== null) {
         setPropertyNotificationCounts(prev => ({
           ...prev,
           [propertyId]: (prev[propertyId] || 0) + 1,
