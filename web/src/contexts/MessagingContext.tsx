@@ -275,8 +275,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     newSocket.on('new-message', (message: any) => {
       console.log('📨 V2 new message received:', {
         messageId: message.id,
-        senderType: message.senderType,
-        senderId: message.senderId,
+        senderType: message.senderType || message.sender?.type,
+        senderId: message.senderId || message.sender?.id,
         content: message.content?.substring(0, 20),
         currentUserId: currentUserId,
         currentUserType: currentUserType,
@@ -296,12 +296,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         id: message.id,
         content: message.content,
         type: message.type || 'TEXT',
-        senderId: message.senderId,
-        senderType: message.senderType,
+        senderId: message.sender?.id || message.senderId,
+        senderType: message.sender?.type || message.senderType,
         createdAt: message.createdAt,
         isEdited: false,
         sender: {
-          id: message.senderId,
+          id: message.sender?.id || message.senderId,
           email: message.sender?.email || 'unknown@email.com',
           profile: {
             firstName: message.sender?.name?.split(' ')[0] || 'Unknown',
@@ -365,13 +365,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       // Update property notification count if message is not from current user
       // Use the WebSocket currentUserId instead of mission control user ID for accurate comparison
       // Also check that the message is not a temporary optimistic message to avoid duplicate notifications
-      const isFromCurrentUser = message.senderId === currentUserId;
+      const isFromCurrentUser = transformedMessage.senderId === currentUserId;
       const isOptimisticMessage = message.id.startsWith('temp-');
 
       // Debug notification logic
       console.log('🔔 Notification check:', {
         messageId: message.id,
-        senderId: message.senderId,
+        senderId: transformedMessage.senderId,
         currentUserId,
         currentUserType,
         isFromCurrentUser,
@@ -606,12 +606,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
                   id: msg.id,
                   content: msg.content,
                   type: msg.type || 'TEXT',
-                  senderId: msg.senderId,
-                  senderType: msg.senderType,
+                  senderId: msg.sender?.id || msg.senderId,
+                  senderType: msg.sender?.type || msg.senderType,
                   createdAt: msg.createdAt,
                   isEdited: false,
                   sender: {
-                    id: msg.senderId,
+                    id: msg.sender?.id || msg.senderId,
                     email: msg.sender?.email || 'unknown@email.com',
                     profile: {
                       firstName: msg.sender?.name?.split(' ')[0] || 'Unknown',

@@ -408,7 +408,7 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       // Debug logging for message broadcast
       this.logger.log(`📤 Broadcasting message from ${client.userType} ${client.userId}:`, {
         messageId: message.id,
-        senderType: message.senderType,
+        senderType: message.sender.type,
         content: message.content.substring(0, 20),
         conversationId: conversation.id,
         propertyId: data.propertyId
@@ -465,7 +465,7 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       // Debug logging for regular message broadcast
       this.logger.log(`📤 Broadcasting conversation message from ${client.userType} ${client.userId}:`, {
         messageId: message.id,
-        senderType: message.senderType,
+        senderType: message.sender.type,
         content: message.content.substring(0, 20),
         conversationId: data.conversationId
       });
