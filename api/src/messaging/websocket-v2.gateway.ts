@@ -44,7 +44,7 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
   async handleConnection(client: AuthenticatedSocket) {
     try {
       const token = client.handshake.auth?.token;
-      const userType = client.handshake.auth?.userType as 'AGENT' | 'CLIENT';
+      let userType = client.handshake.auth?.userType as 'AGENT' | 'CLIENT';
       const timelineId = client.handshake.auth?.timelineId;
 
       this.logger.log(`🔌 Connection attempt: userType=${userType}, hasToken=${!!token}, timelineId=${timelineId}`);
