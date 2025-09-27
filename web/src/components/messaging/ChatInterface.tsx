@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, User, Bot } from 'lucide-react';
+import { Send, MessageSquare, User, Bot, ChevronDown } from 'lucide-react';
 import { useMessaging } from '@/contexts/MessagingContext';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,7 +23,10 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const [messageText, setMessageText] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState(initialConversationId);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const joinedPropertyRef = useRef<string | null>(null);
   const { user } = useMissionControlStore();
 
   // V2 messaging
@@ -38,9 +41,7 @@ export default function ChatInterface({
   const sendMessage = async (content: string) => {
     if (propertyId && timelineId) {
       try {
-        // Ensure conversation exists before sending message
-        await messaging.getOrCreatePropertyConversation(propertyId, timelineId);
-        // Now send the message
+        // Direct send - conversation should already exist from initialization
         return messaging.sendMessage(propertyId, content);
       } catch (error) {
         console.error('Failed to send message:', error);
@@ -68,14 +69,26 @@ export default function ChatInterface({
 
   const activeConversation = propertyId ? messaging.propertyConversations[propertyId] : null;
 
-  // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Check if user is near the bottom of the messages
+  const isNearBottom = () => {
+    if (!messagesContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    return scrollHeight - scrollTop - clientHeight < 100;
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // Handle scroll events to show/hide scroll-to-bottom button
+  const handleScroll = () => {
+    const nearBottom = isNearBottom();
+    setShowScrollToBottom(!nearBottom && currentMessages.length > 0);
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = (force = false) => {
+    if (messagesEndRef.current && (force || isNearBottom())) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
 
   // Initialize conversation if we have timelineId but no conversationId
   useEffect(() => {
@@ -94,47 +107,70 @@ export default function ChatInterface({
 
   // Join conversation with property context when activeConversation or propertyId changes
   useEffect(() => {
-    if (socket && isConnected && propertyId) {
-      socket.emit('join-property-conversation', {
-        propertyId: propertyId
-      });
-    }
-  }, [socket, isConnected, propertyId]);
+    if (socket && isConnected && propertyId && timelineId) {
+      // Prevent duplicate joins for the same property
+      if (joinedPropertyRef.current === propertyId) {
+        console.log('🔄 Agent chat - Property conversation already joined, skipping duplicate:', propertyId);
+        return;
+      }
 
-  // Get current messages for this property
-  const currentMessages = messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      console.log('🔵 Agent chat - Initializing property conversation:', propertyId);
+
+      // Use getOrCreatePropertyConversation instead of direct socket emit
+      // This avoids double-joining the same conversation
+      messaging.getOrCreatePropertyConversation(propertyId, timelineId)
+        .then(() => {
+          console.log('✅ Agent chat - Property conversation ready:', propertyId);
+          // Track that we've joined this property
+          joinedPropertyRef.current = propertyId;
+        })
+        .catch(error => {
+          console.error('❌ Agent chat - Failed to join property conversation:', error);
+        });
+    }
+
+    // Cleanup: reset joined property when propertyId changes
+    return () => {
+      if (joinedPropertyRef.current && joinedPropertyRef.current !== propertyId) {
+        joinedPropertyRef.current = null;
+      }
+    };
+  }, [socket, isConnected, propertyId, timelineId]);
+
+  // Get current messages for this property - reversed for flex-col-reverse
+  const currentMessages = messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Handle sending a message
   const handleSendMessage = async () => {
     if (!messageText.trim()) return;
 
     try {
-      let conversationId = currentConversationId;
-
-      // If no conversation exists and we have timeline info, create one
-      if (!conversationId && timelineId) {
-        try {
-          const conversation = await createConversation();
-          if (conversation) {
-            conversationId = conversation.id;
-            setCurrentConversationId(conversationId);
-            setActiveConversation(propertyId!);
-          }
-        } catch (error) {
-          console.error('Failed to create conversation:', error);
-          return;
-        }
-      }
-
       if (!propertyId) {
         console.error('No property ID available to send message');
         return;
       }
 
+      // Send message directly - conversation should already exist from initialization
       await sendMessage(messageText.trim());
       setMessageText('');
+
+      // Ensure scroll to bottom after sending message
+      setTimeout(() => {
+        scrollToBottom(true); // Force scroll after sending
+      }, 100);
     } catch (error) {
       console.error('Failed to send message:', error);
+
+      // If sending fails, try to ensure conversation exists and retry once
+      if (timelineId) {
+        try {
+          await createConversation();
+          await sendMessage(messageText.trim());
+          setMessageText('');
+        } catch (retryError) {
+          console.error('Failed to send message after retry:', retryError);
+        }
+      }
     }
   };
 
@@ -199,7 +235,7 @@ export default function ChatInterface({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 relative flex flex-col-reverse" onScroll={handleScroll}>
         {currentMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="w-12 h-12 text-slate-500 mb-3" />
@@ -214,19 +250,7 @@ export default function ChatInterface({
             // Check if this message is from the current user for debug purposes only
             const isOwnMessage = message.senderId === currentUserId;
 
-            // Debug logging for message ownership
-            if (message.content.includes('test') || message.content.includes('hello')) {
-              console.log('🔍 V1 Message debug:', {
-                messageId: message.id,
-                senderId: message.senderId,
-                currentUserId,
-                isOwnMessage,
-                senderType: message.senderType,
-                isAgent,
-                isClient,
-                content: message.content.substring(0, 20)
-              });
-            }
+            // V1 debug logging removed - deprecated
 
             // Get sender info - always show Agent/Client consistently
             const senderName = isAgent
@@ -291,7 +315,17 @@ export default function ChatInterface({
             );
           })
         )}
-        <div ref={messagesEndRef} />
+
+        {/* Scroll to bottom button */}
+        {showScrollToBottom && (
+          <button
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg transition-colors z-10"
+            title="Scroll to bottom"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Message Input */}

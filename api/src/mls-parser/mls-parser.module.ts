@@ -4,11 +4,11 @@ import { MLSParserController } from './mls-parser.controller';
 import { BatchController } from './batch.controller';
 import { BatchManagementService } from './batch-management.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { MessagingModule } from '../messaging/messaging.module';
+// MessagingModule removed - already available globally via app.module.ts
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [MessagingModule, PrismaModule],
+  imports: [PrismaModule],
   providers: [MLSParserService, BatchManagementService],
   controllers: [MLSParserController, BatchController],
   exports: [MLSParserService, BatchManagementService],

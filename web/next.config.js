@@ -13,8 +13,8 @@ const nextConfig = {
   env: {
     CUSTOM_KEY: 'my-value',
   },
-  // React configuration
-  reactStrictMode: true,
+  // React configuration - DISABLED for duplicate message debugging
+  reactStrictMode: false,
   // ESLint configuration for production - FORCE DEPLOYMENT
   eslint: {
     // Disable ESLint during production builds (only for deployment)

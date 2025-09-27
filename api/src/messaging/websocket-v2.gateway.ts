@@ -33,6 +33,9 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
 
   private logger = new Logger('WebSocketV2Gateway');
 
+  // Track joined users per property to prevent duplicates
+  private joinedPropertyUsers = new Map<string, Set<string>>();
+
   constructor(
     private messageService: MessageV2Service,
     private conversationService: ConversationV2Service,
@@ -49,6 +52,12 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
 
       this.logger.log(`🔌 Connection attempt: userType=${userType}, hasToken=${!!token}, timelineId=${timelineId}`);
 
+      // Ensure connection isn't closed prematurely
+      if (client.disconnected) {
+        this.logger.warn('Client already disconnected during connection attempt');
+        return;
+      }
+
       // SIMPLIFIED: Allow connections without strict token validation
       let userId: string;
 
@@ -62,11 +71,33 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
           userId = 'agent_fallback';
         }
       } else if (userType === 'CLIENT') {
-        // For clients, create a simple ID
-        userId = `client_${timelineId || 'anonymous'}`;
+        // For clients, create a more reliable ID
+        if (timelineId) {
+          // Try to find the actual client ID from the timeline
+          try {
+            const timeline = await this.prisma.timeline.findUnique({
+              where: { id: timelineId },
+              include: { client: true }
+            });
+
+            if (timeline?.client) {
+              userId = timeline.client.id;
+              this.logger.log(`✅ Found real client ID: ${userId} for timeline: ${timelineId}`);
+            } else {
+              userId = `client_${timelineId}`;
+              this.logger.log(`⚠️ Using synthetic client ID: ${userId} for timeline: ${timelineId}`);
+            }
+          } catch (error) {
+            userId = `client_${timelineId}`;
+            this.logger.warn(`Failed to find client for timeline ${timelineId}, using synthetic ID: ${userId}`);
+          }
+        } else {
+          // Anonymous client without timeline
+          userId = `anonymous_${Date.now()}`;
+        }
       } else {
         // If no userType provided, allow as anonymous
-        userId = 'anonymous_user';
+        userId = `anonymous_${Date.now()}`;
         userType = 'CLIENT';
       }
 
@@ -87,6 +118,12 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       }
 
       this.logger.log(`✅ Client connected: ${userId} (${userType}) - Socket: ${client.id}`);
+
+      // Final check before sending confirmation
+      if (client.disconnected) {
+        this.logger.warn('Client disconnected before confirmation could be sent');
+        return;
+      }
 
       // Send confirmation to client
       client.emit('connected', {
@@ -116,6 +153,20 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
       this.logger.log(`Client disconnected: ${client.userId} (${client.userType})`);
+
+      // Cleanup: Remove user from all joined properties
+      const userKey = `${client.userId}-${client.userType}`;
+      for (const [propertyId, users] of this.joinedPropertyUsers.entries()) {
+        if (users.has(userKey)) {
+          users.delete(userKey);
+          this.logger.log(`🧹 Removed ${userKey} from property ${propertyId} on disconnect`);
+
+          // Clean up empty property sets
+          if (users.size === 0) {
+            this.joinedPropertyUsers.delete(propertyId);
+          }
+        }
+      }
     }
   }
 
@@ -125,11 +176,29 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { propertyId: string }
   ) {
+    // DEBUG: Confirm this NEW code is running
+    this.logger.log(`🚀 NEW CODE: Join request for property ${data.propertyId} from user ${client.userId}-${client.userType}`);
+
     try {
       if (!client.userId || !client.userType) {
         client.emit('error', { message: 'Authentication required' });
         return;
       }
+
+      // CRITICAL FIX: Check if user has already joined this property conversation
+      const userKey = `${client.userId}-${client.userType}`;
+      if (!this.joinedPropertyUsers.has(data.propertyId)) {
+        this.joinedPropertyUsers.set(data.propertyId, new Set());
+      }
+
+      const propertyUsers = this.joinedPropertyUsers.get(data.propertyId)!; // Non-null assertion since we just set it
+      if (propertyUsers.has(userKey)) {
+        this.logger.log(`🔄 User ${userKey} already joined property ${data.propertyId}, skipping duplicate`);
+        return; // Skip processing duplicate join request
+      }
+
+      // Mark user as joined for this property
+      propertyUsers.add(userKey);
 
       // Get or find the conversation for this property
       let conversation;
@@ -241,11 +310,17 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
 
       this.logger.log(`✅ User ${client.userId} joined property conversation ${conversation.id} for property ${data.propertyId}`);
 
-      // Send back the conversation data with messages
+      // SERVER-SIDE MESSAGE DEDUPLICATION: Remove duplicate messages before sending
+      const rawMessages = conversation.messages || [];
+      const deduplicatedMessages = this.deduplicateMessages(rawMessages);
+
+      this.logger.log(`📋 Property ${data.propertyId}: Sending ${deduplicatedMessages.length} messages (${rawMessages.length} raw, removed ${rawMessages.length - deduplicatedMessages.length} duplicates)`);
+
+      // Send back the conversation data with deduplicated messages
       client.emit('property-conversation-joined', {
         propertyId: data.propertyId,
         conversationId: conversation.id,
-        messages: conversation.messages || [],
+        messages: deduplicatedMessages,
         status: 'success'
       });
 
@@ -354,9 +429,21 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
           agentId = client.userId;
           clientId = property.timeline.client.id;
         } else {
-          // For CLIENT, use their actual userId and get agent from timeline
+          // For CLIENT, determine the correct client ID
           agentId = property.timeline.client.agentId;
-          clientId = client.userId; // Use the actual client's userId, not the timeline client ID
+
+          // If the WebSocket client ID is the real client ID from database, use it
+          if (client.userId === property.timeline.client.id) {
+            clientId = client.userId;
+          } else if (client.userId.startsWith('client_') && client.timelineId === property.timeline.id) {
+            // If it's a synthetic ID for this timeline, use the real client ID
+            clientId = property.timeline.client.id;
+            this.logger.log(`🔄 Mapping synthetic client ID ${client.userId} to real ID ${clientId}`);
+          } else {
+            // Fallback: use the client ID from timeline
+            clientId = property.timeline.client.id;
+            this.logger.warn(`⚠️ Using timeline client ID as fallback: ${clientId}`);
+          }
         }
 
         if (!agentId) {
@@ -394,8 +481,7 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         propertyId: data.propertyId
       });
 
-      // Broadcast to conversation room and property room
-      this.server.to(`conversation:${conversation.id}`).emit('new-message', message);
+      // Broadcast to property room only (includes all participants)
       this.server.to(`property:${data.propertyId}`).emit('new-message', message);
 
       // Send confirmation back to sender
@@ -669,5 +755,39 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
   // Helper method to broadcast property-specific notifications
   broadcastPropertyNotification(timelineId: string, notification: any) {
     this.server.to(`timeline:${timelineId}`).emit('property-notification', notification);
+  }
+
+  // SERVER-SIDE MESSAGE DEDUPLICATION: Remove duplicate messages based on ID
+  private deduplicateMessages(messages: any[]): any[] {
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const deduplicatedMessages: any[] = [];
+
+    // Sort messages by createdAt to ensure consistent ordering
+    const sortedMessages = [...messages].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateA - dateB;
+    });
+
+    for (const message of sortedMessages) {
+      // Use message ID as primary deduplication key
+      const messageId = message.id;
+
+      if (!seen.has(messageId)) {
+        seen.add(messageId);
+        deduplicatedMessages.push(message);
+        this.logger.debug(`✅ Added message ${messageId}: "${message.content?.substring(0, 50)}..."`);
+      } else {
+        this.logger.debug(`🔄 Skipped duplicate message ${messageId}: "${message.content?.substring(0, 50)}..."`);
+      }
+    }
+
+    this.logger.log(`🧹 Message deduplication: ${messages.length} → ${deduplicatedMessages.length} (removed ${messages.length - deduplicatedMessages.length} duplicates)`);
+
+    return deduplicatedMessages;
   }
 }

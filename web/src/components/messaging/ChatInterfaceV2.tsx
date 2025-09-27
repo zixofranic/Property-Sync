@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, User } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Send, MessageSquare, User, ChevronDown } from 'lucide-react';
 import { useMessaging } from '@/contexts/MessagingContext';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,7 +20,9 @@ export default function ChatInterfaceV2({
   propertyId
 }: ChatInterfaceV2Props) {
   const [messageText, setMessageText] = useState('');
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useMissionControlStore();
 
   const {
@@ -33,48 +35,83 @@ export default function ChatInterfaceV2({
     clearPropertyNotifications,
     markMessagesAsRead,
     joinPropertyConversation,
+    leavePropertyConversation,
+    resetPropertyInitialization,
     currentUserId,
     currentUserType
   } = useMessaging();
 
-  // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Check if user is near the bottom of the messages
+  const isNearBottom = () => {
+    if (!messagesContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    return scrollHeight - scrollTop - clientHeight < 100;
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // Handle scroll events to show/hide scroll-to-bottom button
+  const handleScroll = () => {
+    const nearBottom = isNearBottom();
+    setShowScrollToBottom(!nearBottom && currentMessages.length > 0);
+  };
 
-  // Initialize property conversation and set as active
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = (force = false) => {
+    if (messagesEndRef.current && (force || isNearBottom())) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // Get current property messages with stronger deduplication
+  const currentMessages = useMemo(() => {
+    if (!propertyId || !messages[propertyId]) return [];
+
+    const messageMap = new Map();
+    messages[propertyId].forEach(message => {
+      // Use message ID as key, keep the latest version if there are duplicates
+      if (!messageMap.has(message.id) || new Date(message.createdAt) > new Date(messageMap.get(message.id).createdAt)) {
+        messageMap.set(message.id, message);
+      }
+    });
+
+    return Array.from(messageMap.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Newest first
+  }, [propertyId, messages]);
+
+
+  // Set active property and clear notifications immediately
+  useEffect(() => {
+    if (propertyId) {
+      console.log(`🔵 Setting active property: ${propertyId}`);
+      setActivePropertyId(propertyId);
+      clearPropertyNotifications(propertyId);
+    }
+  }, [propertyId]); // Only depend on propertyId
+
+  // Initialize conversation only when connected and have required data
   useEffect(() => {
     if (propertyId && timelineId && isConnected) {
-      console.log(`🔵 Initializing chat for property: ${propertyId}`);
+      console.log(`🔄 Initializing conversation for property: ${propertyId}`);
 
-      // Set this property as active for real-time updates
-      setActivePropertyId(propertyId);
-
-      // Clear notifications when opening chat
-      clearPropertyNotifications(propertyId);
-
-      // Ensure conversation exists and load messages
       getOrCreatePropertyConversation(propertyId, timelineId)
         .then(() => {
-          // Join the property conversation to load existing messages
-          joinPropertyConversation(propertyId);
+          console.log(`✅ Property conversation ready: ${propertyId}`);
         })
         .catch(error => {
           console.error('Failed to create/get property conversation:', error);
+          resetPropertyInitialization(propertyId);
         });
     }
+  }, [propertyId, timelineId, isConnected]);
 
-    // Cleanup: clear active property when component unmounts
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (propertyId) {
-        setActivePropertyId(null);
+        console.log(`🧹 Cleaning up property: ${propertyId}`);
+        leavePropertyConversation(propertyId);
       }
     };
-  }, [propertyId, timelineId, isConnected]); // Remove function dependencies to prevent infinite loops
+  }, [propertyId]);
 
   // Mark messages as read when chat opens or when new unread messages arrive from others
   // Only mark messages as read, don't spam the server on every message change
@@ -94,13 +131,6 @@ export default function ChatInterfaceV2({
     }
   }, [propertyId, currentUserId]); // Only depend on propertyId and currentUserId, not message changes
 
-  // Get current property messages with deduplication
-  const currentMessages = propertyId && messages[propertyId]
-    ? messages[propertyId]
-        .filter((message, index, arr) => arr.findIndex(m => m.id === message.id) === index) // Remove duplicates by ID
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-    : [];
-
   // Handle sending a message
   const handleSendMessage = async () => {
     if (!messageText.trim() || !propertyId || !timelineId) return;
@@ -112,6 +142,11 @@ export default function ChatInterfaceV2({
       // Now send the message
       await sendMessage(propertyId, messageText.trim(), 'TEXT');
       setMessageText('');
+
+      // Ensure scroll to bottom after sending message
+      setTimeout(() => {
+        scrollToBottom(true); // Force scroll after sending
+      }, 100);
     } catch (error) {
       console.error('Failed to send message:', error);
       // Show user-friendly error
@@ -164,7 +199,7 @@ export default function ChatInterfaceV2({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 relative flex flex-col-reverse" onScroll={handleScroll}>
         {currentMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="w-12 h-12 text-slate-500 mb-3" />
@@ -264,7 +299,17 @@ export default function ChatInterfaceV2({
             );
           })
         )}
-        <div ref={messagesEndRef} />
+
+        {/* Scroll to bottom button */}
+        {showScrollToBottom && (
+          <button
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg transition-colors z-10"
+            title="Scroll to bottom"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Message Input */}

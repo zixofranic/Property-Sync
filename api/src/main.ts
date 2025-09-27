@@ -63,7 +63,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 3001;
+  const port = process.env.PORT || 3010;
   console.log(`🔄 Starting application on port ${port}...`);
   console.log(`📡 Health check endpoint: /api/health`);
   console.log(`🗄️ Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
