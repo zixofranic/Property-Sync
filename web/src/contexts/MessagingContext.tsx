@@ -165,43 +165,67 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize socket connection to V2 namespace
   useEffect(() => {
-    // CRITICAL FIX: Only clean up if we have a valid socket AND we're not just refreshing
-    if (socket && !socket.connected) {
-      console.log('🧹 Cleaning up disconnected socket before creating new connection');
+    // CRITICAL FIX: Wait for authentication state to be properly loaded before connecting
+    // This prevents the connection issue after login when auth state hasn't updated yet
+    const initializeConnection = async () => {
+      // Check if authentication is in progress (loading state)
+      if (isLoading || (!isAuthenticated && typeof window !== 'undefined' && localStorage.getItem('accessToken'))) {
+        console.log('⏳ Waiting for authentication state to stabilize...', {
+          isLoading,
+          isAuthenticated,
+          hasToken: typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
+        });
 
-      // CRITICAL: Remove ALL listeners before disconnecting
-      console.log('📊 Existing listeners before cleanup:', {
-        newMessage: socket.listeners('new-message').length,
-        connected: socket.listeners('connected').length,
-        propertyJoined: socket.listeners('property-conversation-joined').length
-      });
+        // Wait a bit for auth state to update after login
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      socket.removeAllListeners();
-      socket.off(); // Extra safety - removes all listeners
-
-      if (socket.cleanup) {
-        socket.cleanup();
+        // Re-check auth state after waiting
+        if (!isAuthenticated && typeof window !== 'undefined' && localStorage.getItem('accessToken')) {
+          console.log('🔄 Auth state still not updated, checking auth status...');
+          // Trigger a re-check of auth status by calling the store method
+          const { checkAuthStatus } = useMissionControlStore.getState();
+          checkAuthStatus();
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
 
-      socket.disconnect();
-      setSocket(null);
-      setIsConnected(false);
+      // CRITICAL FIX: Only clean up if we have a valid socket AND we're not just refreshing
+      if (socket && !socket.connected) {
+        console.log('🧹 Cleaning up disconnected socket before creating new connection');
 
-      // IMPORTANT: Clear message event tracking to prevent stale handlers
-      setRecentlyProcessedMessages(new Set());
-      joinedPropertiesRef.current.clear();
+        // CRITICAL: Remove ALL listeners before disconnecting
+        console.log('📊 Existing listeners before cleanup:', {
+          newMessage: socket.listeners('new-message').length,
+          connected: socket.listeners('connected').length,
+          propertyJoined: socket.listeners('property-conversation-joined').length
+        });
 
-      console.log('✅ Disconnected socket completely cleaned up');
-    } else if (socket && socket.connected) {
-      console.log('🔄 Socket already connected, skipping initialization');
-      return;
-    }
+        socket.removeAllListeners();
+        socket.off(); // Extra safety - removes all listeners
 
-    console.log('🎯 Initializing new socket connection...');
+        if (socket.cleanup) {
+          socket.cleanup();
+        }
 
-    // Get current path for debugging
-    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        socket.disconnect();
+        setSocket(null);
+        setIsConnected(false);
+
+        // IMPORTANT: Clear message event tracking to prevent stale handlers
+        setRecentlyProcessedMessages(new Set());
+        joinedPropertiesRef.current.clear();
+
+        console.log('✅ Disconnected socket completely cleaned up');
+      } else if (socket && socket.connected) {
+        console.log('🔄 Socket already connected, skipping initialization');
+        return;
+      }
+
+      console.log('🎯 Initializing new socket connection...');
+
+      // Get current path for debugging
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 
     // CRITICAL FIX: Check for client mode FIRST before agent authentication
     const clientMode = urlParams?.get('clientMode') === 'true';
@@ -309,7 +333,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log('⚪ No authentication path taken - no agent auth and no shareToken');
+      console.log('⚪ No authentication path taken - no agent auth and no shareToken');
+    };
+
+    // Call the async initialization function
+    initializeConnection();
 
     // Return cleanup function
     return () => {
@@ -318,7 +346,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         socketCleanupRef.current();
       }
     };
-  }, []); // Run only once on mount - don't depend on user state during refresh
+  }, [isLoading, isAuthenticated]); // Depend on auth state to re-run when it changes
 
   // Agent WebSocket connection to V2 namespace
   const connectWithAgentAuth = (token: string) => {
