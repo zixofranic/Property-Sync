@@ -114,7 +114,7 @@ interface MessagingContextV2Type {
 const MessagingContext = createContext<MessagingContextV2Type | null>(null);
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useMissionControlStore();
+  const { user, isAuthenticated, isLoading } = useMissionControlStore();
   const { addNotification } = useMissionControlStore();
 
   // Connection state
