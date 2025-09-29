@@ -891,18 +891,18 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             </div>
 
             {/* Right side: Bell and properties count - 30% width on mobile */}
-            <div className="flex items-center justify-end space-x-3 sm:space-x-4" style={{ width: '30%' }}>
-              {/* Mobile: Group notification bell and properties count */}
-              <div className="flex items-center space-x-3">
+            <div className="flex flex-col items-end space-y-1 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4" style={{ width: '30%' }}>
+              {/* Top row: Notification bell and new properties badge */}
+              <div className="flex items-center space-x-2">
                 {/* New Properties Counter Badge */}
                 {newPropertyCount > 0 && (
                   <div className="relative">
-                    <div className="w-7 h-7 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
+                    <div className="w-6 h-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
                       <span className="text-xs font-bold">
                         +{newPropertyCount}
                       </span>
                     </div>
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse"></div>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                   </div>
                 )}
 
@@ -1014,12 +1014,17 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   </div>
                 )}
                 </div>
-
-                {/* Properties Count - grouped with bell on mobile */}
-                <span className="text-xs text-slate-400 font-medium">
-                  {timelineData.properties.length} properties
-                </span>
               </div>
+
+              {/* Bottom row: Properties Count */}
+              <span className="text-xs text-slate-400 font-medium sm:hidden">
+                {timelineData.properties.length} properties
+              </span>
+
+              {/* Desktop: Properties count inline */}
+              <span className="hidden sm:inline text-xs text-slate-400 font-medium">
+                {timelineData.properties.length} properties
+              </span>
             </div>
           </div>
         </div>
