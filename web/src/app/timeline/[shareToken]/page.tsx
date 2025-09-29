@@ -858,37 +858,29 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
       <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {/* Agent Company Logo/Text */}
-              <div className="flex-shrink-0">
-                {/* Desktop: Show logo */}
-                <div className="hidden sm:flex w-20 h-20 items-center justify-center">
-                  {timelineData.agent.logo ? (
-                    <img
-                      src={timelineData.agent.logo}
-                      alt={timelineData.agent.company}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : timelineData.agent.company ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 text-xs font-bold text-white text-center leading-tight px-1">
-                      {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
-                      <Building className="w-8 h-8 text-slate-400" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Mobile: Show company text */}
-                <div className="sm:hidden">
-                  <p className="text-sm font-semibold text-white">
-                    {timelineData.agent.company || 'Real Estate'}
-                  </p>
-                </div>
+            {/* Left side: Agent info - 70% width on mobile */}
+            <div className="flex items-center space-x-4 w-full sm:w-auto">
+              {/* Agent Company Logo - Desktop only */}
+              <div className="hidden sm:flex flex-shrink-0 w-20 h-20 items-center justify-center">
+                {timelineData.agent.logo ? (
+                  <img
+                    src={timelineData.agent.logo}
+                    alt={timelineData.agent.company}
+                    className="w-full h-full object-contain"
+                  />
+                ) : timelineData.agent.company ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 text-xs font-bold text-white text-center leading-tight px-1">
+                    {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
+                    <Building className="w-8 h-8 text-slate-400" />
+                  </div>
+                )}
               </div>
-              
-              <div className="min-h-16 flex flex-col justify-center">
+
+              {/* Agent name and text - 70% on mobile */}
+              <div className="min-h-16 flex flex-col justify-center flex-1 sm:flex-initial" style={{ width: 'calc(70% - 1rem)' }}>
                 <h1 className="text-xl font-bold text-white leading-tight">
                   {timelineData.timeline.title}
                 </h1>
@@ -898,28 +890,29 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Right side: Bell and properties count - 30% width on mobile */}
+            <div className="flex items-center justify-end space-x-3 sm:space-x-4" style={{ width: '30%' }}>
               {/* Mobile: Group notification bell and properties count */}
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center space-x-3">
                 {/* New Properties Counter Badge */}
                 {newPropertyCount > 0 && (
                   <div className="relative">
-                    <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
+                    <div className="w-7 h-7 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
                       <span className="text-xs font-bold">
                         +{newPropertyCount}
                       </span>
                     </div>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse"></div>
                   </div>
                 )}
 
                 {/* Notification Bell */}
                 <div className="relative" ref={notificationRef}>
-                <button 
+                <button
                   onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-                  className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                  className="relative p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <Bell className="w-5 h-5 text-slate-300" />
+                  <Bell className="w-4 h-4 text-slate-300" />
                   {/* Timeline page doesn't need total unread count - simplified for V2 */}
                 </button>
                 
@@ -1023,7 +1016,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                 </div>
 
                 {/* Properties Count - grouped with bell on mobile */}
-                <span className="text-sm text-slate-400">
+                <span className="text-xs text-slate-400 font-medium">
                   {timelineData.properties.length} properties
                 </span>
               </div>

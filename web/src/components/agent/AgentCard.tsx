@@ -194,10 +194,13 @@ If you're looking to buy or sell, I can't recommend them enough! 👏
                   </div>
                 </div>
 
-                {/* Mobile: Name only */}
+                {/* Mobile: Name and company */}
                 <div className="sm:hidden">
                   <h3 className="text-white font-semibold text-sm">{agent.name}</h3>
                   <p className="text-slate-400 text-xs">REALTOR®</p>
+                  {agent.company && (
+                    <p className="text-slate-400 text-xs mt-0.5">{agent.company}</p>
+                  )}
                 </div>
               </div>
 
