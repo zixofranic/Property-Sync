@@ -141,6 +141,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   // Simple tracking: prevent duplicate joins in progress
   const [joiningProperties, setJoiningProperties] = useState<Set<string>>(new Set());
 
+  // Track joined properties to prevent duplicates - use ref to persist across re-renders
+  const joinedPropertiesRef = useRef<Set<string>>(new Set());
+
+  // Track authentication state with refs to prevent stale closures
+  const currentUserIdRef = useRef<string | null>(null);
+  const currentUserTypeRef = useRef<'AGENT' | 'CLIENT' | null>(null);
+
+  // Track socket cleanup function with ref to prevent scope issues
+  const socketCleanupRef = useRef<(() => void) | null>(null);
+
   // Transform server message format to frontend MessageV2 format
   const transformMessage = useCallback((message: any): MessageV2 => {
     return {
@@ -1288,16 +1298,6 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       console.error('❌ Failed to mark messages as read:', error);
     }
   }, [socket, isConnected, propertyConversations, messages, currentUserId, currentUserType]);
-
-  // Track joined properties to prevent duplicates - use ref to persist across re-renders
-  const joinedPropertiesRef = useRef<Set<string>>(new Set());
-
-  // Track authentication state with refs to prevent stale closures
-  const currentUserIdRef = useRef<string | null>(null);
-  const currentUserTypeRef = useRef<'AGENT' | 'CLIENT' | null>(null);
-
-  // Track socket cleanup function with ref to prevent scope issues
-  const socketCleanupRef = useRef<(() => void) | null>(null);
 
   // Join property conversation (load messages)
   const joinPropertyConversation = useCallback((propertyId: string) => {
