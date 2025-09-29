@@ -53,7 +53,7 @@ export function ClientChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // API base URL
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010';
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {

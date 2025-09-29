@@ -228,7 +228,7 @@ class ApiClient {
 
   constructor() {
     // Use local development server
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010';
 
     // Initialize with stored tokens
     if (typeof window !== 'undefined') {
