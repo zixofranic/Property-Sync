@@ -859,23 +859,33 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Agent Company Logo */}
-              <div className="flex-shrink-0 w-20 h-20 flex items-center justify-center">
-                {timelineData.agent.logo ? (
-                  <img
-                    src={timelineData.agent.logo}
-                    alt={timelineData.agent.company}
-                    className="w-full h-full object-contain"
-                  />
-                ) : timelineData.agent.company ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 text-xs font-bold text-white text-center leading-tight px-1">
-                    {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
-                    <Building className="w-8 h-8 text-slate-400" />
-                  </div>
-                )}
+              {/* Agent Company Logo/Text */}
+              <div className="flex-shrink-0">
+                {/* Desktop: Show logo */}
+                <div className="hidden sm:flex w-20 h-20 items-center justify-center">
+                  {timelineData.agent.logo ? (
+                    <img
+                      src={timelineData.agent.logo}
+                      alt={timelineData.agent.company}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : timelineData.agent.company ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 text-xs font-bold text-white text-center leading-tight px-1">
+                      {timelineData.agent.company.split(' ').map(word => word[0]).join('').slice(0, 3).toUpperCase()}
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600">
+                      <Building className="w-8 h-8 text-slate-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile: Show company text */}
+                <div className="sm:hidden">
+                  <p className="text-sm font-semibold text-white">
+                    {timelineData.agent.company || 'Real Estate'}
+                  </p>
+                </div>
               </div>
               
               <div className="min-h-16 flex flex-col justify-center">
@@ -888,21 +898,23 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              {/* New Properties Counter Badge */}
-              {newPropertyCount > 0 && (
-                <div className="relative">
-                  <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-xs font-bold">
-                      +{newPropertyCount}
-                    </span>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Mobile: Group notification bell and properties count */}
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                {/* New Properties Counter Badge */}
+                {newPropertyCount > 0 && (
+                  <div className="relative">
+                    <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-xs font-bold">
+                        +{newPropertyCount}
+                      </span>
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   </div>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                </div>
-              )}
-              
-              {/* Notification Bell */}
-              <div className="relative" ref={notificationRef}>
+                )}
+
+                {/* Notification Bell */}
+                <div className="relative" ref={notificationRef}>
                 <button 
                   onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
                   className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
@@ -1008,12 +1020,13 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                     </div>
                   </div>
                 )}
+                </div>
+
+                {/* Properties Count - grouped with bell on mobile */}
+                <span className="text-sm text-slate-400">
+                  {timelineData.properties.length} properties
+                </span>
               </div>
-              
-              {/* Properties Count */}
-              <span className="text-sm text-slate-400">
-                {timelineData.properties.length} properties
-              </span>
             </div>
           </div>
         </div>
@@ -2005,8 +2018,8 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
         </div>
       )}
 
-      {/* Color Picker Button - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-50" data-color-picker>
+      {/* Color Picker Button - Bottom Right Above Footer */}
+      <div className="fixed bottom-20 right-4 z-50" data-color-picker>
         <motion.button
           onClick={() => setShowColorPicker(!showColorPicker)}
           className="w-14 h-14 bg-brand-primary hover:bg-brand-primary-dark text-white rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center"
@@ -2028,7 +2041,7 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
             initial={{ opacity: 0, y: 20, x: -20 }}
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: 20, x: -20 }}
-            className="fixed bottom-20 left-4 z-50 bg-slate-800/95 backdrop-blur-md border border-slate-700/50 rounded-xl p-6 shadow-2xl max-w-sm"
+            className="fixed bottom-36 right-4 z-50 bg-slate-800/95 backdrop-blur-md border border-slate-700/50 rounded-xl p-6 shadow-2xl max-w-sm"
             data-color-picker
           >
             <div className="flex items-center justify-between mb-4">

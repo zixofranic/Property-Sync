@@ -142,7 +142,8 @@ export function PhotoViewerModal({
         }}
       >
         {/* Header */}
-        <div className="fixed top-6 left-6 right-6 flex items-center justify-between z-[70]">
+        <div className="fixed top-6 left-6 right-6 z-[70] space-y-3">
+          {/* Address line */}
           <div className="bg-slate-800/80 backdrop-blur-md border border-slate-700/50 rounded-xl px-4 py-3">
             <h2 className="text-white font-semibold text-lg mb-1">{propertyAddress || 'Property Photos'}</h2>
             <p className="text-slate-300 text-sm">
@@ -150,7 +151,8 @@ export function PhotoViewerModal({
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          {/* Icons line */}
+          <div className="flex items-center justify-end space-x-3">
             {/* Zoom Controls */}
             <button
               onClick={toggleZoom}
@@ -246,7 +248,7 @@ export function PhotoViewerModal({
 
         {/* Thumbnail Strip (Bottom) - Hidden scrollbar with fade edges */}
         {images.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-4xl px-8">
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-full max-w-4xl px-8">
             <div className="relative">
               {/* Left fade */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-gray-900/60 to-transparent z-10 pointer-events-none rounded-l-xl" />
@@ -289,7 +291,7 @@ export function PhotoViewerModal({
         )}
 
         {/* Keyboard Shortcuts Help */}
-        <div className="absolute bottom-4 right-4 text-white/60 text-xs">
+        <div className="absolute bottom-6 right-4 text-white/60 text-xs">
           <div>← → Navigate • Esc Close • Click Zoom</div>
           {!isClientView && <div>Del Delete Photo</div>}
         </div>

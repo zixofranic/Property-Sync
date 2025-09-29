@@ -148,7 +148,7 @@ If you're looking to buy or sell, I can't recommend them enough! 👏
             <div className="flex items-center justify-between">
               {/* Agent Info Section */}
               <div className="flex items-center space-x-4">
-                <div className="relative w-10 h-10">
+                <div className="relative w-12 h-12">
                   {agent.logo && !imageError ? (
                     <>
                       {imageLoading && (
@@ -162,7 +162,7 @@ If you're looking to buy or sell, I can't recommend them enough! 👏
                       <img
                         src={agent.logo}
                         alt={agent.name}
-                        className={`w-10 h-10 rounded-full object-cover border-2 transition-opacity duration-200 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                        className={`w-12 h-12 rounded-full object-cover border-2 transition-opacity duration-200 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
                         style={{ borderColor: agent.brandColor }}
                         onLoad={() => setImageLoading(false)}
                         onError={() => {
@@ -173,10 +173,10 @@ If you're looking to buy or sell, I can't recommend them enough! 👏
                     </>
                   ) : (
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center border-2"
+                      className="w-12 h-12 rounded-full flex items-center justify-center border-2"
                       style={{ backgroundColor: `${agent.brandColor}20`, color: agent.brandColor, borderColor: agent.brandColor }}
                     >
-                      <User className="w-5 h-5" />
+                      <User className="w-6 h-6" />
                     </div>
                   )}
                 </div>
