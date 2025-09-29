@@ -175,29 +175,26 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize socket connection to V2 namespace
   useEffect(() => {
-    // CRITICAL FIX: Wait for authentication state to be properly loaded before connecting
-    // This prevents the connection issue after login when auth state hasn't updated yet
+    // FORCE socket initialization on mount - don't wait for auth state
+    console.log('🚀 Socket initialization triggered');
+
     const initializeConnection = async () => {
-      // Check if authentication is in progress (loading state)
-      if (isLoading || (!isAuthenticated && typeof window !== 'undefined' && localStorage.getItem('accessToken'))) {
-        console.log('⏳ Waiting for authentication state to stabilize...', {
-          isLoading,
-          isAuthenticated,
-          hasToken: typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
-        });
+      // Get current path for debugging
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 
-        // Wait a bit for auth state to update after login
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Check for agent authentication via localStorage (more reliable than props)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-        // Re-check auth state after waiting
-        if (!isAuthenticated && typeof window !== 'undefined' && localStorage.getItem('accessToken')) {
-          console.log('🔄 Auth state still not updated, checking auth status...');
-          // Trigger a re-check of auth status by calling the store method
-          const { checkAuthStatus } = useMissionControlStore.getState();
-          checkAuthStatus();
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
+      console.log('🔍 Auth check:', {
+        hasToken: !!token,
+        path: currentPath,
+        hasUser: !!user,
+        isAuthenticated,
+        isLoading
+      });
+
+      // Skip auth state waiting - proceed directly to connection logic
 
       // CRITICAL FIX: Only clean up if we have a valid socket AND we're not just refreshing
       if (socket && !socket.connected) {
@@ -232,10 +229,6 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('🎯 Initializing new socket connection...');
-
-      // Get current path for debugging
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 
     // CRITICAL FIX: Check for client mode FIRST before agent authentication
     const clientMode = urlParams?.get('clientMode') === 'true';
@@ -278,7 +271,6 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Check for agent authentication via localStorage (more reliable than props)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
       console.log('🟢 Agent auth path: Found token in localStorage');
       console.log('✅ Taking AGENT authentication path');
@@ -377,7 +369,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         socketCleanupRef.current();
       }
     };
-  }, [isLoading, isAuthenticated]); // Depend on auth state to re-run when it changes
+  }, []); // FORCE: Run once on mount, don't wait for auth state changes
 
   // Agent WebSocket connection to V2 namespace
   const connectWithAgentAuth = (token: string) => {
