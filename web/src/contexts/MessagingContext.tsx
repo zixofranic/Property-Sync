@@ -256,6 +256,27 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // CRITICAL FIX: Check for timeline paths BEFORE agent authentication
+    // This prevents clients on timeline pages from using agent auth when agent tokens exist
+    if (currentPath && currentPath.includes('/timeline/') && currentPath !== '/timeline') {
+      console.log('🔵 TIMELINE PATH DETECTED: Forcing client authentication');
+      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
+
+      // Extract shareToken from timeline path
+      const pathSegments = currentPath.split('/').filter(Boolean);
+      const timelineIndex = pathSegments.indexOf('timeline');
+      if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
+        const shareToken = pathSegments[timelineIndex + 1];
+        // Additional validation: shareToken should look like an ID (not a common word)
+        if (shareToken.length > 10 && !['properties', 'messages', 'chat'].includes(shareToken)) {
+          const effectiveToken = sessionToken || 'anonymous-client';
+          console.log('✅ Taking CLIENT authentication path with shareToken:', shareToken);
+          connectWithClientAuth(effectiveToken, shareToken);
+          return;
+        }
+      }
+    }
+
     // Check for agent authentication via localStorage (more reliable than props)
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
