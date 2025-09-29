@@ -145,12 +145,6 @@ If you're looking to buy or sell, I can't recommend them enough! 👏
           style={{ borderTopColor: `${agent.brandColor}30` }}
         >
           <div className="max-w-7xl mx-auto px-4 py-3">
-            {/* Mobile: Company name above everything */}
-            {agent.company && (
-              <div className="sm:hidden mb-2">
-                <p className="text-slate-400 text-xs text-left">{agent.company}</p>
-              </div>
-            )}
 
             <div className="flex items-center justify-between">
               {/* Agent Info Section */}
