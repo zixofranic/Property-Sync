@@ -392,15 +392,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         userType: 'AGENT',
         timelineId: null, // Agent connections don't need specific timeline
       },
-      transports: ['websocket', 'polling'],
+      // CRITICAL: Railway WebSocket fixes
+      transports: ['polling', 'websocket'], // Start with polling, upgrade to websocket
       upgrade: true,
       reconnection: true,
-      reconnectionAttempts: 10, // Increased attempts
-      reconnectionDelay: 500, // Faster initial reconnection
+      reconnectionAttempts: 5, // Reduced for faster fallback
+      reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000, // Increased timeout
-      forceNew: false, // Allow reusing connections when possible
+      timeout: 20000,
+      forceNew: true, // Force new connection for Railway
       autoConnect: true,
+
+      // Railway-specific settings
+      path: '/socket.io/', // Explicit path
+      secure: typeof window !== 'undefined' && window.location.protocol === 'https:', // Force secure in production
+      rejectUnauthorized: false, // Allow self-signed certs temporarily
     });
 
     const cleanup = setupSocketEventListeners(newSocket);
@@ -421,15 +427,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         userType: 'CLIENT',
         timelineId: shareToken, // Use shareToken as timelineId for clients
       },
-      transports: ['websocket', 'polling'],
+      // CRITICAL: Railway WebSocket fixes
+      transports: ['polling', 'websocket'], // Start with polling, upgrade to websocket
       upgrade: true,
       reconnection: true,
-      reconnectionAttempts: 10, // Increased attempts
-      reconnectionDelay: 500, // Faster initial reconnection
+      reconnectionAttempts: 5, // Reduced for faster fallback
+      reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000, // Increased timeout
-      forceNew: false, // Allow reusing connections when possible
+      timeout: 20000,
+      forceNew: true, // Force new connection for Railway
       autoConnect: true,
+
+      // Railway-specific settings
+      path: '/socket.io/', // Explicit path
+      secure: typeof window !== 'undefined' && window.location.protocol === 'https:', // Force secure in production
+      rejectUnauthorized: false, // Allow self-signed certs temporarily
     });
 
     const cleanup = setupSocketEventListeners(newSocket);
