@@ -275,7 +275,7 @@ export default function ChatInterface({
             const isRightAligned = isClient;
 
             return (
-              <div key={message.id || `temp-message-${index}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-4`}>
+              <div key={(message.id && message.id.trim()) || `temp-message-${index}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-4`}>
                 <div className={`max-w-[70%] ${isRightAligned ? 'ml-12' : 'mr-12'}`}>
                   {/* Sender name (always show for clarity) */}
                   {!isRightAligned && (

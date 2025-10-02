@@ -269,7 +269,7 @@ export function ClientChatInterface({
           messages.map((message, index) => {
             const isOwnMessage = message.senderType === 'client';
             return (
-              <div key={message.id || `temp-message-${index}`} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+              <div key={(message.id && message.id.trim()) || `temp-message-${index}`} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                 <div className={`
                   max-w-[85%] p-3 rounded-lg
                   ${isOwnMessage
