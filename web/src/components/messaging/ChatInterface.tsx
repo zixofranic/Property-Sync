@@ -242,13 +242,14 @@ export default function ChatInterface({
             <p className="text-slate-400">No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          currentMessages.map((message) => {
+          currentMessages.map((message, index) => {
             // Determine sender type consistently
             const isAgent = message.senderType === 'AGENT';
             const isClient = message.senderType === 'CLIENT';
 
             // Check if this message is from the current user for debug purposes only
             const isOwnMessage = message.senderId === currentUserId;
+            const isTemporary = message.id.startsWith('temp-');
 
             // V1 debug logging removed - deprecated
 
@@ -274,7 +275,7 @@ export default function ChatInterface({
             const isRightAligned = isClient;
 
             return (
-              <div key={message.id || `message-${Date.now()}-${Math.random()}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-4`}>
+              <div key={message.id || `temp-message-${index}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-4`}>
                 <div className={`max-w-[70%] ${isRightAligned ? 'ml-12' : 'mr-12'}`}>
                   {/* Sender name (always show for clarity) */}
                   {!isRightAligned && (
@@ -293,8 +294,9 @@ export default function ChatInterface({
 
                     {/* Message content */}
                     <div className={`
-                      p-3 rounded-lg flex-1
+                      p-3 rounded-lg transition-opacity flex-1
                       ${messageColors}
+                      ${isTemporary ? 'opacity-70' : 'opacity-100'}
                       ${isRightAligned ? 'rounded-br-sm' : 'rounded-bl-sm'}
                     `}>
                       <p className="text-sm leading-relaxed">{message.content}</p>

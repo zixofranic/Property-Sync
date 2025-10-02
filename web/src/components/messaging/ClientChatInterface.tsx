@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, User, Bot, AlertCircle } from 'lucide-react';
+import { Send, MessageSquare, User, Bot, AlertCircle, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Message {
@@ -50,6 +50,8 @@ export function ClientChatInterface({
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // API base URL
@@ -152,7 +154,14 @@ export function ClientChatInterface({
 
   // Handle sending a message
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !conversation || !sessionToken) return;
+    if (!messageText.trim() || !conversation || !sessionToken || isSending) return;
+
+    const textToSend = messageText.trim();
+
+    // Backup message and clear textarea immediately
+    setPendingMessage(textToSend);
+    setMessageText('');
+    setIsSending(true);
 
     try {
       const response = await fetch(`${apiUrl}/api/v1/messaging/client/${shareToken}/conversations/${conversation.id}/messages`, {
@@ -161,7 +170,7 @@ export function ClientChatInterface({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: messageText.trim(),
+          content: textToSend,
           sessionToken,
         }),
       });
@@ -176,11 +185,19 @@ export function ClientChatInterface({
 
       // Add message to local state
       setMessages(prev => [...prev, newMessage]);
-      setMessageText('');
+
+      // Success - clear backup
+      setPendingMessage('');
       setError(null); // Clear any previous errors
     } catch (error) {
       console.error('Failed to send message:', error);
+
+      // Restore message text on failure
+      setMessageText(textToSend);
+
       setError(error instanceof Error ? error.message : 'Failed to send message');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -249,10 +266,10 @@ export function ClientChatInterface({
             </p>
           </div>
         ) : (
-          messages.map((message) => {
+          messages.map((message, index) => {
             const isOwnMessage = message.senderType === 'client';
             return (
-              <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+              <div key={message.id || `temp-message-${index}`} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                 <div className={`
                   max-w-[85%] p-3 rounded-lg
                   ${isOwnMessage
@@ -304,10 +321,14 @@ export function ClientChatInterface({
           </div>
           <button
             onClick={handleSendMessage}
-            disabled={!messageText.trim() || (!isConnected && sessionToken)}
+            disabled={!messageText.trim() || (!isConnected && sessionToken) || isSending}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center"
           >
-            <Send className="w-4 h-4" />
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </button>
         </div>
 

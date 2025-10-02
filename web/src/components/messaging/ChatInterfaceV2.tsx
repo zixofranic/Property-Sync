@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, MessageSquare, User, ChevronDown } from 'lucide-react';
+import { Send, MessageSquare, User, ChevronDown, Loader2 } from 'lucide-react';
 import { useMessaging } from '@/contexts/MessagingContext';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -21,6 +21,8 @@ export default function ChatInterfaceV2({
 }: ChatInterfaceV2Props) {
   const [messageText, setMessageText] = useState('');
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useMissionControlStore();
@@ -129,19 +131,28 @@ export default function ChatInterfaceV2({
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [propertyId, currentUserId]); // Only depend on propertyId and currentUserId, not message changes
+  }, [propertyId, currentUserId, messages[propertyId]?.length]); // Include message count to trigger when messages load
 
   // Handle sending a message
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !propertyId || !timelineId) return;
+    if (!messageText.trim() || !propertyId || !timelineId || isSending) return;
+
+    const textToSend = messageText.trim();
+
+    // Backup message and clear textarea immediately
+    setPendingMessage(textToSend);
+    setMessageText('');
+    setIsSending(true);
 
     try {
       // Ensure conversation exists before sending message
       await getOrCreatePropertyConversation(propertyId, timelineId);
 
       // Now send the message
-      await sendMessage(propertyId, messageText.trim(), 'TEXT');
-      setMessageText('');
+      await sendMessage(propertyId, textToSend, 'TEXT');
+
+      // Success - clear backup
+      setPendingMessage('');
 
       // Ensure scroll to bottom after sending message
       setTimeout(() => {
@@ -149,8 +160,14 @@ export default function ChatInterfaceV2({
       }, 100);
     } catch (error) {
       console.error('Failed to send message:', error);
+
+      // Restore message text on failure
+      setMessageText(textToSend);
+
       // Show user-friendly error
       alert('Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -199,14 +216,14 @@ export default function ChatInterfaceV2({
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 relative flex flex-col-reverse" onScroll={handleScroll}>
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 relative flex flex-col-reverse gap-4" onScroll={handleScroll}>
         {currentMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="w-12 h-12 text-slate-500 mb-3" />
             <p className="text-slate-400">No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          currentMessages.map((message) => {
+          currentMessages.map((message, index) => {
             // Determine sender type consistently
             const isAgent = message.senderType === 'AGENT';
             const isClient = message.senderType === 'CLIENT';
@@ -252,7 +269,7 @@ export default function ChatInterfaceV2({
             const isRightAligned = isClient;
 
             return (
-              <div key={message.id || `message-${Date.now()}-${Math.random()}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-4`}>
+              <div key={message.id || `temp-message-${index}`} className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[70%] ${isRightAligned ? 'ml-12' : 'mr-12'}`}>
                   {/* Sender name (always show for clarity) */}
                   {!isRightAligned && (
@@ -328,10 +345,14 @@ export default function ChatInterfaceV2({
           </div>
           <button
             onClick={handleSendMessage}
-            disabled={!messageText.trim() || !isConnected}
+            disabled={!messageText.trim() || !isConnected || isSending}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center"
           >
-            <Send className="w-4 h-4" />
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </button>
         </div>
 

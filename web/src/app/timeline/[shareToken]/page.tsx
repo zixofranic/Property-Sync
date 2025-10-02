@@ -913,7 +913,19 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                   className="relative p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <Bell className="w-4 h-4 text-slate-300" />
-                  {/* Timeline page doesn't need total unread count - simplified for V2 */}
+                  {/* Show unread chat message count */}
+                  {(() => {
+                    // Calculate total unread messages across all properties
+                    const totalUnread = sortedProperties.reduce((sum, property) => {
+                      return sum + (messaging.getPropertyUnreadCount(property.id) || 0);
+                    }, 0);
+
+                    return totalUnread > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {totalUnread > 9 ? '9+' : totalUnread}
+                      </span>
+                    );
+                  })()}
                 </button>
                 
                 {/* Notification Dropdown */}
@@ -929,13 +941,19 @@ ${timelineData.client.firstName} ${timelineData.client.lastName}`;
                           {clientMessages.length > 0 && clientMessages.filter(msg => !msg.isRead).length > 0 && (
                             <motion.button
                               onClick={() => {
-                                // Mark all messages as read
+                                // Mark all client notification messages as read locally
                                 const updatedMessages = clientMessages.map(msg => ({
                                   ...msg,
                                   isRead: true
                                 }));
                                 setClientMessages(updatedMessages);
                                 setUnreadMessageCount(0);
+
+                                // ALSO mark all property chat messages as read to clear the badge
+                                sortedProperties.forEach(property => {
+                                  messaging.markMessagesAsRead(property.id);
+                                });
+
                                 setShowNotificationDropdown(false);
                               }}
                               className="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded border border-slate-600 hover:border-slate-400"
