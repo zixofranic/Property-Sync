@@ -1,7 +1,11 @@
 {
   "name": "property-sync",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
+    "version:bump": "node scripts/bump-version.js",
+    "version:push": "powershell -ExecutionPolicy Bypass -File scripts/version-push.ps1",
+    "version:push:unix": "bash scripts/version-push.sh",
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "dev:clean": "node scripts/dev-server.js",
     "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev-win.ps1",
@@ -10,7 +14,7 @@
     "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/api",
     "db:generate": "npm run db:generate --workspace=apps/api",
-    "db:push": "npm run db:push --workspace=apps/api", 
+    "db:push": "npm run db:push --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:studio": "npm run db:studio --workspace=apps/api",
     "lint": "npm run lint --workspace=apps/api && npm run lint --workspace=apps/web",
