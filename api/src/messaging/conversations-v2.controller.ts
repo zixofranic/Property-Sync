@@ -14,6 +14,7 @@ import { Request as ExpressRequest } from 'express';
 import { ConversationV2Service } from './conversation-v2.service';
 import { MessageV2Service } from './message-v2.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ClientSessionGuard } from '../auth/guards/client-session.guard';
 import { HierarchicalUnreadResponse } from './dto/hierarchical-unread.dto';
 
 interface AuthenticatedRequest extends ExpressRequest {
@@ -193,5 +194,59 @@ export class ConversationsV2Controller {
     }
 
     return this.conversationService.getHierarchicalUnreadCounts(user.id);
+  }
+
+  // PHASE 1 - TASK 2: Get client unread counts per property
+  @Get('unread/client')
+  @UseGuards(ClientSessionGuard) // Override controller-level JwtAuthGuard for client-specific auth
+  @ApiOperation({
+    summary: 'Get client unread message counts per property',
+    description: 'Returns unread message counts for each property the client has conversations for. Only available for clients.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Client unread counts retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        counts: {
+          type: 'object',
+          additionalProperties: { type: 'number' },
+          description: 'Map of propertyId to unread count',
+          example: {
+            'property_123': 3,
+            'property_456': 1,
+            'property_789': 0,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only clients can access client unread counts',
+  })
+  async getClientUnreadCounts(@Request() req: AuthenticatedRequest) {
+    const { user } = req;
+
+    console.log(`📊 CLIENT BADGE: Endpoint called by user: ${user.id}, userType: ${user.userType}`);
+
+    // CRITICAL: Only clients can access client unread counts
+    if (user.userType !== 'CLIENT') {
+      console.error(`❌ CLIENT BADGE: Access denied - user is ${user.userType}, not CLIENT`);
+      throw new Error('Client unread counts are only available for clients');
+    }
+
+    // For clients, user.id is the clientId
+    const clientId = user.id;
+    console.log(`✅ CLIENT BADGE: Fetching unread counts for clientId: ${clientId}`);
+
+    const counts = await this.conversationService.getClientUnreadCounts(clientId);
+
+    return { counts };
   }
 }

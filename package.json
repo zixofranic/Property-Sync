@@ -1,6 +1,6 @@
 {
   "name": "property-sync",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "scripts": {
     "version:bump": "node scripts/bump-version.js",

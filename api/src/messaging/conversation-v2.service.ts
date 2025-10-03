@@ -455,4 +455,42 @@ export class ConversationV2Service {
       return 0;
     }
   }
+
+  // PHASE 1 - TASK 1: Get client unread counts (flat map per property)
+  async getClientUnreadCounts(clientId: string): Promise<{ [propertyId: string]: number }> {
+    try {
+      console.log(`📊 CLIENT BADGE: Fetching unread counts for client: ${clientId}`);
+
+      // Query all active conversations for this client
+      const conversations = await this.prisma.propertyConversation.findMany({
+        where: {
+          clientId,
+          status: 'ACTIVE',
+        },
+        select: {
+          propertyId: true,
+          unreadClientCount: true,
+        },
+      });
+
+      // Build flat map: { propertyId: unreadCount }
+      const unreadMap: { [propertyId: string]: number } = {};
+
+      conversations.forEach((conv) => {
+        // Handle null/undefined unreadClientCount safely
+        unreadMap[conv.propertyId] = conv.unreadClientCount || 0;
+      });
+
+      console.log(`✅ CLIENT BADGE: Found ${conversations.length} conversations for client ${clientId}`);
+      console.log(`   Total properties with unreads: ${Object.keys(unreadMap).length}`);
+
+      return unreadMap;
+
+    } catch (error) {
+      console.error(`❌ CLIENT BADGE: Error in getClientUnreadCounts for client ${clientId}:`, error);
+
+      // Return empty map on error - fail gracefully
+      return {};
+    }
+  }
 }
