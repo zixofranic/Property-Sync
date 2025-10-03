@@ -9,10 +9,12 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import { ConversationV2Service } from './conversation-v2.service';
 import { MessageV2Service } from './message-v2.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { HierarchicalUnreadResponse } from './dto/hierarchical-unread.dto';
 
 interface AuthenticatedRequest extends ExpressRequest {
   user: {
@@ -23,6 +25,8 @@ interface AuthenticatedRequest extends ExpressRequest {
   query: any;
 }
 
+@ApiTags('Conversations V2')
+@ApiBearerAuth()
 @Controller('api/v2/conversations')
 @UseGuards(JwtAuthGuard)
 export class ConversationsV2Controller {
@@ -159,5 +163,35 @@ export class ConversationsV2Controller {
     return {
       unreadCount: await this.messageService.getUnreadCount(user.id, user.userType),
     };
+  }
+
+  // ISSUE 10 FIX: Get hierarchical unread counts for agent with proper DTOs and Swagger docs
+  @Get('unread/hierarchical')
+  @ApiOperation({
+    summary: 'Get hierarchical unread message counts',
+    description: 'Returns a structured view of unread message counts grouped by client and property. Only available for agents.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Hierarchical unread counts retrieved successfully',
+    type: HierarchicalUnreadResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only agents can access hierarchical counts',
+  })
+  async getHierarchicalUnreadCounts(@Request() req: AuthenticatedRequest): Promise<HierarchicalUnreadResponse> {
+    const { user } = req;
+
+    // Only agents can access hierarchical view
+    if (user.userType !== 'AGENT') {
+      throw new Error('Hierarchical unread counts are only available for agents');
+    }
+
+    return this.conversationService.getHierarchicalUnreadCounts(user.id);
   }
 }

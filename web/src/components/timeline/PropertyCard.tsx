@@ -1,7 +1,7 @@
 'use client';
 
 // apps/web/src/components/timeline/PropertyCard.tsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, MessageCircle, MessageSquare, X, ExternalLink, MapPin, DollarSign, ChevronLeft, ChevronRight, Bed, Bath, Square } from 'lucide-react';
 import { ChatInterfaceV2 } from '@/components/messaging/ChatInterfaceV2';
@@ -50,8 +50,15 @@ export function PropertyCard({
   // V2 messaging hooks for notifications
   const messaging = useMessaging();
 
-  // Get unread count for this property
-  const unreadCount = messaging.getPropertyNotificationCount(property.id) || 0;
+  // TASK 7: Memoized unread count calculation to prevent unnecessary recalculations
+  const unreadCount = useMemo(() => {
+    return messaging.getPropertyUnreadCount(property.id) || 0;
+  }, [messaging, property.id, messaging.messages[property.id]?.length]);
+
+  // TASK 7: Separate memoized notification count
+  const notificationCount = useMemo(() => {
+    return messaging.getPropertyNotificationCount(property.id) || 0;
+  }, [messaging, property.id, messaging.messages[property.id]?.length]);
 
   // Get all images (handle both single imageUrl and multiple imageUrls)
   const images = property.imageUrls?.length > 0 

@@ -554,6 +554,8 @@ model PropertyConversation {
   messages        MessageV2[]
   notifications   NotificationV2[]
 
+  // ISSUE 5 FIX: Optimized indexes - removed volatile count columns
+  // Count columns should not be in indexes - they're selected, not filtered
   @@index([agentId, status])
   @@index([clientId, status])
   @@index([timelineId])
@@ -576,8 +578,10 @@ model MessageV2 {
   // Relations
   conversation          PropertyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
+  // TASK 9: Optimized indexes for message queries
   @@index([conversationId, createdAt])
   @@index([senderId])
+  @@index([conversationId, senderType, isRead])
   @@map("messages_v2")
 }
 

@@ -86,13 +86,9 @@ export function MissionControl() {
   // V2 messaging
   const messaging = useMessaging();
 
-  // Calculate total unread count across all properties
+  // Calculate total unread count using hierarchical badge system
   const getUnreadCount = () => {
-    const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
-    const properties = currentTimeline?.properties || [];
-    return properties.reduce((total, property) => {
-      return total + (messaging.getPropertyUnreadCount(property.id) || 0);
-    }, 0);
+    return messaging.getTotalUnreadCount();
   };
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [mlsModal, setMlsModal] = useState<{ isOpen: boolean; url: string; address: string }>({
@@ -737,14 +733,35 @@ const testProfileAPI = async () => {
                               </div>
                             </div>
                             <div className="text-right ml-4">
-                              {(() => {
-                                const calculatedStatus = calculateClientStatus(client);
-                                return (
-                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(calculatedStatus)}`}>
-                                    {calculatedStatus}
-                                  </div>
-                                );
-                              })()}
+                              <div className="flex items-center space-x-2">
+                                {(() => {
+                                  const calculatedStatus = calculateClientStatus(client);
+                                  return (
+                                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(calculatedStatus)}`}>
+                                      {calculatedStatus}
+                                    </div>
+                                  );
+                                })()}
+                                {/* TASK 4: Per-client unread message badge */}
+                                {(() => {
+                                  const clientUnreadCount = messaging.getClientUnreadCount(client.id);
+                                  if (clientUnreadCount > 0) {
+                                    return (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white"
+                                        style={{
+                                          animation: 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                                        }}
+                                      >
+                                        {clientUnreadCount > 99 ? '99+' : clientUnreadCount}
+                                      </motion.div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                               <div className="text-xs text-slate-400 mt-1">
                                 {client.engagementScore || 0}% engagement
                               </div>

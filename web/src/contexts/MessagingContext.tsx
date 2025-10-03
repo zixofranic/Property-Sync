@@ -1,14 +1,25 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useMissionControlStore } from '@/stores/missionControlStore';
+import { useBadgePersistenceStore } from '@/stores/badgePersistenceStore';
 
 // Extend Socket interface to include our cleanup function
 declare module 'socket.io-client' {
   interface Socket {
     cleanup?: () => void;
   }
+}
+
+// TASK 8: Connection state machine for lifecycle management with AUTHENTICATING state
+enum ConnectionState {
+  IDLE = 'IDLE',
+  CONNECTING = 'CONNECTING',
+  AUTHENTICATING = 'AUTHENTICATING', // TASK 8: New state between CONNECTING and CONNECTED
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+  DISCONNECTED = 'DISCONNECTED',
 }
 
 interface MessageV2 {
@@ -105,6 +116,11 @@ interface MessagingContextV2Type {
   getPropertyNotificationCount: (propertyId: string) => number;
   clearPropertyNotifications: (propertyId: string) => void;
 
+  // TASK 3: Hierarchical unread count methods
+  getTotalUnreadCount: () => number;
+  getClientUnreadCount: (clientId: string) => number;
+  fetchHierarchicalUnreadCounts: () => Promise<void>;
+
   // Real-time events
   typingUsers: Record<string, string[]>; // propertyId -> userIds
   startTyping: (propertyId: string) => void;
@@ -117,8 +133,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useMissionControlStore();
   const { addNotification } = useMissionControlStore();
 
-  // Connection state
+  // Connection state with state machine
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.IDLE);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
@@ -135,21 +152,103 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
   const [propertyNotificationCounts, setPropertyNotificationCounts] = useState<Record<string, number>>({});
 
-  // EMERGENCY DUPLICATE PREVENTION: Track recently processed messages
-  const [recentlyProcessedMessages, setRecentlyProcessedMessages] = useState<Set<string>>(new Set());
+  // TASK 3: Hierarchical unread counts state
+  const [hierarchicalUnreadCounts, setHierarchicalUnreadCounts] = useState<{
+    totalUnread: number;
+    clients: Array<{
+      clientId: string;
+      clientName: string;
+      unreadCount: number;
+      properties: Array<{
+        propertyId: string;
+        address: string;
+        unreadCount: number;
+      }>;
+    }>;
+  } | null>(null);
 
-  // Simple tracking: prevent duplicate joins in progress
-  const [joiningProperties, setJoiningProperties] = useState<Set<string>>(new Set());
+  // Badge data loading state
+  const [badgeDataLoading, setBadgeDataLoading] = useState<boolean>(false);
+
+  // TASK 8: Optimized message deduplication cache (Map with timestamps, max 100 entries, 10s timeout)
+  const [recentlyProcessedMessages, setRecentlyProcessedMessages] = useState<Map<string, number>>(new Map());
+  const MAX_PROCESSED_MESSAGES = 100;
+  const PROCESSED_MESSAGE_TIMEOUT = 10000; // 10 seconds
+
+  // TASK 10: Property conversation state management with lifecycle tracking
+  type PropertyState = 'joining' | 'joined' | 'error';
+  const [propertyStates, setPropertyStates] = useState<Map<string, PropertyState>>(new Map());
 
   // Track joined properties to prevent duplicates - use ref to persist across re-renders
   const joinedPropertiesRef = useRef<Set<string>>(new Set());
 
-  // Track authentication state with refs to prevent stale closures
+  // ISSUE 7 FIX: Store property IDs before disconnect for reconnection restoration
+  const propertyIdsBeforeDisconnectRef = useRef<Set<string>>(new Set());
+
+  // TASK 3: Authentication refs removed - using state variables instead
+
+  // TASK 2: socketCleanupRef removed - cleanup stored on socket instance
+
+  // TASK 3: Authentication promise to block message processing until auth completes
+  const authenticationPromiseRef = useRef<Promise<void> | null>(null);
+  const authenticationResolveRef = useRef<(() => void) | null>(null);
+
+  // TASK 1 & 2: Message queue for pre-authentication messages
+  const messageQueueRef = useRef<any[]>([]);
+
+  // Auth state refs to avoid stale closures in event handlers
   const currentUserIdRef = useRef<string | null>(null);
   const currentUserTypeRef = useRef<'AGENT' | 'CLIENT' | null>(null);
 
-  // Track socket cleanup function with ref to prevent scope issues
-  const socketCleanupRef = useRef<(() => void) | null>(null);
+  // Connection management refs
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionAttempts = useRef<number>(0);
+  const backoffIndex = useRef<number>(0);
+  const reconnectionInFlightRef = useRef<boolean>(false);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const MAX_CONNECTION_ATTEMPTS = 10;
+  const BACKOFF_DELAYS = [1000, 2000, 5000, 10000, 30000]; // Exponential backoff delays
+
+  // TASK 1 & 2: Auth state initialization tracking
+  const [authStateChecked, setAuthStateChecked] = useState(false);
+  const authInitializedRef = useRef(false);
+
+  // TASK 3: Waiting for auth flag
+  const waitingForAuthRef = useRef(false);
+
+  // TASK 6: Token availability monitor refs
+  const tokenMonitorIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tokenCheckAttemptsRef = useRef<number>(0);
+
+  // TASK 7: Health check optimization refs
+  const healthCheckFailures = useRef<number>(0);
+  const MAX_HEALTH_CHECK_FAILURES = 3;
+
+  // TASK 3: Pong timeout management ref
+  const pongTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPingTimeRef = useRef<number>(0);
+
+  // TASK 9: Connection backoff strategy enhancement
+  type FailureReason = 'network' | 'auth' | 'server';
+  const lastFailureReason = useRef<FailureReason>('network');
+  const stableConnectionTime = useRef<number>(0);
+
+  // TASK 4: Share token persistence for client reconnection
+  const shareTokenRef = useRef<string | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+
+  // TASK 9: Session token timestamp tracking
+  const sessionTokenTimestampRef = useRef<number | null>(null);
+  const SESSION_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Helper to synchronize auth state and refs atomically
+  const updateAuthState = useCallback((userId: string | null, userType: 'AGENT' | 'CLIENT' | null) => {
+    setCurrentUserId(userId);
+    setCurrentUserType(userType);
+    currentUserIdRef.current = userId;
+    currentUserTypeRef.current = userType;
+    console.log(`🔐 Auth state updated: userId=${userId}, userType=${userType}`);
+  }, []);
 
   // Transform server message format to frontend MessageV2 format
   const transformMessage = useCallback((message: any): MessageV2 => {
@@ -173,203 +272,423 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user]);
 
-  // Initialize socket connection to V2 namespace
-  useEffect(() => {
-    // FORCE socket initialization on mount - don't wait for auth state
-    console.log('🚀 Socket initialization triggered');
+  // TASK 9 & 10: Calculate backoff delay based on failure reason with mobile detection
+  const calculateBackoffDelay = useCallback((reason: FailureReason, attemptIndex: number): number => {
+    // TASK 10: Detect mobile clients
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isClient = currentUserType === 'CLIENT' || shareTokenRef.current !== null;
 
-    const initializeConnection = async () => {
-      // Get current path for debugging
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    let baseDelay: number;
 
-      // Check for agent authentication via localStorage (more reliable than props)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-
-      console.log('🔍 Auth check:', {
-        hasToken: !!token,
-        path: currentPath,
-        hasUser: !!user,
-        isAuthenticated,
-        isLoading
-      });
-
-      // Skip auth state waiting - proceed directly to connection logic
-
-      // CRITICAL FIX: Only clean up if we have a valid socket AND we're not just refreshing
-      if (socket && !socket.connected) {
-        console.log('🧹 Cleaning up disconnected socket before creating new connection');
-
-        // CRITICAL: Remove ALL listeners before disconnecting
-        console.log('📊 Existing listeners before cleanup:', {
-          newMessage: socket.listeners('new-message').length,
-          connected: socket.listeners('connected').length,
-          propertyJoined: socket.listeners('property-conversation-joined').length
-        });
-
-        socket.removeAllListeners();
-        socket.off(); // Extra safety - removes all listeners
-
-        if (socket.cleanup) {
-          socket.cleanup();
-        }
-
-        socket.disconnect();
-        setSocket(null);
-        setIsConnected(false);
-
-        // IMPORTANT: Clear message event tracking to prevent stale handlers
-        setRecentlyProcessedMessages(new Set());
-        joinedPropertiesRef.current.clear();
-
-        console.log('✅ Disconnected socket completely cleaned up');
-      } else if (socket && socket.connected) {
-        console.log('🔄 Socket already connected, skipping initialization');
-        return;
+    // TASK 10: Mobile-specific strategy - faster initial retries
+    if (isMobile && isClient) {
+      switch (reason) {
+        case 'network':
+          // Mobile strategy: 500ms initial, faster retries, max 15s (not 30s)
+          baseDelay = Math.min(500 * Math.pow(1.5, attemptIndex), 15000);
+          break;
+        case 'auth':
+          // Mobile auth: 3s (faster than desktop)
+          baseDelay = 3000;
+          break;
+        case 'server':
+          // Mobile server: 5-15s range
+          baseDelay = Math.min(5000 + (attemptIndex * 1000), 15000);
+          break;
+        default:
+          baseDelay = 3000;
       }
-
-      console.log('🎯 Initializing new socket connection...');
-
-    // CRITICAL FIX: Check for client mode FIRST before agent authentication
-    const clientMode = urlParams?.get('clientMode') === 'true';
-
-    if (clientMode) {
-      console.log('🔵 CLIENT MODE DETECTED: Using client authentication path');
-      // Force client authentication even if agent token exists
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
-      const propertyId = urlParams?.get('propertyId');
-
-      if (propertyId) {
-        const effectiveToken = sessionToken || 'anonymous-client';
-        console.log('✅ Taking CLIENT authentication path with propertyId:', propertyId);
-        connectWithClientAuth(effectiveToken, propertyId);
-        return;
-      } else {
-        console.log('⚠️ Client mode enabled but no propertyId found in URL params');
+      console.log(`📱 TASK 10: Mobile client reconnection strategy (${reason})`);
+    } else {
+      // Desktop/agent strategy (original)
+      switch (reason) {
+        case 'network':
+          // Exponential starting at 1s
+          baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 30000);
+          break;
+        case 'auth':
+          // Fixed 5s
+          baseDelay = 5000;
+          break;
+        case 'server':
+          // 10-30s range based on attempt
+          baseDelay = Math.min(10000 + (attemptIndex * 2000), 30000);
+          break;
+        default:
+          baseDelay = 5000;
       }
     }
 
-    // CRITICAL FIX: Check for timeline paths BEFORE agent authentication
-    // This prevents clients on timeline pages from using agent auth when agent tokens exist
-    if (currentPath && currentPath.includes('/timeline/') && currentPath !== '/timeline') {
-      console.log('🔵 TIMELINE PATH DETECTED: Forcing client authentication');
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
+    // Add ±20% jitter
+    const jitter = baseDelay * 0.2 * (Math.random() * 2 - 1);
+    const finalDelay = Math.max(500, baseDelay + jitter); // TASK 10: Min 500ms for mobile
 
-      // Extract shareToken from timeline path
-      const pathSegments = currentPath.split('/').filter(Boolean);
-      const timelineIndex = pathSegments.indexOf('timeline');
-      if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
-        const shareToken = pathSegments[timelineIndex + 1];
-        // Additional validation: shareToken should look like an ID (not a common word)
-        if (shareToken.length > 10 && !['properties', 'messages', 'chat'].includes(shareToken)) {
+    return Math.floor(finalDelay);
+  }, [currentUserType]);
+
+  // Central reconnection handler with enhanced backoff (TASK 1, 9 & 10)
+  const handleReconnection = useCallback((reason: FailureReason = 'network') => {
+    // Prevent multiple simultaneous reconnection attempts
+    if (reconnectionInFlightRef.current) {
+      console.log('🔄 Reconnection already in flight, skipping');
+      return;
+    }
+
+    // TASK 10: Mobile clients get 15 attempts instead of 10
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isClient = currentUserType === 'CLIENT' || shareTokenRef.current !== null;
+    const maxAttempts = (isMobile && isClient) ? 15 : MAX_CONNECTION_ATTEMPTS;
+
+    if (connectionAttempts.current >= maxAttempts) {
+      console.error(`❌ TASK 10: Max reconnection attempts reached (${maxAttempts})`);
+      setConnectionState(ConnectionState.DISCONNECTED);
+      return;
+    }
+
+    reconnectionInFlightRef.current = true;
+    setConnectionState(ConnectionState.RECONNECTING);
+
+    // TASK 9 & 10: Track failure reason and calculate appropriate backoff
+    lastFailureReason.current = reason;
+    const delay = calculateBackoffDelay(reason, backoffIndex.current);
+
+    console.log(`🔄 TASK 10: Scheduling reconnection in ${delay}ms (attempt ${connectionAttempts.current + 1}/${maxAttempts}, reason: ${reason}, mobile: ${isMobile && isClient})`);
+    backoffIndex.current++;
+
+    setTimeout(() => {
+      reconnectionInFlightRef.current = false;
+
+      // TASK 4: Check if we have stored client tokens for reconnection
+      if (shareTokenRef.current && sessionTokenRef.current) {
+        console.log('✅ TASK 4: Reconnecting with stored client tokens:', {
+          shareToken: shareTokenRef.current.substring(0, 10) + '...',
+          hasSessionToken: !!sessionTokenRef.current
+        });
+        connectionAttempts.current++;
+        setConnectionState(ConnectionState.CONNECTING);
+        connectWithClientAuth(sessionTokenRef.current, shareTokenRef.current);
+      } else {
+        debouncedConnect();
+      }
+    }, delay);
+  }, [calculateBackoffDelay]);
+
+
+  // Debounced connection manager to prevent race conditions (TASK 1: respects state machine)
+  const debouncedConnect = useCallback(() => {
+    // Clear any pending connection attempts
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+    }
+
+    // Respect state machine: don't connect if already connecting or connected
+    if (connectionState === ConnectionState.CONNECTING || connectionState === ConnectionState.CONNECTED) {
+      console.log('🔄 Connection already active, skipping', { connectionState });
+      return;
+    }
+
+    // Check connection attempt limits
+    if (connectionAttempts.current >= MAX_CONNECTION_ATTEMPTS) {
+      console.error('❌ Max connection attempts reached. Please refresh the page.');
+      setConnectionState(ConnectionState.DISCONNECTED);
+      return;
+    }
+
+    // Debounce connection attempts by 300ms
+    connectionTimeoutRef.current = setTimeout(() => {
+      // Double-check state before attempting connection
+      if (socket?.connected || connectionState === ConnectionState.CONNECTED) {
+        console.log('🔄 Connection already active, skipping');
+        return;
+      }
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const clientMode = urlParams?.get('clientMode') === 'true';
+
+      console.log(`🔄 Debounced connection attempt ${connectionAttempts.current + 1}/${MAX_CONNECTION_ATTEMPTS}`);
+
+      // Priority 1: Client mode with propertyId
+      if (clientMode) {
+        const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
+        const propertyId = urlParams?.get('propertyId');
+
+        if (propertyId) {
           const effectiveToken = sessionToken || 'anonymous-client';
-          console.log('✅ Taking CLIENT authentication path with shareToken:', shareToken);
-          connectWithClientAuth(effectiveToken, shareToken);
+          console.log('✅ CLIENT MODE: Connecting with propertyId');
+          connectionAttempts.current++;
+          setConnectionState(ConnectionState.CONNECTING);
+          connectWithClientAuth(effectiveToken, propertyId);
           return;
         }
       }
-    }
 
-    // Check for agent authentication via localStorage (more reliable than props)
-    if (token) {
-      console.log('🟢 Agent auth path: Found token in localStorage');
-      console.log('✅ Taking AGENT authentication path');
-      connectWithAgentAuth(token);
-      return;
-    }
+      // Priority 2: Timeline paths (force client auth)
+      if (currentPath && currentPath.includes('/timeline/') && currentPath !== '/timeline') {
+        const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
+        const pathSegments = currentPath.split('/').filter(Boolean);
+        const timelineIndex = pathSegments.indexOf('timeline');
 
-    // Check if user is on agent path but has no token - redirect to login
-    const isAgentPath = currentPath.includes('dashboard') ||
-                        currentPath.includes('admin') ||
-                        currentPath.includes('agent') ||
-                        currentPath.includes('settings');
-
-    if (isAgentPath && !clientMode) {
-      console.log('🚨 Agent on dashboard with no token - redirecting to login');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/agent/login';
-      }
-      return;
-    }
-
-    console.log('❌ No agent token found, checking for client auth');
-
-    // Client authentication - check for shareTokens in URL params or client timeline paths
-    const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
-
-    // Get shareToken from URL params OR from client timeline paths
-    let shareToken = urlParams?.get('shareToken') || null;
-
-    // Extract shareToken from timeline paths OR allow client mode from agent dashboard
-    if (!shareToken && currentPath) {
-      // Block certain agent/admin paths that should NEVER generate shareTokens
-      const isBlockedAgentPath = currentPath.includes('login') ||
-                          currentPath.includes('register') ||
-                          currentPath.includes('auth');
-
-      // Allow timeline paths OR client mode from dashboard
-      const allowClientConnection = (!isBlockedAgentPath && currentPath.includes('/timeline/')) ||
-                                   (clientMode && currentPath.includes('dashboard'));
-
-      if (allowClientConnection) {
-        if (currentPath.includes('/timeline/') && currentPath !== '/timeline') {
-          // Extract from timeline path
-          const pathSegments = currentPath.split('/').filter(Boolean);
-          const timelineIndex = pathSegments.indexOf('timeline');
-          if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
-            const potentialToken = pathSegments[timelineIndex + 1];
-            // Additional validation: shareToken should look like an ID (not a common word)
-            if (potentialToken.length > 10 && !['properties', 'messages', 'chat'].includes(potentialToken)) {
-              shareToken = potentialToken;
-              console.log('✅ Extracted shareToken from timeline path:', shareToken);
-            } else {
-              console.log('⚠️ Skipped invalid shareToken:', potentialToken);
-            }
-          }
-        } else if (clientMode) {
-          // Use clientMode from dashboard - get propertyId from URL params
-          const propertyId = urlParams?.get('propertyId');
-          if (propertyId) {
-            shareToken = propertyId; // Use propertyId as shareToken for client connections
-            console.log('✅ Using client mode with propertyId as shareToken:', shareToken);
-          } else {
-            console.log('⚠️ Client mode enabled but no propertyId found in URL params');
+        if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
+          const shareToken = pathSegments[timelineIndex + 1];
+          if (shareToken.length > 10 && !['properties', 'messages', 'chat'].includes(shareToken)) {
+            const effectiveToken = sessionToken || 'anonymous-client';
+            console.log('✅ TIMELINE PATH: Connecting with shareToken');
+            connectionAttempts.current++;
+            setConnectionState(ConnectionState.CONNECTING);
+            connectWithClientAuth(effectiveToken, shareToken);
+            return;
           }
         }
-      } else {
-        console.log('🚫 Blocked client connection from path:', currentPath);
+      }
+
+      // Priority 3: Agent authentication
+      if (token) {
+        console.log('✅ AGENT MODE: Connecting with token');
+        connectionAttempts.current++;
+        setConnectionState(ConnectionState.CONNECTING);
+        connectWithAgentAuth(token);
+        return;
+      }
+
+      // TASK 3 & 5: No authentication available - set waiting flag but keep state as IDLE
+      console.log('⚪ No authentication available for connection - waiting for auth');
+      waitingForAuthRef.current = true;
+    }, 300); // 300ms debounce
+  }, [socket, connectionState]);
+
+  // Initialize socket connection to V2 namespace
+  useEffect(() => {
+    console.log('🚀 Socket initialization triggered on mount');
+
+    // Cleanup any disconnected socket
+    if (socket && !socket.connected) {
+      console.log('🧹 Cleaning up disconnected socket');
+      socket.removeAllListeners();
+      if (socket.cleanup) socket.cleanup();
+      socket.disconnect();
+      setSocket(null);
+      setIsConnected(false);
+      setRecentlyProcessedMessages(new Map()); // TASK 8: Clear Map
+      joinedPropertiesRef.current.clear();
+    }
+
+    // TASK 1 & 2: Only connect after auth state is checked
+    if (authStateChecked) {
+      console.log('✅ Auth state checked - initiating connection');
+      debouncedConnect();
+    } else {
+      console.log('⏳ Waiting for auth state to be checked before connecting');
+    }
+
+    // Return cleanup function (TASK 2: socketCleanupRef removed)
+    return () => {
+      console.log('🧹 Cleaning up socket initialization');
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+      }
+      if (tokenMonitorIntervalRef.current) {
+        clearInterval(tokenMonitorIntervalRef.current);
+      }
+      if (socket?.cleanup) {
+        socket.cleanup();
+      }
+    };
+  }, [authStateChecked]); // Run when authStateChecked changes
+
+  // TASK 2 & 4: Watch for authentication changes and set initialization flag
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+    // TASK 2: Mark auth as initialized on first run
+    if (!authInitializedRef.current) {
+      console.log('🔐 Auth watching effect - first run, marking as initialized');
+      authInitializedRef.current = true;
+      setAuthStateChecked(true);
+
+      // TASK 4: If token exists but socket isn't connected, trigger connection
+      if (token && (!socket || !socket.connected)) {
+        console.log('🔄 Auth initialized with token - triggering connection');
+        debouncedConnect();
       }
     }
 
-    console.log('🔴 Client auth fallback:', { sessionToken: !!sessionToken, shareToken, currentPath, isTimelinePath: currentPath?.includes('/timeline/'), isDashboardPath: currentPath?.includes('/dashboard') });
+    // TASK 3: If we were waiting for auth and now have it, trigger connection
+    if (waitingForAuthRef.current && token && (!socket || !socket.connected)) {
+      console.log('🔄 Auth became available - triggering delayed connection');
+      waitingForAuthRef.current = false;
+      debouncedConnect();
+    }
 
-    if (shareToken) {
-      // Connect with session token if available, otherwise just with shareToken
-      const effectiveToken = sessionToken || 'anonymous-client';
-      console.log('🔵 Client connecting with shareToken:', {
-        shareToken,
-        hasSessionToken: !!sessionToken,
-        effectiveToken,
-        isIncognito: !sessionToken && typeof window !== 'undefined'
-      });
-      connectWithClientAuth(effectiveToken, shareToken);
+    // Only attempt reconnection if:
+    // 1. We have a token
+    // 2. We don't have a connected socket
+    // 3. User is authenticated
+    if (token && !socket?.connected && isAuthenticated && user) {
+      console.log('🔄 Auth state changed - attempting reconnection');
+      debouncedConnect();
+    }
+  }, [isAuthenticated, user, socket?.connected, debouncedConnect]);
+
+  // TASK 1: Token polling removed - connection managed by state machine and health checks
+
+  // TASK 6 & 7: Optimized health check system with client portal compatibility
+  useEffect(() => {
+    if (!socket || !socket.connected) {
       return;
     }
 
-      console.log('⚪ No authentication path taken - no agent auth and no shareToken');
-    };
+    // Detect if mobile device
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const healthCheckInterval = isMobile ? 60000 : 30000; // 60s for mobile, 30s for desktop
 
-    // Call the async initialization function
-    initializeConnection();
+    // TASK 6: Check if this is a client connection
+    const isClientConnection = currentUserType === 'CLIENT' || shareTokenRef.current !== null;
 
-    // Return cleanup function
-    return () => {
-      console.log('🧹 Cleaning up socket connection useEffect');
-      if (socketCleanupRef.current) {
-        socketCleanupRef.current();
+    // TASK 6: Adjust failure threshold for clients (mobile networks are less stable)
+    const maxFailures = isClientConnection ? 5 : 3;
+
+    console.log(`🏥 TASK 6: Starting health check system (${healthCheckInterval / 1000}s interval, mobile: ${isMobile}, client: ${isClientConnection}, maxFailures: ${maxFailures})`);
+
+    const healthCheck = () => {
+      if (socket.connected && connectionState === ConnectionState.CONNECTED) {
+        const pingTime = Date.now();
+        lastPingTimeRef.current = pingTime; // TASK 4: Store ping time for RTT calculation
+        console.log(`🏥 TASK 6: Sending ping to server at ${new Date(pingTime).toISOString()}`);
+        console.log(`   Socket state: ${socket.connected ? 'connected' : 'disconnected'}, ID: ${socket.id}`);
+        console.log(`   Current failure count: ${healthCheckFailures.current}/${maxFailures}`);
+        console.log(`   Client connection: ${isClientConnection}`);
+        socket.emit('ping');
+
+        // TASK 3: Store timeout in ref for persistent pong listener to clear
+        pongTimeoutRef.current = setTimeout(() => {
+          healthCheckFailures.current++;
+          const timeoutTime = Date.now();
+          console.warn(`⚠️ TASK 6: Socket health check failed - no pong received after 15s (${healthCheckFailures.current}/${maxFailures})`);
+          console.warn(`   Ping sent at: ${new Date(pingTime).toISOString()}, Timeout at: ${new Date(timeoutTime).toISOString()}`);
+          console.warn(`   Socket state at timeout: ${socket.connected ? 'connected' : 'disconnected'}, ID: ${socket.id}`);
+          console.warn(`   Client connection: ${isClientConnection}`);
+
+          // Clear the ref since timeout fired
+          pongTimeoutRef.current = null;
+
+          // TASK 6 & 7: Disconnect after max failures (higher threshold for clients)
+          if (healthCheckFailures.current >= maxFailures) {
+            console.error(`❌ TASK 6: Max health check failures reached (${maxFailures}) - disconnecting`);
+            socket.disconnect();
+            setIsConnected(false);
+            setConnectionState(ConnectionState.DISCONNECTED);
+            healthCheckFailures.current = 0;
+
+            // TASK 6 & 9: Use central reconnection handler with network failure reason
+            // Exponential backoff will be applied automatically
+            handleReconnection('network');
+          }
+        }, 15000); // TASK 7: 15 second timeout for pong response
+
+        console.log(`⏱️ TASK 6: Pong timeout set - expecting response within 15s`);
       }
     };
-  }, []); // FORCE: Run once on mount, don't wait for auth state changes
+
+    // Run health check at calculated interval
+    healthCheckIntervalRef.current = setInterval(healthCheck, healthCheckInterval);
+
+    // Initial health check
+    healthCheck();
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up health check system');
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
+    };
+  }, [socket, socket?.connected, connectionState, handleReconnection]);
+
+  // Listen for localStorage changes (cross-tab token updates or login events)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // Only react to accessToken changes
+      if (e.key === 'accessToken') {
+        console.log('🔄 Storage event: accessToken changed', {
+          oldValue: !!e.oldValue,
+          newValue: !!e.newValue,
+          currentlyConnected: socket?.connected
+        });
+
+        if (e.newValue && !socket?.connected) {
+          // Token was added/updated and we're not connected
+          console.log('🔄 Token added - triggering reconnection');
+          debouncedConnect();
+        } else if (!e.newValue && socket?.connected) {
+          // Token was removed - disconnect
+          console.log('🔄 Token removed - disconnecting socket');
+          socket.disconnect();
+          setIsConnected(false);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [socket?.connected, debouncedConnect]);
+
+  // TASK 6: Token availability monitor
+  useEffect(() => {
+    // Only run if socket is null or disconnected
+    if (socket?.connected) {
+      return;
+    }
+
+    console.log('🔍 Starting token availability monitor');
+    tokenCheckAttemptsRef.current = 0;
+
+    const checkInterval = setInterval(() => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      tokenCheckAttemptsRef.current++;
+
+      if (token) {
+        console.log('✅ Token found by monitor - triggering connection');
+        clearInterval(checkInterval);
+        debouncedConnect();
+      } else if (tokenCheckAttemptsRef.current >= 10) {
+        console.log('⏰ Token monitor timeout - max attempts reached');
+        clearInterval(checkInterval);
+      }
+    }, 500);
+
+    tokenMonitorIntervalRef.current = checkInterval;
+
+    return () => {
+      if (tokenMonitorIntervalRef.current) {
+        clearInterval(tokenMonitorIntervalRef.current);
+        tokenMonitorIntervalRef.current = null;
+      }
+    };
+  }, [socket?.connected, debouncedConnect]);
+
+  // TASK 8: Listen for auth:ready custom event
+  useEffect(() => {
+    const handleAuthReady = (event: CustomEvent) => {
+      console.log('🔐 Auth ready event received:', event.detail);
+
+      if (event.detail.authenticated && !socket?.connected) {
+        console.log('✅ Auth ready with authentication - triggering connection');
+        debouncedConnect();
+      }
+    };
+
+    window.addEventListener('auth:ready', handleAuthReady as EventListener);
+
+    return () => {
+      window.removeEventListener('auth:ready', handleAuthReady as EventListener);
+    };
+  }, [socket?.connected, debouncedConnect]);
 
   // Agent WebSocket connection to V2 namespace
   const connectWithAgentAuth = (token: string) => {
@@ -404,14 +723,44 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const cleanup = setupSocketEventListeners(newSocket);
     setSocket(newSocket);
 
-    // Store cleanup function for later use
-    newSocket.cleanup = cleanup;
-    socketCleanupRef.current = cleanup;
+    // TASK 2: Cleanup function stored on socket instance via Object.defineProperty
   };
 
   // Client WebSocket connection to V2 namespace
   const connectWithClientAuth = (sessionToken: string, shareToken: string) => {
     setIsConnecting(true);
+
+    // TASK 9: Validate session token age
+    const now = Date.now();
+    if (sessionTokenTimestampRef.current) {
+      const tokenAge = now - sessionTokenTimestampRef.current;
+      if (tokenAge > SESSION_TOKEN_MAX_AGE) {
+        console.warn('⚠️ TASK 9: Session token expired (age: ${tokenAge}ms), clearing tokens');
+        // Clear expired token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('clientSessionToken');
+        }
+        sessionTokenRef.current = null;
+        sessionTokenTimestampRef.current = null;
+        // Use anonymous token for fresh session
+        sessionToken = 'anonymous-client';
+      } else {
+        console.log('✅ TASK 9: Session token valid (age: ${tokenAge}ms)');
+      }
+    } else {
+      // First time storing token, record timestamp
+      sessionTokenTimestampRef.current = now;
+      console.log('✅ TASK 9: Session token timestamp recorded:', new Date(now).toISOString());
+    }
+
+    // TASK 4: Store tokens for reconnection
+    shareTokenRef.current = shareToken;
+    sessionTokenRef.current = sessionToken;
+    console.log('✅ TASK 4 & 9: Stored client tokens for reconnection:', {
+      shareToken: shareToken.substring(0, 10) + '...',
+      hasSessionToken: !!sessionToken,
+      tokenTimestamp: sessionTokenTimestampRef.current ? new Date(sessionTokenTimestampRef.current).toISOString() : 'new'
+    });
 
     const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010'}/messaging-v2`, {
       auth: {
@@ -439,72 +788,134 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const cleanup = setupSocketEventListeners(newSocket);
     setSocket(newSocket);
 
-    // Store cleanup function for later use
-    newSocket.cleanup = cleanup;
-    socketCleanupRef.current = cleanup;
+    // TASK 2: Cleanup function stored on socket instance via Object.defineProperty
   };
 
-  // Socket event listeners for V2 system
-  const setupSocketEventListeners = (newSocket: Socket) => {
-    // CRITICAL: Check if listeners already exist to prevent duplicates
-    const existingListeners = {
-      newMessage: newSocket.listeners('new-message').length,
-      connected: newSocket.listeners('connected').length,
-      propertyJoined: newSocket.listeners('property-conversation-joined').length
-    };
+  // Helper function to clear all listeners (TASK 2)
+  const clearAllListeners = useCallback((socket: Socket) => {
+    console.log('🧹 Clearing all socket event listeners');
 
-    console.log('📊 Existing listeners before setup:', existingListeners);
-
-    if (existingListeners.newMessage > 0 || existingListeners.connected > 0) {
-      console.warn('⚠️ Socket already has listeners, cleaning before registration');
-      newSocket.removeAllListeners();
+    // Execute stored cleanup function if it exists
+    if (socket.cleanup) {
+      socket.cleanup();
     }
+
+    // Remove all listeners as fallback
+    socket.removeAllListeners();
+  }, []);
+
+  // Socket event listeners for V2 system (TASK 2: improved cleanup, TASK 3: auth promise)
+  const setupSocketEventListeners = useCallback((newSocket: Socket) => {
+    // Defensive ref initialization check
+    if (typeof currentUserIdRef === 'undefined' || typeof currentUserTypeRef === 'undefined') {
+      console.error('❌ CRITICAL: Auth state refs not initialized. Cannot setup event listeners.');
+      return () => {}; // Return empty cleanup function
+    }
+
+    // TASK 2: Clear all existing listeners at start
+    clearAllListeners(newSocket);
+
+    // TASK 3 & 7: Create authentication promise that resolves on 'connected' event
+    const authPromiseTimestamp = Date.now();
+    authenticationPromiseRef.current = new Promise<void>((resolve) => {
+      authenticationResolveRef.current = resolve;
+    });
+
+    console.log('📊 TASK 7: Setting up fresh event listeners');
+    console.log('🔐 TASK 7: Authentication promise created at:', new Date(authPromiseTimestamp).toISOString());
+    console.log('⏳ TASK 7: Messages will be queued until authentication completes');
 
     console.log('🎯 Registering fresh socket event listeners...');
     newSocket.on('connect', () => {
       console.log('✅ Connected to V2 messaging server');
       console.log('🔗 Socket ID:', newSocket.id);
-      setIsConnected(true);
+
+      // TASK 8: Transition to AUTHENTICATING state (not CONNECTED yet)
+      console.log('🔐 TASK 8: Transitioning to AUTHENTICATING state');
+      setConnectionState(ConnectionState.AUTHENTICATING);
       setIsConnecting(false);
+      // Don't set isConnected=true yet, wait for 'connected' event with auth data
+
+      // TASK 9: Track stable connection time
+      stableConnectionTime.current = Date.now();
+
+      // Reset connection management on successful connection
+      connectionAttempts.current = 0;
+      reconnectionInFlightRef.current = false;
+
+      // TASK 9: Only reset backoff after 60s of stable connection
+      setTimeout(() => {
+        const connectionDuration = Date.now() - stableConnectionTime.current;
+        if (connectionDuration >= 60000) {
+          backoffIndex.current = 0;
+          console.log('✅ 60s stable connection reached - backoff reset');
+        }
+      }, 60000);
+
+      console.log('🔄 Connection attempts reset');
+    });
+
+    // TASK 2: Persistent pong listener for health checks
+    newSocket.on('pong', () => {
+      const now = Date.now();
+      const roundTripTime = lastPingTimeRef.current > 0 ? now - lastPingTimeRef.current : 0;
+
+      console.log(`✅ Pong received at ${new Date(now).toISOString()}`);
+      console.log(`   Round-trip time: ${roundTripTime}ms`);
+      console.log(`   Socket state: ${newSocket.connected ? 'connected' : 'disconnected'}, ID: ${newSocket.id}`);
+
+      // TASK 3: Clear timeout if it exists
+      if (pongTimeoutRef.current) {
+        clearTimeout(pongTimeoutRef.current);
+        pongTimeoutRef.current = null;
+        console.log(`🧹 Cleared pong timeout (RTT: ${roundTripTime}ms)`);
+      }
+
+      // TASK 4: Reset failure counter and backoff on successful pong
+      healthCheckFailures.current = 0;
+      backoffIndex.current = 0;
+      console.log(`✅ Health check successful - failure counter reset (RTT: ${roundTripTime}ms)`);
     });
 
     newSocket.on('disconnect', (reason) => {
       console.log('Disconnected from V2 messaging server:', reason);
       setIsConnected(false);
+      setConnectionState(ConnectionState.DISCONNECTED);
 
       // Check if this is a page refresh or navigation away
       const isPageRefresh = reason === 'transport close' || reason === 'transport error' || reason === 'io server disconnect';
+      const isIntentionalDisconnect = reason === 'io client disconnect';
 
       if (!isPageRefresh) {
-        // Clear current user info and state only on real disconnects
-        setCurrentUserId(null);
-        setCurrentUserType(null);
-        currentUserIdRef.current = null;
-        currentUserTypeRef.current = null;
+        // Clear current user info and state only on real disconnects (TASK 3: using state only)
+        updateAuthState(null, null);
         setOnlineUsers([]);
+
+        // ISSUE 7 FIX: Store joined properties before clearing for reconnection
+        propertyIdsBeforeDisconnectRef.current = new Set(joinedPropertiesRef.current);
+        console.log('💾 ISSUE 7: Stored property IDs before disconnect:', Array.from(propertyIdsBeforeDisconnectRef.current));
 
         // Clear joined properties on disconnect to prevent stale state
         joinedPropertiesRef.current.clear();
 
-        // Clear recently processed messages to prevent stale state
-        setRecentlyProcessedMessages(new Set());
+        // TASK 8: Clear recently processed messages Map
+        setRecentlyProcessedMessages(new Map());
       } else {
         console.log('🔄 Page refresh detected, preserving connection state');
       }
 
-      // Auto-reconnect on page refresh or network issues, but not on intentional disconnects
-      if (isPageRefresh && reason !== 'io client disconnect') {
-        console.log('🔄 Auto-reconnecting due to:', reason);
-        setTimeout(() => {
-          if (!newSocket.connected && newSocket.io._readyState === 'opening') {
-            console.log('🔄 Attempting reconnection...');
-            newSocket.connect();
-          }
-        }, 500); // Reduced timeout for faster reconnection
+      // TASK 9: Auto-reconnect using central handler with failure reason
+      if (!isIntentionalDisconnect) {
+        // Determine failure reason from disconnect reason
+        const failureReason: FailureReason =
+          reason === 'io server disconnect' ? 'server' :
+          reason === 'transport error' ? 'network' :
+          'network';
+        handleReconnection(failureReason);
       }
 
       // Clean up event listeners to prevent memory leaks and duplicates
-      if (reason !== 'io client disconnect' && !isPageRefresh) {
+      if (!isIntentionalDisconnect && !isPageRefresh) {
         // Only clean up if not intentionally disconnected and not a page refresh
         console.log('🧹 Cleaning up event listeners on unexpected disconnect');
         newSocket.removeAllListeners();
@@ -520,35 +931,150 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
       setIsConnecting(false);
       setIsConnected(false);
+      setConnectionState(ConnectionState.DISCONNECTED);
+
+      // TASK 9: Determine failure reason from error type
+      const failureReason: FailureReason =
+        error.message?.includes('auth') || error.message?.includes('Authentication') ? 'auth' :
+        error.type === 'TransportError' ? 'network' :
+        'network';
+
+      handleReconnection(failureReason);
     });
 
     newSocket.on('connected', (data) => {
-      console.log('V2 messaging initialized:', data);
-      console.log('🔍 Server user detection:', {
+      const connectedTimestamp = Date.now();
+      console.log('🔐 TASK 7: V2 messaging initialized at:', new Date(connectedTimestamp).toISOString());
+      console.log('🔍 TASK 7: Server user detection:', {
         serverUserId: data.userId,
         serverUserType: data.userType,
         localIsAuthenticated: isAuthenticated,
         localUser: user?.id,
-        expectedType: isAuthenticated && user ? 'AGENT' : 'CLIENT'
+        expectedType: isAuthenticated && user ? 'AGENT' : 'CLIENT',
+        queuedMessagesCount: messageQueueRef.current.length
       });
       setOnlineUsers(data.onlineUsers || []);
 
-      // FORCE CONNECTION STATE TO TRUE when authenticated
+      // TASK 8: Transition from AUTHENTICATING to CONNECTED state
       setIsConnected(true);
       setIsConnecting(false);
-      console.log('✅ FORCED CONNECTION STATE TO TRUE');
+      setConnectionState(ConnectionState.CONNECTED); // TASK 8: Now fully authenticated and connected
+      console.log('✅ TASK 7 & 8: State transitioned to CONNECTED');
 
-      // CRITICAL FIX: Set current user info immediately from server response
-      if (data.userId && data.userType) {
-        console.log('🔧 AUTHENTICATION COMPLETE: Setting currentUserId and currentUserType from server:', {
+      // TASK 1 & 3: Enhanced client authentication detection
+      // Check if userId pattern indicates client connection
+      const isClientUserId = data.userId && (
+        data.userId.startsWith('client_') ||
+        data.userId.startsWith('anonymous_') ||
+        (typeof window !== 'undefined' && window.location.pathname.includes('/timeline/'))
+      );
+
+      // TASK 1: Determine user type with client detection
+      let detectedUserType = data.userType;
+      if (!detectedUserType && isClientUserId) {
+        detectedUserType = 'CLIENT';
+        console.log('✅ TASK 1: Detected CLIENT userType from userId pattern:', data.userId);
+      }
+
+      // TASK 3 & 7: Set current user info immediately from server response
+      if (data.userId && detectedUserType) {
+        const authStartTimestamp = Date.now();
+        console.log('🔧 TASK 1 & 7: AUTHENTICATION COMPLETE at:', new Date(authStartTimestamp).toISOString());
+        console.log('🔧 TASK 1 & 7: Setting currentUserId and currentUserType from server:', {
           userId: data.userId,
-          userType: data.userType
+          userType: detectedUserType,
+          isClientDetected: isClientUserId,
+          queuedMessages: messageQueueRef.current.length,
+          timeSincePromiseCreated: `${authStartTimestamp - connectedTimestamp}ms`,
+          connectionState: 'CONNECTED' // TASK 8
         });
 
-        setCurrentUserId(data.userId);
-        setCurrentUserType(data.userType);
-        currentUserIdRef.current = data.userId;
-        currentUserTypeRef.current = data.userType;
+        updateAuthState(data.userId, detectedUserType);
+
+        // Store queue length before processing for later logging
+        const processedQueueLength = messageQueueRef.current.length;
+
+        // Add microtask delay to ensure refs are updated before processing queue
+        Promise.resolve().then(() => {
+          // TASK 5 & 7: Validate authentication state before processing queue
+          console.log(`📦 TASK 5 & 7: Validating auth state before queue processing at:`, new Date().toISOString());
+          console.log(`   userId: ${data.userId}, userType: ${detectedUserType}`);
+          console.log(`   Queue size: ${messageQueueRef.current.length}`);
+
+          // TASK 5: Additional validation for client messages
+          if (detectedUserType === 'CLIENT') {
+            console.log(`✅ TASK 5: Client authentication confirmed - processing queue`);
+          }
+
+          // TASK 3 & 7: Process queued messages BEFORE resolving authentication promise
+          console.log(`📦 TASK 5 & 7: Processing ${messageQueueRef.current.length} queued messages at:`, new Date().toISOString());
+          const queuedMessages = [...messageQueueRef.current];
+          messageQueueRef.current = []; // Clear queue
+
+          // Process each queued message through the normal handler
+          queuedMessages.forEach((queuedMessage, index) => {
+            console.log(`📨 TASK 5 & 7: Processing queued message ${index + 1}/${queuedMessages.length}:`, {
+              messageId: queuedMessage.id,
+              content: queuedMessage.content?.substring(0, 30),
+              timestamp: new Date().toISOString(),
+              isClientMessage: detectedUserType === 'CLIENT'
+            });
+            // Trigger the handler by emitting to self
+            newSocket.emit('__process_queued_message', queuedMessage);
+          });
+
+          // Resolve authentication promise to unblock future message processing
+          if (authenticationResolveRef.current) {
+            const resolveTimestamp = Date.now();
+            console.log('✅ TASK 7: Resolving authentication promise at:', new Date(resolveTimestamp).toISOString());
+            console.log('⏱️ TASK 7: Total auth time:', `${resolveTimestamp - connectedTimestamp}ms`);
+            authenticationResolveRef.current();
+            authenticationResolveRef.current = null;
+            authenticationPromiseRef.current = null;
+          }
+        });
+
+        // ISSUE 4 FIX: Fetch hierarchical counts automatically on agent login
+        if (detectedUserType === 'AGENT') {
+          console.log('✅ ISSUE 4: Agent authenticated - scheduling hierarchical unread counts fetch');
+          // Use setTimeout to ensure React state updates have completed
+          setTimeout(() => {
+            console.log('📊 Badge fetch: Verifying auth state before fetch:', {
+              currentUserId: currentUserIdRef.current,
+              currentUserType: currentUserTypeRef.current,
+              isConnected
+            });
+            if (currentUserIdRef.current && currentUserTypeRef.current) {
+              fetchHierarchicalUnreadCounts();
+            } else {
+              console.warn('⚠️ Badge fetch skipped: Auth state not ready');
+            }
+          }, 100);
+        }
+
+        // ISSUE 7 FIX: Restore property subscriptions after reconnection
+        if (propertyIdsBeforeDisconnectRef.current.size > 0) {
+          console.log('🔄 ISSUE 7: Restoring property subscriptions after reconnection');
+          const propertiesToRestore = Array.from(propertyIdsBeforeDisconnectRef.current);
+          console.log('📋 ISSUE 7: Properties to restore:', propertiesToRestore);
+
+          setTimeout(() => {
+            propertiesToRestore.forEach((propertyId) => {
+              console.log(`🔌 ISSUE 7: Rejoining property: ${propertyId}`);
+              joinPropertyConversation(propertyId);
+            });
+            // Clear the stored property IDs after restoration
+            propertyIdsBeforeDisconnectRef.current.clear();
+
+            // Refresh badge counts after property subscription restoration
+            if (currentUserTypeRef.current === 'AGENT') {
+              setTimeout(() => {
+                console.log('🔄 Refreshing badge counts after reconnection');
+                fetchHierarchicalUnreadCounts();
+              }, 500);
+            }
+          }, 200);
+        }
 
         // IMPORTANT: Force a state update to ensure UI reflects connection
         // This addresses the stale closure issue with React state
@@ -561,18 +1087,64 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           userId: data.userId,
           userType: data.userType,
           canSendMessages: true,
+          processedQueuedMessages: processedQueueLength,
           serverResponse: data
         });
       } else {
         console.error('❌ Server did not provide userId or userType:', data);
-        // Set fallback authentication for clients to prevent blocking
+        // TASK 3: Enhanced fallback authentication with share token detection
         if (!isAuthenticated && !user) {
-          const fallbackUserId = `anonymous_${Date.now()}`;
-          console.warn('⚠️ Using fallback client authentication:', fallbackUserId);
-          setCurrentUserId(fallbackUserId);
-          setCurrentUserType('CLIENT');
-          currentUserIdRef.current = fallbackUserId;
-          currentUserTypeRef.current = 'CLIENT';
+          // Check if this is a client portal session with share tokens
+          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+          const shareToken = urlParams?.get('shareToken');
+          const timelineId = urlParams?.get('timelineId');
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
+          // Extract timeline from path if present
+          let extractedTimelineId = timelineId;
+          if (currentPath.includes('/timeline/')) {
+            const pathSegments = currentPath.split('/').filter(Boolean);
+            const timelineIndex = pathSegments.indexOf('timeline');
+            if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
+              extractedTimelineId = pathSegments[timelineIndex + 1];
+            }
+          }
+
+          // TASK 3: Create client-specific fallback ID
+          let fallbackUserId;
+          if (extractedTimelineId) {
+            fallbackUserId = `client_${extractedTimelineId}`;
+            console.warn('⚠️ TASK 3: Using timeline-based client authentication:', fallbackUserId);
+          } else if (shareToken) {
+            fallbackUserId = `client_${shareToken.substring(0, 12)}`;
+            console.warn('⚠️ TASK 3: Using shareToken-based client authentication:', fallbackUserId);
+          } else {
+            fallbackUserId = `anonymous_${Date.now()}`;
+            console.warn('⚠️ TASK 3: Using anonymous client authentication:', fallbackUserId);
+          }
+
+          updateAuthState(fallbackUserId, 'CLIENT');
+
+          // Process queued messages even for fallback
+          console.log(`📦 TASK 3: Processing ${messageQueueRef.current.length} queued messages (fallback)...`);
+          const queuedMessages = [...messageQueueRef.current];
+          messageQueueRef.current = [];
+
+          queuedMessages.forEach((queuedMessage, index) => {
+            console.log(`📨 TASK 3: Processing queued message ${index + 1}/${queuedMessages.length}:`, {
+              messageId: queuedMessage.id,
+              content: queuedMessage.content?.substring(0, 30)
+            });
+            newSocket.emit('__process_queued_message', queuedMessage);
+          });
+
+          // TASK 3: Resolve authentication promise even for fallback
+          if (authenticationResolveRef.current) {
+            console.log('✅ TASK 3: Resolving authentication promise for client fallback');
+            authenticationResolveRef.current();
+            authenticationResolveRef.current = null;
+            authenticationPromiseRef.current = null;
+          }
         }
       }
     });
@@ -584,6 +1156,22 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       setIsConnecting(false);
     });
 
+    // TASK 9: Listen for auth-expired events from server
+    newSocket.on('auth-expired', (data) => {
+      console.warn('⚠️ TASK 9: Authentication expired event received from server:', data);
+      // Clear stored tokens
+      sessionTokenRef.current = null;
+      sessionTokenTimestampRef.current = null;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('clientSessionToken');
+      }
+      // Disconnect and trigger reconnection with fresh auth
+      newSocket.disconnect();
+      setIsConnected(false);
+      setConnectionState(ConnectionState.DISCONNECTED);
+      handleReconnection('auth');
+    });
+
     newSocket.on('user_online', (data) => {
       setOnlineUsers(prev => [...prev.filter(id => id !== data.userId), data.userId]);
     });
@@ -592,8 +1180,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       setOnlineUsers(prev => prev.filter(id => id !== data.userId));
     });
 
-    // Handle new messages from V2 system
-    newSocket.on('new-message', (message: any) => {
+    // Handle new messages from V2 system (TASK 3: wait for authentication promise)
+    newSocket.on('new-message', async (message: any) => {
       console.log('📨 V2 new message received:', {
         messageId: message.id,
         senderType: message.senderType || message.sender?.type,
@@ -602,25 +1190,38 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         currentUserId: currentUserIdRef.current,
         currentUserType: currentUserTypeRef.current,
         authenticationComplete: currentUserIdRef.current !== null && currentUserTypeRef.current !== null,
+        authPromiseExists: !!authenticationPromiseRef.current,
         fullMessage: message
       });
 
-      // CRITICAL FIX: Don't process INCOMING messages if authentication is not complete
-      // But allow optimistic messages (temp IDs) to pass through
+      // TASK 2: Queue messages that arrive before authentication completes
       const isOptimisticMessage = message.id && message.id.toString().startsWith('temp-');
 
+      if (!isOptimisticMessage && authenticationPromiseRef.current) {
+        console.log('⏳ QUEUING: Message arrived before authentication complete, adding to queue:', {
+          messageId: message.id,
+          queueSize: messageQueueRef.current.length
+        });
+        messageQueueRef.current.push(message);
+        return; // Don't process now, will process after auth completes
+      }
+
       if (!isOptimisticMessage && (currentUserIdRef.current === null || currentUserTypeRef.current === null)) {
-        console.warn('⚠️ Received incoming message before authentication complete, blocking:', {
+        console.warn('⚠️ Received incoming message before authentication complete, queuing:', {
           messageId: message.id,
           isOptimistic: isOptimisticMessage,
           currentUserId: currentUserIdRef.current,
-          currentUserType: currentUserTypeRef.current
+          currentUserType: currentUserTypeRef.current,
+          queueSize: messageQueueRef.current.length
         });
+        messageQueueRef.current.push(message);
         return;
       }
 
-      // EMERGENCY DUPLICATE PREVENTION: Check if we recently processed this exact message
+      // TASK 8: Optimized duplicate prevention with Map
       const messageKey = `${message.id}-${message.content.substring(0, 50)}-${message.createdAt}`;
+      const now = Date.now();
+
       if (recentlyProcessedMessages.has(messageKey)) {
         console.warn('🚨 BLOCKING: Recently processed message detected', {
           messageId: message.id,
@@ -629,19 +1230,38 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Add to recently processed (keep for 30 seconds)
+      // Add to recently processed with timestamp
       setRecentlyProcessedMessages(prev => {
-        const newSet = new Set(prev);
-        newSet.add(messageKey);
-        // Clean up old entries after 30 seconds
+        const newMap = new Map(prev);
+
+        // Remove entries older than 10 seconds (cleanup on add)
+        for (const [key, timestamp] of newMap.entries()) {
+          if (now - timestamp > PROCESSED_MESSAGE_TIMEOUT) {
+            newMap.delete(key);
+          }
+        }
+
+        // If we're at max capacity, remove oldest entry
+        if (newMap.size >= MAX_PROCESSED_MESSAGES) {
+          const oldestKey = Array.from(newMap.entries())
+            .sort((a, b) => a[1] - b[1])[0][0];
+          newMap.delete(oldestKey);
+          console.log('🧹 Removed oldest processed message entry (capacity limit)');
+        }
+
+        // Add new entry with timestamp
+        newMap.set(messageKey, now);
+
+        // Schedule cleanup for this specific entry
         setTimeout(() => {
           setRecentlyProcessedMessages(current => {
-            const updated = new Set(current);
+            const updated = new Map(current);
             updated.delete(messageKey);
             return updated;
           });
-        }, 30000);
-        return newSet;
+        }, PROCESSED_MESSAGE_TIMEOUT);
+
+        return newMap;
       });
 
       // Extract property ID from the message's conversation
@@ -750,26 +1370,239 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      // Update property notification count if message is not from current user
-      // Use the WebSocket currentUserId instead of mission control user ID for accurate comparison
-      // Also check that the message is not a temporary optimistic message to avoid duplicate notifications
-      const isFromCurrentUser = transformedMessage.senderId === currentUserIdRef.current;
+      // TASK 8: Client-specific message deduplication with flexible comparison
+      let isFromCurrentUser = transformedMessage.senderId === currentUserId;
+
+      // TASK 8: For client connections, use flexible sender ID matching
+      if (currentUserType === 'CLIENT' && !isFromCurrentUser) {
+        // Check if sender ID contains timeline ID or matches client patterns
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        let timelineId = null;
+
+        // Extract timeline ID from path
+        if (currentPath.includes('/timeline/')) {
+          const pathSegments = currentPath.split('/').filter(Boolean);
+          const timelineIndex = pathSegments.indexOf('timeline');
+          if (timelineIndex !== -1 && timelineIndex + 1 < pathSegments.length) {
+            timelineId = pathSegments[timelineIndex + 1];
+          }
+        }
+
+        // TASK 8: Check if message is from this client using flexible matching
+        if (timelineId && transformedMessage.senderId.includes(timelineId)) {
+          isFromCurrentUser = true;
+          console.log('✅ TASK 8: Detected own message via timelineId match:', {
+            senderId: transformedMessage.senderId,
+            timelineId,
+            currentUserId
+          });
+        } else if (currentUserId && (
+          currentUserId.startsWith('client_') || currentUserId.startsWith('anonymous_')
+        )) {
+          // For synthetic IDs, check if sender matches pattern
+          const userIdBase = currentUserId.split('_')[1];
+          if (transformedMessage.senderId.includes(userIdBase)) {
+            isFromCurrentUser = true;
+            console.log('✅ TASK 8: Detected own message via synthetic ID match:', {
+              senderId: transformedMessage.senderId,
+              currentUserId,
+              userIdBase
+            });
+          }
+        }
+      }
 
       // Debug notification logic
-      console.log('🔔 Notification check:', {
+      console.log('🔔 TASK 8: Notification check:', {
         messageId: message.id,
         senderId: transformedMessage.senderId,
-        currentUserId: currentUserIdRef.current,
-        currentUserType: currentUserTypeRef.current,
+        currentUserId: currentUserId,
+        currentUserType: currentUserType,
         isFromCurrentUser,
         isOptimisticMessage,
-        currentUserIdIsNull: currentUserIdRef.current === null,
-        willShowNotification: !isFromCurrentUser && !isOptimisticMessage && currentUserIdRef.current !== null
+        currentUserIdIsNull: currentUserId === null,
+        isClientConnection: currentUserType === 'CLIENT',
+        willShowNotification: !isFromCurrentUser && !isOptimisticMessage && currentUserId !== null
       });
 
-      // CRITICAL FIX: Don't show notifications if currentUserId is null (authentication not complete)
-      // This prevents notifications when WebSocket connection is established but user auth is pending
-      if (!isFromCurrentUser && !isOptimisticMessage && currentUserIdRef.current !== null) {
+      // Don't show notifications if currentUserId is null (authentication not complete)
+      if (!isFromCurrentUser && !isOptimisticMessage && currentUserId !== null) {
+        setPropertyNotificationCounts(prev => ({
+          ...prev,
+          [propertyId]: (prev[propertyId] || 0) + 1,
+        }));
+
+        // Show notification popup only for genuine incoming messages from other users
+        addNotification({
+          type: 'info',
+          title: `New message about property`,
+          message: message.content.substring(0, 100),
+          read: false,
+        });
+      }
+
+      // Update conversation's last message time
+      setPropertyConversations(prev => {
+        const conversation = prev[propertyId];
+        if (conversation) {
+          return {
+            ...prev,
+            [propertyId]: {
+              ...conversation,
+              lastMessageAt: new Date(message.createdAt),
+            },
+          };
+        }
+        return prev;
+      });
+    });
+
+    // TASK 3: Handle queued message processing (internal event)
+    newSocket.on('__process_queued_message', async (message: any) => {
+      console.log('📨 Processing queued message from queue:', {
+        messageId: message.id,
+        content: message.content?.substring(0, 30)
+      });
+
+      // Process through the same logic as new-message handler
+      // (duplicate the core processing logic below)
+
+      // TASK 8: Optimized duplicate prevention with Map
+      const messageKey = `${message.id}-${message.content.substring(0, 50)}-${message.createdAt}`;
+      const now = Date.now();
+
+      if (recentlyProcessedMessages.has(messageKey)) {
+        console.warn('🚨 BLOCKING: Recently processed message detected (from queue)', {
+          messageId: message.id,
+          messageKey: messageKey.substring(0, 100)
+        });
+        return;
+      }
+
+      // Add to recently processed with timestamp
+      setRecentlyProcessedMessages(prev => {
+        const newMap = new Map(prev);
+
+        // Remove entries older than 10 seconds (cleanup on add)
+        for (const [key, timestamp] of newMap.entries()) {
+          if (now - timestamp > PROCESSED_MESSAGE_TIMEOUT) {
+            newMap.delete(key);
+          }
+        }
+
+        // If we're at max capacity, remove oldest entry
+        if (newMap.size >= MAX_PROCESSED_MESSAGES) {
+          const oldestKey = Array.from(newMap.entries())
+            .sort((a, b) => a[1] - b[1])[0][0];
+          newMap.delete(oldestKey);
+          console.log('🧹 Removed oldest processed message entry (capacity limit)');
+        }
+
+        // Add new entry with timestamp
+        newMap.set(messageKey, now);
+
+        // Schedule cleanup for this specific entry
+        setTimeout(() => {
+          setRecentlyProcessedMessages(current => {
+            const updated = new Map(current);
+            updated.delete(messageKey);
+            return updated;
+          });
+        }, PROCESSED_MESSAGE_TIMEOUT);
+
+        return newMap;
+      });
+
+      // Extract property ID from the message's conversation
+      const propertyId = message.conversation?.propertyId || message.propertyId;
+
+      if (!propertyId) {
+        console.warn('Received message without propertyId:', message);
+        return;
+      }
+
+      // Transform message to match frontend format
+      const transformedMessage: MessageV2 = {
+        id: message.id,
+        content: message.content,
+        type: message.type || 'TEXT',
+        senderId: message.sender?.id || message.senderId,
+        senderType: message.sender?.type || message.senderType,
+        createdAt: message.createdAt,
+        isEdited: false,
+        sender: {
+          id: message.sender?.id || message.senderId,
+          email: message.sender?.email || 'unknown@email.com',
+          profile: {
+            firstName: message.sender?.name?.split(' ')[0] || 'Unknown',
+            lastName: message.sender?.name?.split(' ').slice(1).join(' ') || 'User',
+          },
+        },
+        reads: message.isRead ? [{ userId: user?.id || '', readAt: new Date(message.readAt || message.createdAt) }] : [],
+      };
+
+      // Check if this is a duplicate message (avoid duplicating optimistic messages)
+      setMessages(prev => {
+        const existingMessages = prev[propertyId] || [];
+
+        // CLAUDE OPUS SOLUTION 2: Simple ID-based deduplication (no time window needed)
+        const isDuplicate = existingMessages.some(existingMsg => {
+          // Exact ID match for non-temp messages (server is authoritative)
+          return existingMsg.id === transformedMessage.id && !transformedMessage.id.startsWith('temp-');
+        });
+
+        if (isDuplicate) {
+          console.log('🔄 Skipping duplicate message (from queue):', transformedMessage.id);
+          return prev;
+        }
+
+        // ENHANCED TEMP MESSAGE REPLACEMENT: More robust matching and replacement
+        let filteredMessages = existingMessages;
+        if (!transformedMessage.id.startsWith('temp-')) {
+          // Find and replace temp messages with same content from same sender
+          const tempMessageIndex = existingMessages.findIndex(existingMsg =>
+            existingMsg.id.startsWith('temp-') &&
+            existingMsg.content.trim() === transformedMessage.content.trim() &&
+            existingMsg.senderId === transformedMessage.senderId &&
+            Math.abs(new Date(existingMsg.createdAt).getTime() - new Date(transformedMessage.createdAt).getTime()) < 15000
+          );
+
+          if (tempMessageIndex !== -1) {
+            // Replace the temp message with the real message at the same position
+            filteredMessages = [...existingMessages];
+            filteredMessages[tempMessageIndex] = transformedMessage;
+            console.log('🔄 Replaced temp message with real message (from queue):', {
+              tempId: existingMessages[tempMessageIndex].id,
+              realId: transformedMessage.id,
+              content: transformedMessage.content.substring(0, 30)
+            });
+
+            return {
+              ...prev,
+              [propertyId]: filteredMessages,
+            };
+          } else {
+            // No temp message found, just filter out any potential duplicates
+            filteredMessages = existingMessages.filter(existingMsg =>
+              !(existingMsg.id.startsWith('temp-') &&
+                existingMsg.content.trim() === transformedMessage.content.trim() &&
+                existingMsg.senderId === transformedMessage.senderId &&
+                Math.abs(new Date(existingMsg.createdAt).getTime() - new Date(transformedMessage.createdAt).getTime()) < 15000)
+            );
+          }
+        }
+
+        return {
+          ...prev,
+          [propertyId]: [...filteredMessages, transformedMessage],
+        };
+      });
+
+      // TASK 3: Update property notification count using state variables
+      const isFromCurrentUser = transformedMessage.senderId === currentUserId;
+
+      // Don't show notifications if currentUserId is null (authentication not complete)
+      if (!isFromCurrentUser && currentUserId !== null) {
         setPropertyNotificationCounts(prev => ({
           ...prev,
           [propertyId]: (prev[propertyId] || 0) + 1,
@@ -859,7 +1692,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           } as PropertyConversation
         }));
 
-        // ENHANCED DATABASE SYNC: Perfect message deduplication using Map-based approach
+        // TASK 4: ENHANCED DATABASE SYNC with duplicate prevention
         setMessages(prev => {
           const existingMessages = prev[data.propertyId] || [];
           const serverMessages = data.messages || [];
@@ -875,9 +1708,28 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           });
 
           // Step 2: Add/update with server messages (server is authoritative for real messages)
+          // TASK 4: Also add to recentlyProcessedMessages Map to prevent duplicate event processing
           serverMessages.forEach(serverMsg => {
             const transformed = transformMessage(serverMsg);
             messageMap.set(transformed.id, transformed); // Overwrites any existing
+
+            // TASK 4: Mark as processed to prevent duplicate processing from new-message events
+            const messageKey = `${transformed.id}-${transformed.content.substring(0, 50)}-${transformed.createdAt}`;
+            setRecentlyProcessedMessages(current => {
+              const newMap = new Map(current);
+              newMap.set(messageKey, Date.now());
+
+              // Schedule cleanup
+              setTimeout(() => {
+                setRecentlyProcessedMessages(latest => {
+                  const updated = new Map(latest);
+                  updated.delete(messageKey);
+                  return updated;
+                });
+              }, PROCESSED_MESSAGE_TIMEOUT);
+
+              return newMap;
+            });
           });
 
           // Step 3: Add back unconfirmed temp messages
@@ -901,13 +1753,14 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
 
-          console.log('🔄 FIXED Database sync complete:', {
+          console.log('🔄 TASK 4: Database sync complete with duplicate prevention:', {
             propertyId: data.propertyId,
             existingCount: existingMessages.length,
             serverCount: serverMessages.length,
             finalCount: finalMessages.length,
             tempMessagesPreserved: finalMessages.filter(m => m.id.startsWith('temp-')).length,
-            duplicatesPrevented: (existingMessages.length + serverMessages.length) - finalMessages.length
+            duplicatesPrevented: (existingMessages.length + serverMessages.length) - finalMessages.length,
+            markedAsProcessed: serverMessages.length
           });
 
           return {
@@ -934,6 +1787,55 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // TASK 6: Listen for unread counts updated event
+    newSocket.on('unreadCountsUpdated', (data: { propertyId: string; agentUnreadCount: number; clientUnreadCount: number }) => {
+      console.log('📊 Unread counts updated:', data);
+
+      // Update the conversation unread count in state
+      setPropertyConversations(prev => {
+        const conversation = prev[data.propertyId];
+        if (conversation) {
+          return {
+            ...prev,
+            [data.propertyId]: {
+              ...conversation,
+              unreadAgentCount: data.agentUnreadCount,
+              unreadClientCount: data.clientUnreadCount,
+            },
+          };
+        }
+        return prev;
+      });
+
+      // TASK 6: Request hierarchical refresh for agents
+      if (currentUserType === 'AGENT') {
+        fetchHierarchicalUnreadCounts();
+      }
+    });
+
+    // ISSUE 1 FIX: Listen for hierarchical unread counts updated event
+    newSocket.on('hierarchicalUnreadCountsUpdated', (data: {
+      totalUnread: number;
+      clients: Array<{
+        clientId: string;
+        clientName: string;
+        unreadCount: number;
+        properties: Array<{
+          propertyId: string;
+          address: string;
+          unreadCount: number;
+        }>;
+      }>;
+    }) => {
+      console.log('📊 ISSUE 1: Hierarchical unread counts updated via WebSocket:', data);
+
+      // Directly update the hierarchical unread counts state
+      setHierarchicalUnreadCounts(data);
+
+      // Trigger badge re-render by updating the state
+      console.log('✅ ISSUE 1: Badge state updated with real-time hierarchical counts');
+    });
+
     newSocket.on('error', (error: any) => {
       // Rate limit error logging to prevent spam
       const now = Date.now();
@@ -958,20 +1860,30 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Return cleanup function to remove all event listeners
-    return () => {
+    // TASK 2: Store cleanup function on socket instance (non-enumerable)
+    const cleanup = () => {
       console.log('🧹 Cleaning up socket event listeners');
       newSocket.removeAllListeners();
       newSocket.disconnect();
     };
-  };
 
-  // Cleanup effect
+    // Store cleanup function using Object.defineProperty (non-enumerable)
+    Object.defineProperty(newSocket, 'cleanup', {
+      value: cleanup,
+      writable: true,
+      enumerable: false,
+      configurable: true
+    });
+
+    return cleanup;
+  }, [clearAllListeners, transformMessage, addNotification, user, currentUserId, currentUserType, isAuthenticated, handleReconnection]);
+
+  // Cleanup effect (TASK 2: uses stored cleanup function, removed socketCleanupRef)
   useEffect(() => {
     return () => {
       if (socket) {
         console.log('🧹 Cleaning up socket on socket change');
-        // Call cleanup function if it exists to remove event listeners
+        // Execute stored cleanup function
         if (socket.cleanup) {
           socket.cleanup();
         } else {
@@ -985,7 +1897,23 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     };
   }, [socket]);
 
-  // Get or create property conversation
+  // Monitor auth state sync between state and refs (diagnostic hook)
+  useEffect(() => {
+    const stateUserId = currentUserId;
+    const stateUserType = currentUserType;
+    const refUserId = currentUserIdRef.current;
+    const refUserType = currentUserTypeRef.current;
+
+    if (stateUserId !== refUserId || stateUserType !== refUserType) {
+      console.warn('⚠️ AUTH STATE DIVERGENCE DETECTED:', {
+        timestamp: new Date().toISOString(),
+        state: { userId: stateUserId, userType: stateUserType },
+        ref: { userId: refUserId, userType: refUserType }
+      });
+    }
+  }, [currentUserId, currentUserType]);
+
+  // TASK 10: Get or create property conversation with state lifecycle
   const getOrCreatePropertyConversation = useCallback(async (propertyId: string, timelineId: string): Promise<PropertyConversation> => {
     try {
       // Check if conversation already exists locally
@@ -993,25 +1921,32 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         return propertyConversations[propertyId];
       }
 
-      // Simple check: prevent duplicate joins in progress
-      if (joiningProperties.has(propertyId)) {
-        console.log(`⏳ Property conversation join already in progress: ${propertyId}`);
-        throw new Error(`Already joining property conversation: ${propertyId}`);
+      // TASK 10: Check property state to prevent duplicate joins
+      const currentState = propertyStates.get(propertyId);
+      if (currentState === 'joining' || currentState === 'joined') {
+        console.log(`⏳ Property conversation already in state: ${currentState} for ${propertyId}`);
+        throw new Error(`Property already ${currentState}: ${propertyId}`);
       }
+
+      // TASK 10: Set state to joining
+      setPropertyStates(prev => new Map(prev).set(propertyId, 'joining'));
 
       // First, try to join the property conversation via WebSocket
       if (socket && isConnected) {
-        // Mark as joining
-        setJoiningProperties(prev => new Set(prev).add(propertyId));
-
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            // Remove from joining on timeout
-            setJoiningProperties(prev => {
-              const next = new Set(prev);
-              next.delete(propertyId);
-              return next;
-            });
+            // TASK 10: Set state to error on timeout
+            setPropertyStates(prev => new Map(prev).set(propertyId, 'error'));
+
+            // Auto-transition error to unjoined after 5s
+            setTimeout(() => {
+              setPropertyStates(prev => {
+                const updated = new Map(prev);
+                updated.delete(propertyId);
+                return updated;
+              });
+            }, 5000);
+
             reject(new Error('Timeout waiting for property conversation'));
           }, 10000);
 
@@ -1019,14 +1954,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           socket.once('property-conversation-joined', (data: { propertyId: string; conversationId: string; messages: any[] }) => {
             clearTimeout(timeout);
 
-            // Remove from joining
-            setJoiningProperties(prev => {
-              const next = new Set(prev);
-              next.delete(propertyId);
-              return next;
-            });
-
             if (data.propertyId === propertyId) {
+              // TASK 10: Set state to joined on success
+              setPropertyStates(prev => new Map(prev).set(propertyId, 'joined'));
+
               // DUPLICATE CONVERSATION CREATION REMOVED - Main handler handles this
               console.log(`🗑️ Promise handler: Skipping conversation creation for ${propertyId}`);
 
@@ -1042,12 +1973,17 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           socket.once('error', (error: any) => {
             clearTimeout(timeout);
 
-            // Remove from joining on error
-            setJoiningProperties(prev => {
-              const next = new Set(prev);
-              next.delete(propertyId);
-              return next;
-            });
+            // TASK 10: Set state to error
+            setPropertyStates(prev => new Map(prev).set(propertyId, 'error'));
+
+            // Auto-transition error to unjoined after 5s
+            setTimeout(() => {
+              setPropertyStates(prev => {
+                const updated = new Map(prev);
+                updated.delete(propertyId);
+                return updated;
+              });
+            }, 5000);
 
             // Only log if not already rate limited
             const now = Date.now();
@@ -1089,17 +2025,32 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Not connected to V2 messaging server');
     }
 
-    // CRITICAL FIX: Wait for authentication to complete before sending messages
-    let attempts = 0;
-    const maxAttempts = 50; // 5 seconds maximum wait
-    while ((currentUserId === null || currentUserType === null) && attempts < maxAttempts) {
-      console.log(`⏳ Waiting for authentication... Attempt ${attempts + 1}/${maxAttempts}`);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
+    // ISSUE 4 FIX: Use authentication promise instead of setTimeout polling
+    if (authenticationPromiseRef.current) {
+      console.log('⏳ Waiting for authentication to complete...');
+      try {
+        // Wait for authentication to complete with a timeout
+        await Promise.race([
+          authenticationPromiseRef.current,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Authentication timeout')), 5000)
+          )
+        ]);
+        console.log('✅ Authentication completed, proceeding with message send');
+      } catch (error) {
+        console.error('❌ Authentication timeout - cannot send message:', {
+          currentUserId,
+          currentUserType,
+          isConnected,
+          socketId: socket?.id
+        });
+        throw new Error('Authentication required - please wait for connection to complete');
+      }
     }
 
+    // Double-check authentication state after promise resolves
     if (currentUserId === null || currentUserType === null) {
-      console.error('❌ Authentication timeout - cannot send message:', {
+      console.error('❌ Authentication failed - cannot send message:', {
         currentUserId,
         currentUserType,
         isConnected,
@@ -1376,26 +2327,26 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     console.log(`🔄 Left property conversation (messages preserved): ${propertyId}`);
   }, [socket, activePropertyId]);
 
-  // Reset property initialization state (simplified)
+  // TASK 10: Reset property initialization state using Map
   const resetPropertyInitialization = useCallback((propertyId: string) => {
     console.log('🔄 Reset property initialization:', propertyId);
-    // Clear any joining state
-    setJoiningProperties(prev => {
-      const next = new Set(prev);
-      next.delete(propertyId);
-      return next;
+    // Remove property from state Map
+    setPropertyStates(prev => {
+      const updated = new Map(prev);
+      updated.delete(propertyId);
+      return updated;
     });
   }, []);
 
-  // Simple reset - clear joining state and conversation
+  // TASK 10: Force reset with state lifecycle management
   const forceResetPropertyConversation = useCallback((propertyId: string) => {
     console.log('💥 RESET: Clearing state for property:', propertyId);
 
-    // Clear simple tracking
-    setJoiningProperties(prev => {
-      const next = new Set(prev);
-      next.delete(propertyId);
-      return next;
+    // Remove from property states Map
+    setPropertyStates(prev => {
+      const updated = new Map(prev);
+      updated.delete(propertyId);
+      return updated;
     });
 
     // Clear conversation data
@@ -1452,6 +2403,113 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  // TASK 3: Get total unread count across all properties (memoized)
+  const getTotalUnreadCount = useCallback(() => {
+    // Use hierarchical unread counts as the authoritative source
+    return hierarchicalUnreadCounts?.totalUnread || 0;
+  }, [hierarchicalUnreadCounts]);
+
+  // ISSUE 9 FIX: Create memoized conversationsByClient map for O(1) lookup
+  const conversationsByClient = useMemo(() => {
+    const clientMap = new Map<string, PropertyConversation[]>();
+
+    Object.values(propertyConversations).forEach(conv => {
+      const existingConvs = clientMap.get(conv.clientId) || [];
+      clientMap.set(conv.clientId, [...existingConvs, conv]);
+    });
+
+    console.log(`📊 ISSUE 9: Memoized conversationsByClient map created (${clientMap.size} clients)`);
+    return clientMap;
+  }, [propertyConversations]);
+
+  // TASK 3: Get unread count for a specific client (use hierarchical data)
+  const getClientUnreadCount = useCallback((clientId: string) => {
+    // Use hierarchical unread counts as the authoritative source
+    if (!hierarchicalUnreadCounts?.clients) return 0;
+
+    const client = hierarchicalUnreadCounts.clients.find(c => c.clientId === clientId);
+    return client?.unreadCount || 0;
+  }, [hierarchicalUnreadCounts]);
+
+  // TASK 3: Fetch hierarchical unread counts from API
+  const fetchHierarchicalUnreadCounts = useCallback(async () => {
+    console.log('📊 fetchHierarchicalUnreadCounts called with state:', {
+      currentUserId,
+      currentUserType,
+      isConnected
+    });
+
+    if (!currentUserId || currentUserType !== 'AGENT' || !isConnected) {
+      console.warn('⚠️ Skipping hierarchical fetch - incomplete auth state:', {
+        hasUserId: !!currentUserId,
+        isAgent: currentUserType === 'AGENT',
+        isConnected
+      });
+      return;
+    }
+
+    setBadgeDataLoading(true);
+
+    // ISSUE 2 FIX: Cache-then-network pattern - load from cache first
+    const { getCachedBadgeState, setCachedBadgeState } = useBadgePersistenceStore.getState();
+    const cachedState = getCachedBadgeState();
+
+    if (cachedState && cachedState.isFresh) {
+      console.log('✅ ISSUE 2: Loading badge state from cache (fresh, <5min old)');
+      setHierarchicalUnreadCounts(cachedState.counts);
+      // Continue with network request in background to refresh data
+    } else if (cachedState && !cachedState.isFresh) {
+      console.log('⚠️ ISSUE 2: Loading stale cache (>5min old), refreshing in background');
+      setHierarchicalUnreadCounts(cachedState.counts);
+    } else {
+      console.log('📡 ISSUE 2: No cache available, fetching from network');
+    }
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) return;
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010'}/api/v2/conversations/unread/hierarchical`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch hierarchical unread counts');
+      }
+
+      const data = await response.json();
+      setHierarchicalUnreadCounts(data);
+
+      // ISSUE 2 FIX: Cache the fresh data for next time
+      setCachedBadgeState(data);
+      console.log('✅ ISSUE 2: Cached fresh badge state to localStorage');
+      console.log('✅ Hierarchical unread counts fetched:', data);
+    } catch (error) {
+      console.error('Failed to fetch hierarchical unread counts:', error);
+    } finally {
+      setBadgeDataLoading(false);
+    }
+  }, [currentUserId, currentUserType, isConnected]);
+
+  // Auto-fetch badges when authentication state is established
+  useEffect(() => {
+    if (currentUserId && currentUserType === 'AGENT' && isConnected) {
+      console.log('🎯 useEffect: Auth state established, fetching hierarchical badge counts');
+      fetchHierarchicalUnreadCounts();
+    }
+
+    return () => {
+      // Cleanup: cancel any pending fetches if component unmounts
+      console.log('🧹 useEffect cleanup: Auth state changed');
+    };
+  }, [currentUserId, currentUserType, isConnected, fetchHierarchicalUnreadCounts]);
+
   // Auto-join removed - components should handle joining explicitly to prevent duplicates
 
   const value: MessagingContextV2Type = {
@@ -1487,6 +2545,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     getPropertyUnreadCount,
     getPropertyNotificationCount,
     clearPropertyNotifications,
+
+    // TASK 3: Hierarchical unread count methods
+    getTotalUnreadCount,
+    getClientUnreadCount,
+    fetchHierarchicalUnreadCounts,
+    badgeDataLoading,
 
     // Real-time events
     typingUsers,

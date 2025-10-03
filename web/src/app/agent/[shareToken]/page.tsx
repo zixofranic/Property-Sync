@@ -8,6 +8,25 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
+// TASK 6: Mobile detection hook (safe for SSR)
+function useMobileDetection() {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    // Only run on client side
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
+
 interface AgentData {
   firstName: string;
   lastName: string;
@@ -107,38 +126,48 @@ export default function AgentSharePage() {
   const [agent, setAgent] = React.useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // TASK 6: Use mobile detection hook
+  const isMobile = useMobileDetection();
+
   // Extract tracking parameters
   const referralSource = searchParams.get('ref');
   const clientName = searchParams.get('client');
   const agentName = searchParams.get('agent');
   const token = searchParams.get('token');
 
+  // TASK 5: Capture referral parameters at mount using refs
+  const referralSourceRef = React.useRef(referralSource);
+  const clientNameRef = React.useRef(clientName);
+
+  // TASK 5: Separate analytics effect with empty deps
   React.useEffect(() => {
-    const loadAgentData = async () => {
-      try {
-        console.log('🔍 Loading agent data for shareToken:', shareToken);
-        const agentData = await getAgentData(shareToken as string);
-        console.log('📦 Agent data received:', agentData);
-        setAgent(agentData);
+    console.log('Agent page visit:', {
+      shareToken,
+      referralSource: referralSourceRef.current || 'direct',
+      clientName: clientNameRef.current || 'Unknown'
+    });
+  }, []);
 
-        // Temporarily disabled analytics tracking
-        // TODO: Re-enable once backend analytics endpoint is fixed
-        console.log('Agent page visit:', {
-          shareToken,
-          referralSource: referralSource || 'direct',
-          clientName: clientName || 'Unknown'
-        });
-      } catch (error) {
-        console.error('Failed to load agent data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // TASK 5: Wrap loadAgentData in useCallback with only shareToken dependency
+  const loadAgentData = React.useCallback(async () => {
+    try {
+      console.log('🔍 Loading agent data for shareToken:', shareToken);
+      const agentData = await getAgentData(shareToken as string);
+      console.log('📦 Agent data received:', agentData);
+      setAgent(agentData);
+    } catch (error) {
+      console.error('Failed to load agent data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [shareToken]);
 
+  // TASK 5: Fixed useEffect with only necessary dependencies
+  React.useEffect(() => {
     if (shareToken) {
       loadAgentData();
     }
-  }, [shareToken, referralSource, clientName]);
+  }, [shareToken, loadAgentData]);
 
   if (isLoading) {
     return (

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -307,5 +307,152 @@ export class ConversationV2Service {
     }
 
     return conversation;
+  }
+
+  // TASK 2: Get hierarchical unread counts for agent (all clients and properties)
+  async getHierarchicalUnreadCounts(agentId: string) {
+    try {
+      console.log(`📊 ISSUE 8: Fetching hierarchical counts for agent: ${agentId}`);
+
+      // Single optimized query with proper joins
+      const conversations = await this.prisma.propertyConversation.findMany({
+        where: {
+          agentId,
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          clientId: true,
+          propertyId: true,
+          unreadAgentCount: true,
+          client: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          property: {
+            select: {
+              id: true,
+              address: true,
+            },
+          },
+        },
+      });
+
+      // Aggregate by client
+      const clientMap = new Map<string, {
+        clientId: string;
+        clientName: string;
+        unreadCount: number;
+        properties: Array<{
+          propertyId: string;
+          address: string;
+          unreadCount: number;
+        }>;
+      }>();
+
+      let totalUnread = 0;
+
+      conversations.forEach((conv) => {
+        totalUnread += conv.unreadAgentCount;
+
+        const clientKey = conv.clientId;
+        if (!clientMap.has(clientKey)) {
+          clientMap.set(clientKey, {
+            clientId: conv.clientId,
+            clientName: `${conv.client.firstName} ${conv.client.lastName}`,
+            unreadCount: 0,
+            properties: [],
+          });
+        }
+
+        const clientData = clientMap.get(clientKey)!;
+        clientData.unreadCount += conv.unreadAgentCount;
+        clientData.properties.push({
+          propertyId: conv.propertyId,
+          address: conv.property.address,
+          unreadCount: conv.unreadAgentCount,
+        });
+      });
+
+      const result = {
+        totalUnread,
+        clients: Array.from(clientMap.values()),
+      };
+
+      console.log(`✅ ISSUE 8: Hierarchical counts fetched successfully (total: ${totalUnread})`);
+      return result;
+
+    } catch (error) {
+      console.error(`❌ ISSUE 8: Error in getHierarchicalUnreadCounts for agent ${agentId}:`, error);
+
+      // ISSUE 8 FIX: Return safe defaults on error
+      return {
+        totalUnread: 0,
+        clients: [],
+      };
+    }
+  }
+
+  // TASK 2: Get unread counts by client
+  async getUnreadCountsByClient(agentId: string): Promise<Map<string, number>> {
+    try {
+      console.log(`📊 ISSUE 8: Fetching unread counts by client for agent: ${agentId}`);
+
+      const conversations = await this.prisma.propertyConversation.groupBy({
+        by: ['clientId'],
+        where: {
+          agentId,
+          status: 'ACTIVE',
+        },
+        _sum: {
+          unreadAgentCount: true,
+        },
+      });
+
+      const clientUnreadMap = new Map<string, number>();
+      conversations.forEach((conv) => {
+        clientUnreadMap.set(conv.clientId, conv._sum.unreadAgentCount || 0);
+      });
+
+      console.log(`✅ ISSUE 8: Unread counts by client fetched (${clientUnreadMap.size} clients)`);
+      return clientUnreadMap;
+
+    } catch (error) {
+      console.error(`❌ ISSUE 8: Error in getUnreadCountsByClient for agent ${agentId}:`, error);
+
+      // ISSUE 8 FIX: Return empty map on error
+      return new Map<string, number>();
+    }
+  }
+
+  // TASK 2: Get total unread for agent
+  async getTotalUnreadForAgent(agentId: string): Promise<number> {
+    try {
+      console.log(`📊 ISSUE 8: Fetching total unread for agent: ${agentId}`);
+
+      const result = await this.prisma.propertyConversation.aggregate({
+        where: {
+          agentId,
+          status: 'ACTIVE',
+        },
+        _sum: {
+          unreadAgentCount: true,
+        },
+      });
+
+      const totalUnread = result._sum.unreadAgentCount || 0;
+      console.log(`✅ ISSUE 8: Total unread for agent: ${totalUnread}`);
+
+      return totalUnread;
+
+    } catch (error) {
+      console.error(`❌ ISSUE 8: Error in getTotalUnreadForAgent for agent ${agentId}:`, error);
+
+      // ISSUE 8 FIX: Return 0 on error
+      return 0;
+    }
   }
 }

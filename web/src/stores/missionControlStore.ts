@@ -554,14 +554,22 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
           console.log('Store: Checking auth status...');
           const isAuth = apiClient.isAuthenticated();
           const storedUser = apiClient.getStoredUser();
-          
+
           if (isAuth && storedUser) {
             console.log('Store: Auth status valid, user found');
             set({
               isAuthenticated: true,
               user: storedUser,
             });
-            
+
+            // TASK 7: Emit auth:ready event for socket connection
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('auth:ready', {
+                detail: { authenticated: isAuth, hasUser: !!storedUser }
+              }));
+              console.log('🔐 Dispatched auth:ready event');
+            }
+
             // Use deduplication for data loading
             if (loadingTracker.canLoad('auth-check-data')) {
               get().loadInitialData();
@@ -572,6 +580,14 @@ export const useMissionControlStore = create<MissionControlState & MissionContro
               isAuthenticated: false,
               user: null,
             });
+
+            // TASK 7: Emit auth:ready event even when not authenticated
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('auth:ready', {
+                detail: { authenticated: false, hasUser: false }
+              }));
+              console.log('🔐 Dispatched auth:ready event (not authenticated)');
+            }
           }
         },
 

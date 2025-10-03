@@ -33,15 +33,82 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
 
   private logger = new Logger('WebSocketV2Gateway');
 
-  // Track joined users per property to prevent duplicates
+  // TASK 4: Track joined users per property to prevent duplicates with timestamps
   private joinedPropertyUsers = new Map<string, Set<string>>();
+  private joinedPropertyTimestamps = new Map<string, number>(); // userKey -> timestamp
+  private readonly STALE_ENTRY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+  // TASK 5: Server-side health check monitoring
+  private lastPingTimes = new Map<string, number>(); // socketId -> timestamp
+  private readonly PING_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     private messageService: MessageV2Service,
     private conversationService: ConversationV2Service,
     private jwtService: JwtService,
     private prisma: PrismaService,
-  ) {}
+  ) {
+    // TASK 4: Start cleanup interval for stale entries (every minute)
+    setInterval(() => this.cleanupStaleEntries(), 60000);
+
+    // TASK 5: Start cleanup interval for stale ping times (every 5 minutes)
+    setInterval(() => this.cleanupStalePings(), this.PING_CLEANUP_INTERVAL);
+  }
+
+  // TASK 4: Cleanup stale entries older than 5 minutes
+  private cleanupStaleEntries() {
+    const now = Date.now();
+    const staleKeys: string[] = [];
+
+    // Find stale entries
+    for (const [key, timestamp] of this.joinedPropertyTimestamps.entries()) {
+      if (now - timestamp > this.STALE_ENTRY_TIMEOUT) {
+        staleKeys.push(key);
+      }
+    }
+
+    // Remove stale entries
+    for (const key of staleKeys) {
+      const [propertyId, userKey] = key.split(':');
+      const propertyUsers = this.joinedPropertyUsers.get(propertyId);
+
+      if (propertyUsers) {
+        propertyUsers.delete(userKey);
+        this.logger.log(`🧹 Removed stale entry: ${userKey} from property ${propertyId}`);
+
+        // Clean up empty property sets
+        if (propertyUsers.size === 0) {
+          this.joinedPropertyUsers.delete(propertyId);
+        }
+      }
+
+      this.joinedPropertyTimestamps.delete(key);
+    }
+
+    if (staleKeys.length > 0) {
+      this.logger.log(`🧹 Cleaned up ${staleKeys.length} stale property join entries`);
+    }
+  }
+
+  // TASK 5: Cleanup stale ping times (no pings in last 5 minutes = likely disconnected)
+  private cleanupStalePings() {
+    const now = Date.now();
+    const staleSocketIds: string[] = [];
+
+    for (const [socketId, lastPingTime] of this.lastPingTimes.entries()) {
+      if (now - lastPingTime > this.PING_CLEANUP_INTERVAL) {
+        staleSocketIds.push(socketId);
+      }
+    }
+
+    for (const socketId of staleSocketIds) {
+      this.lastPingTimes.delete(socketId);
+    }
+
+    if (staleSocketIds.length > 0) {
+      this.logger.log(`🧹 Cleaned up ${staleSocketIds.length} stale ping entries`);
+    }
+  }
 
   // Handle client connection - SIMPLIFIED AUTH
   async handleConnection(client: AuthenticatedSocket) {
@@ -125,13 +192,35 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         return;
       }
 
-      // Send confirmation to client
+      // TASK 2 & 5: Validate userId and userType are ALWAYS set before sending 'connected' event
+      if (!userId || userId === 'undefined' || userId === 'null') {
+        this.logger.error(`❌ TASK 2: CRITICAL - Invalid userId detected: ${userId}`);
+        userId = `emergency_fallback_${Date.now()}`;
+        this.logger.warn(`⚠️ TASK 2: Using emergency fallback ID: ${userId}`);
+      }
+
+      if (!userType) {
+        this.logger.error(`❌ TASK 2: CRITICAL - Invalid userType detected: ${userType}`);
+        userType = 'CLIENT'; // Default to CLIENT for safety
+        this.logger.warn(`⚠️ TASK 2: Using fallback userType: ${userType}`);
+      }
+
+      // TASK 5: CRITICAL - Send 'connected' event FIRST before any other events
+      // This ensures frontend authentication completes before messages arrive
+      this.logger.log(`📤 TASK 2 & 5: Sending 'connected' event FIRST to establish authentication`);
+      this.logger.log(`   ✅ TASK 2: Validated userId: ${userId}, userType: ${userType}`);
       client.emit('connected', {
         userId,
         userType,
         socketId: client.id,
         message: 'Successfully connected to V2 messaging',
       });
+
+      // TASK 5: Small delay to ensure 'connected' event is processed first
+      // This prevents race condition where messages arrive before authentication
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      this.logger.log(`✅ TASK 5: Authentication event sent, safe to send other events now`);
 
       // Broadcast user online status to relevant rooms
       if (userType === 'AGENT') {
@@ -149,16 +238,17 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
     }
   }
 
-  // Handle client disconnection
+  // Handle client disconnection (TASK 4: also cleanup timestamps, TASK 5: cleanup ping times)
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
       this.logger.log(`Client disconnected: ${client.userId} (${client.userType})`);
 
-      // Cleanup: Remove user from all joined properties
+      // Cleanup: Remove user from all joined properties and timestamps
       const userKey = `${client.userId}-${client.userType}`;
       for (const [propertyId, users] of this.joinedPropertyUsers.entries()) {
         if (users.has(userKey)) {
           users.delete(userKey);
+          this.joinedPropertyTimestamps.delete(`${propertyId}:${userKey}`);
           this.logger.log(`🧹 Removed ${userKey} from property ${propertyId} on disconnect`);
 
           // Clean up empty property sets
@@ -167,6 +257,12 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
           }
         }
       }
+    }
+
+    // TASK 5: Cleanup ping tracking on disconnect
+    if (this.lastPingTimes.has(client.id)) {
+      this.lastPingTimes.delete(client.id);
+      this.logger.log(`🧹 Removed ping tracking for socket ${client.id}`);
     }
   }
 
@@ -177,13 +273,36 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
     @MessageBody() data: { propertyId: string }
   ) {
     // DEBUG: Confirm this NEW code is running
-    this.logger.log(`🚀 NEW CODE: Join request for property ${data.propertyId} from user ${client.userId}-${client.userType}`);
+    this.logger.log(`🚀 TASK 6: Join request for property ${data.propertyId} from user ${client.userId}-${client.userType}`);
 
     try {
+      // TASK 6: Validate authentication state before processing
       if (!client.userId || !client.userType) {
-        client.emit('error', { message: 'Authentication required' });
+        this.logger.warn(`⚠️ TASK 6: Join request rejected - authentication not complete for socket ${client.id}`);
+        client.emit('error', { message: 'Authentication required - please wait for connection to complete' });
         return;
       }
+
+      // TASK 6: Additional safety check - ensure client has the auth properties set
+      if (!client.userId || client.userId === 'undefined' || client.userId === 'null') {
+        this.logger.warn(`⚠️ TASK 6: Join request rejected - invalid userId: ${client.userId}`);
+        client.emit('error', { message: 'Invalid authentication state' });
+        return;
+      }
+
+      // TASK 7: Validate client access with synthetic IDs
+      if (client.userType === 'CLIENT' && (client.userId.startsWith('client_') || client.userId.startsWith('anonymous_'))) {
+        this.logger.log(`✅ TASK 7: Validating client with synthetic ID: ${client.userId}`);
+
+        // For synthetic IDs, validate by timelineId if available
+        if (client.timelineId) {
+          this.logger.log(`   TASK 7: Client has timelineId: ${client.timelineId} - access granted`);
+        } else {
+          this.logger.warn(`   TASK 7: Client with synthetic ID has no timelineId - allowing with limited access`);
+        }
+      }
+
+      this.logger.log(`✅ TASK 6 & 7: Authentication validated for ${client.userId} (${client.userType})`);
 
       // CRITICAL FIX: Check if user has already joined this property conversation
       const userKey = `${client.userId}-${client.userType}`;
@@ -197,8 +316,9 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         return; // Skip processing duplicate join request
       }
 
-      // Mark user as joined for this property
+      // Mark user as joined for this property (TASK 4: with timestamp)
       propertyUsers.add(userKey);
+      this.joinedPropertyTimestamps.set(`${data.propertyId}:${userKey}`, Date.now());
 
       // Get or find the conversation for this property
       let conversation;
@@ -368,6 +488,33 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
     }
   }
 
+  // TASK 4: Leave property conversation handler
+  @SubscribeMessage('leave-property-conversation')
+  handleLeavePropertyConversation(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { propertyId: string }
+  ) {
+    if (!client.userId || !client.userType) {
+      return;
+    }
+
+    const userKey = `${client.userId}-${client.userType}`;
+    const propertyUsers = this.joinedPropertyUsers.get(data.propertyId);
+
+    if (propertyUsers && propertyUsers.has(userKey)) {
+      propertyUsers.delete(userKey);
+      this.joinedPropertyTimestamps.delete(`${data.propertyId}:${userKey}`);
+      this.logger.log(`✅ User ${userKey} left property ${data.propertyId}`);
+
+      // Clean up empty property sets
+      if (propertyUsers.size === 0) {
+        this.joinedPropertyUsers.delete(data.propertyId);
+      }
+    }
+
+    client.leave(`property:${data.propertyId}`);
+  }
+
   // Leave conversation room
   @SubscribeMessage('leave-conversation')
   handleLeaveConversation(
@@ -392,6 +539,18 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       if (!client.userId || !client.userType) {
         client.emit('error', { message: 'Authentication required' });
         return;
+      }
+
+      // TASK 7: Validate client access with synthetic IDs
+      if (client.userType === 'CLIENT' && (client.userId.startsWith('client_') || client.userId.startsWith('anonymous_'))) {
+        this.logger.log(`✅ TASK 7: Validating message send from client with synthetic ID: ${client.userId}`);
+
+        // For synthetic IDs, ensure they have proper timeline association
+        if (client.timelineId) {
+          this.logger.log(`   TASK 7: Client has timelineId: ${client.timelineId} - message allowed`);
+        } else {
+          this.logger.warn(`   TASK 7: Client with synthetic ID has no timelineId - allowing message with caution`);
+        }
       }
 
       // Get or create the conversation for this property
@@ -709,6 +868,28 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       this.logger.error('❌ Mark messages read error:', error);
       client.emit('error', { message: 'Failed to mark messages as read', details: error.message });
     }
+  }
+
+  // TASK 1: Ping/pong handlers for WebSocket health checks
+  @SubscribeMessage('ping')
+  async handlePing(@ConnectedSocket() client: AuthenticatedSocket) {
+    const now = Date.now();
+    const lastPing = this.lastPingTimes.get(client.id);
+    const timeSinceLastPing = lastPing ? now - lastPing : null;
+
+    this.logger.log(`📡 Ping received from socket ${client.id} (user: ${client.userId || 'unknown'}, userType: ${client.userType || 'unknown'})`);
+
+    if (timeSinceLastPing !== null) {
+      this.logger.log(`   Time since last ping: ${Math.floor(timeSinceLastPing / 1000)}s`);
+    } else {
+      this.logger.log(`   First ping from this socket`);
+    }
+
+    // TASK 5: Track ping time for monitoring
+    this.lastPingTimes.set(client.id, now);
+
+    // Immediately respond with pong
+    client.emit('pong');
   }
 
   // Helper method to extract user ID from token

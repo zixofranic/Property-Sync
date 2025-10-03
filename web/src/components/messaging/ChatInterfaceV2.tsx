@@ -25,7 +25,13 @@ export default function ChatInterfaceV2({
   const [pendingMessage, setPendingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // ISSUE 6 FIX: Track mark-as-read timeout to prevent race conditions
+  const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useMissionControlStore();
+
+  // TASK 5: Track latest message ID when chat opens to prevent race condition
+  const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
+  const [isChatVisible, setIsChatVisible] = useState(true);
 
   const {
     socket,
@@ -115,23 +121,55 @@ export default function ChatInterfaceV2({
     };
   }, [propertyId]);
 
-  // Mark messages as read when chat opens or when new unread messages arrive from others
-  // Only mark messages as read, don't spam the server on every message change
+  // TASK 5: Visibility API check
   useEffect(() => {
-    if (propertyId && messages[propertyId]?.length > 0) {
-      // Only mark as read if there are messages from other users (not just our own messages)
-      const otherUserMessages = messages[propertyId].filter(msg => msg.senderId !== currentUserId);
+    const handleVisibilityChange = () => {
+      setIsChatVisible(!document.hidden);
+    };
 
-      if (otherUserMessages.length > 0) {
-        // Add a delay to batch mark-as-read operations and prevent spam
-        const timeoutId = setTimeout(() => {
-          markMessagesAsRead(propertyId);
-        }, 500); // Increased delay to reduce server calls
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
-        return () => clearTimeout(timeoutId);
+  // TASK 5: Improved mark-as-read logic - track latest message and only mark up to that ID
+  useEffect(() => {
+    if (!propertyId || !messages[propertyId] || !isChatVisible) return;
+
+    const propertyMessages = messages[propertyId];
+    if (propertyMessages.length === 0) return;
+
+    // Find the latest message from other users (not from current user)
+    const otherUserMessages = propertyMessages.filter(msg => msg.senderId !== currentUserId);
+    if (otherUserMessages.length === 0) return;
+
+    // Get the latest message ID
+    const latestMessage = otherUserMessages[0]; // Messages are sorted newest first
+    const latestMessageId = latestMessage.id;
+
+    // Only mark as read if we have a new latest message
+    if (latestMessageId !== lastReadMessageId && !latestMessageId.startsWith('temp-')) {
+      setLastReadMessageId(latestMessageId);
+
+      // ISSUE 6 FIX: Clear any existing timeout before setting a new one
+      if (markReadTimeoutRef.current) {
+        clearTimeout(markReadTimeoutRef.current);
       }
+
+      // Debounce the mark-as-read call
+      markReadTimeoutRef.current = setTimeout(() => {
+        markMessagesAsRead(propertyId);
+        markReadTimeoutRef.current = null;
+      }, 500);
     }
-  }, [propertyId, currentUserId, messages[propertyId]?.length]); // Include message count to trigger when messages load
+
+    // ISSUE 6 FIX: Cleanup function to clear timeout on unmount or propertyId change
+    return () => {
+      if (markReadTimeoutRef.current) {
+        clearTimeout(markReadTimeoutRef.current);
+        markReadTimeoutRef.current = null;
+      }
+    };
+  }, [propertyId, currentUserId, messages[propertyId]?.length, lastReadMessageId, isChatVisible, markMessagesAsRead]);
 
   // Handle sending a message
   const handleSendMessage = async () => {
