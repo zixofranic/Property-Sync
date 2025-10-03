@@ -1815,9 +1815,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         return prev;
       });
 
-      // TASK 6: Request hierarchical refresh for agents
+      // TASK 6 + PHASE 3: Request badge refresh based on user type
       if (currentUserType === 'AGENT') {
         fetchHierarchicalUnreadCounts();
+      } else if (currentUserType === 'CLIENT') {
+        // PHASE 3: Update client badge counts directly from socket event
+        setClientUnreadCounts(prev => ({
+          ...prev,
+          [data.propertyId]: data.clientUnreadCount
+        }));
+        console.log('✅ CLIENT BADGE: Updated badge count for property:', data.propertyId, data.clientUnreadCount);
       }
     });
 

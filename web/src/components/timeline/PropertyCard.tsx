@@ -50,10 +50,23 @@ export function PropertyCard({
   // V2 messaging hooks for notifications
   const messaging = useMessaging();
 
-  // TASK 7: Memoized unread count calculation to prevent unnecessary recalculations
+  // TASK 7 + PHASE 3: Memoized unread count calculation (client-aware)
   const unreadCount = useMemo(() => {
+    // PHASE 3: For clients, use client-specific badge state from API
+    if (messaging.currentUserType === 'CLIENT') {
+      console.log('🏷️ PropertyCard: Using client badge state for property:', property.id, messaging.getClientPropertyUnreadCount(property.id));
+      return messaging.getClientPropertyUnreadCount(property.id) || 0;
+    }
+
+    // For agents, use existing hierarchical calculation
     return messaging.getPropertyUnreadCount(property.id) || 0;
-  }, [messaging, property.id, messaging.messages[property.id]?.length]);
+  }, [
+    messaging,
+    property.id,
+    messaging.currentUserType,
+    messaging.messages[property.id]?.length,
+    messaging.clientUnreadCounts // PHASE 3: Re-calculate when client counts update
+  ]);
 
   // TASK 7: Separate memoized notification count
   const notificationCount = useMemo(() => {
