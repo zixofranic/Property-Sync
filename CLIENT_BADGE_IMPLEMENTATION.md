@@ -34,8 +34,34 @@ Fix client-side notification badges to display correctly on page load, show on p
 
 ---
 
+### Phase 1B: Security Hardening (PRIORITY)
+**Status:** ✅ PARTIALLY COMPLETE - Remaining work deferred to night development
+**CTO Review Result:** C- Security Grade - Critical vulnerabilities must be fixed
+
+**Security Issues Completed:**
+- [x] Add rate limiting (10 req/min per IP) - DONE
+- [x] Fix exception handling (use NestJS exceptions) - DONE
+- [x] Add CORS headers for session tokens - DONE
+
+**Security Issues Deferred (🌙 NIGHT PRIORITY):**
+- [ ] Implement session token hashing (bcrypt) - DEFERRED
+- [ ] Create DB migration for hashed tokens - DEFERRED
+- [ ] Update ClientAuth creation logic - DEFERRED
+- [ ] Implement token rotation mechanism (7-day rotation) - DEFERRED
+- [ ] Add request caching (5-min TTL) - DEFERRED
+- [ ] Add comprehensive security logging - DEFERRED
+
+**Decision Rationale:**
+Token hashing requires database migration that will invalidate all existing client sessions. User chose to defer remaining security work to night development cycle to maintain development momentum on badge feature. Security fixes are documented in log.md Session 6 as CRITICAL priority.
+
+**Estimated Time for Remaining Work:** 6-8 hours
+**Priority:** CRITICAL - Must complete before production deployment
+**Next Commit:** Will commit Phase 1B partial completion before starting Phase 2
+
+---
+
 ### Phase 2: Frontend State Management
-**Status:** Not Started
+**Status:** Blocked (waiting for Phase 1B security fixes)
 **Files to Modify:**
 - [ ] `web/src/contexts/MessagingContext.tsx` - Add state variables and methods
 - [ ] `web/src/stores/badgePersistenceStore.ts` - Add client persistence

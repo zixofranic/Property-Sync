@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // SECURITY: Rate limiting
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health/health.controller';
@@ -23,6 +24,11 @@ import { SparkModule } from './spark/spark.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // SECURITY: Rate limiting configuration
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // Time window: 60 seconds
+      limit: 100, // Default: 100 requests per minute (general endpoints)
+    }]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -39,6 +45,12 @@ import { SparkModule } from './spark/spark.module';
   controllers: [AppController, HealthController],
   providers: [
     AppService,
+    // SECURITY: Apply throttling globally (can be overridden per endpoint)
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    // Auth guard applied after throttler
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

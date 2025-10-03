@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Bump version before push
+node scripts/bump-version.js
+
+# Stage version files
+git add VERSION package.json api/package.json web/package.json 2>/dev/null || true
+
+# Amend the current commit with version bump if there are staged changes
+if ! git diff --cached --quiet; then
+  git commit --amend --no-edit --no-verify
+fi

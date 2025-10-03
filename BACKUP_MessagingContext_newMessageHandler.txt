@@ -1,0 +1,56 @@
+BACKUP: MessagingContext.tsx new-message handler (Lines 631-836)
+Date: 2025-10-01
+Reason: Fixing socket auth race condition to prevent agent self-notifications
+
+ORIGINAL CODE:
+================================================================================
+
+    // Handle new messages from V2 system
+    newSocket.on('new-message', (message: any) => {
+      console.log('📨 V2 new message received:', {
+        messageId: message.id,
+        senderType: message.senderType || message.sender?.type,
+        senderId: message.senderId || message.sender?.id,
+        content: message.content?.substring(0, 20),
+        currentUserId: currentUserIdRef.current,
+        currentUserType: currentUserTypeRef.current,
+        authenticationComplete: currentUserIdRef.current !== null && currentUserTypeRef.current !== null,
+        fullMessage: message
+      });
+
+      // CRITICAL FIX: Don't process INCOMING messages if authentication is not complete
+      // But allow optimistic messages (temp IDs) to pass through
+      const isOptimisticMessage = message.id && message.id.toString().startsWith('temp-');
+
+      if (!isOptimisticMessage && (currentUserIdRef.current === null || currentUserTypeRef.current === null)) {
+        console.warn('⚠️ Received incoming message before authentication complete, blocking:', {
+          messageId: message.id,
+          isOptimistic: isOptimisticMessage,
+          currentUserId: currentUserIdRef.current,
+          currentUserType: currentUserTypeRef.current
+        });
+        return;
+      }
+
+      // EMERGENCY DUPLICATE PREVENTION: Check if we recently processed this exact message
+      const messageKey = `${message.id}-${message.content.substring(0, 50)}-${message.createdAt}`;
+      if (recentlyProcessedMessages.has(messageKey)) {
+        console.warn('🚨 BLOCKING: Recently processed message detected', {
+          messageId: message.id,
+          messageKey: messageKey.substring(0, 100)
+        });
+        return;
+      }
+
+      // [... rest of handler continues ...]
+
+RESTORATION INSTRUCTIONS:
+================================================================================
+If the new implementation breaks, restore lines 631-836 from this backup.
+
+Key sections to restore:
+1. Authentication check (lines 643-655)
+2. Duplicate prevention (lines 657-680)
+3. Message transformation (lines 682-786)
+4. Notification logic (lines 788-820)
+5. Conversation update (lines 822-836)

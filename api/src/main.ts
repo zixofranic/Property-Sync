@@ -57,7 +57,7 @@ async function bootstrap() {
       /https:\/\/.*\.up\.railway\.app$/,
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'X-Session-Token', 'X-Client-Session-Token'],
     credentials: true,
   });
 

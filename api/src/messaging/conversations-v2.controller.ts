@@ -16,6 +16,8 @@ import { MessageV2Service } from './message-v2.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClientSessionGuard } from '../auth/guards/client-session.guard';
 import { HierarchicalUnreadResponse } from './dto/hierarchical-unread.dto';
+import { Throttle } from '@nestjs/throttler'; // SECURITY: Rate limiting
+import { ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common'; // SECURITY: Proper exceptions
 
 interface AuthenticatedRequest extends ExpressRequest {
   user: {
@@ -50,7 +52,7 @@ export class ConversationsV2Controller {
       // Agent needs to provide clientId in query or we fetch from timeline
       const clientId = req.query.clientId as string;
       if (!clientId) {
-        throw new Error('Client ID required for agent requests');
+        throw new BadRequestException('Client ID required for agent requests');
       }
 
       return this.conversationService.getOrCreatePropertyConversation({
@@ -70,7 +72,7 @@ export class ConversationsV2Controller {
         );
         return conversation;
       } catch (error) {
-        throw new Error('Conversation not found for this property');
+        throw new NotFoundException('Conversation not found for this property');
       }
     }
   }
@@ -188,9 +190,9 @@ export class ConversationsV2Controller {
   async getHierarchicalUnreadCounts(@Request() req: AuthenticatedRequest): Promise<HierarchicalUnreadResponse> {
     const { user } = req;
 
-    // Only agents can access hierarchical view
+    // SECURITY: Only agents can access hierarchical view
     if (user.userType !== 'AGENT') {
-      throw new Error('Hierarchical unread counts are only available for agents');
+      throw new ForbiddenException('Hierarchical unread counts are only available for agents');
     }
 
     return this.conversationService.getHierarchicalUnreadCounts(user.id);
@@ -198,6 +200,7 @@ export class ConversationsV2Controller {
 
   // PHASE 1 - TASK 2: Get client unread counts per property
   @Get('unread/client')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // SECURITY: Aggressive rate limit - 10 requests per minute
   @UseGuards(ClientSessionGuard) // Override controller-level JwtAuthGuard for client-specific auth
   @ApiOperation({
     summary: 'Get client unread message counts per property',
@@ -235,10 +238,10 @@ export class ConversationsV2Controller {
 
     console.log(`📊 CLIENT BADGE: Endpoint called by user: ${user.id}, userType: ${user.userType}`);
 
-    // CRITICAL: Only clients can access client unread counts
+    // SECURITY: Only clients can access client unread counts
     if (user.userType !== 'CLIENT') {
       console.error(`❌ CLIENT BADGE: Access denied - user is ${user.userType}, not CLIENT`);
-      throw new Error('Client unread counts are only available for clients');
+      throw new ForbiddenException('Client unread counts are only available for clients');
     }
 
     // For clients, user.id is the clientId

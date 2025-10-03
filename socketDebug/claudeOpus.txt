@@ -1,0 +1,194 @@
+Looking at the extensive troubleshooting documentation, I can identify the core issues and provide targeted solutions:
+
+## Issue 1: WebSocket "Disconnected" Status After Page Refresh
+
+The problem is a **race condition** between socket connection and authentication state restoration. The socket connects but `currentUserId` and `currentUserType` aren't properly set on refresh.
+
+### Fix for MessagingContext.tsx:
+
+```typescript
+// Add this after line 389 in the 'connected' event handler
+newSocket.on('connected', (data) => {
+  console.log('V2 messaging initialized:', data);
+  setOnlineUsers(data.onlineUsers || []);
+  
+  // CRITICAL: Force connection state and restore auth immediately
+  setIsConnected(true);
+  setIsConnecting(false);
+  
+  // FIX: Always set auth state from server response, even on refresh
+  if (data.userId && data.userType) {
+    setCurrentUserId(data.userId);
+    setCurrentUserType(data.userType);
+    currentUserIdRef.current = data.userId;
+    currentUserTypeRef.current = data.userType;
+    
+    // IMPORTANT: Force a state update to ensure UI reflects connection
+    // This addresses the stale closure issue with React state
+    setTimeout(() => {
+      setIsConnected(true); // Force re-render
+    }, 0);
+  }
+});
+```
+
+## Issue 2: Persistent Duplicate Messages
+
+The real problem is **WebSocket event listeners aren't being properly cleaned up** on reconnection, causing duplicate event handlers.
+
+### Critical Fix for MessagingContext.tsx:
+
+Replace the socket initialization logic (around line 200-220):
+
+```typescript
+// Clean up any existing socket AND its event listeners
+if (socket) {
+  console.log('🧹 Cleaning up existing socket before creating new connection');
+  
+  // CRITICAL: Remove ALL listeners before disconnecting
+  socket.removeAllListeners();
+  socket.off(); // Extra safety - removes all listeners
+  
+  if (socket.cleanup) {
+    socket.cleanup();
+  }
+  
+  socket.disconnect();
+  setSocket(null);
+  setIsConnected(false);
+  
+  // IMPORTANT: Clear message event tracking to prevent stale handlers
+  setRecentlyProcessedMessages(new Set());
+  joinedPropertiesRef.current.clear();
+}
+```
+
+### Fix the duplicate message handler registration:
+
+In `setupSocketEventListeners` function, add a check to prevent duplicate listener registration:
+
+```typescript
+const setupSocketEventListeners = (newSocket: Socket) => {
+  // CRITICAL: Check if listeners already exist
+  if (newSocket.listeners('new-message').length > 0) {
+    console.warn('⚠️ Socket already has listeners, skipping registration');
+    return () => {}; // Return empty cleanup
+  }
+  
+  // Now register listeners...
+  newSocket.on('connect', () => {
+    // ... existing code
+  });
+```
+
+## Issue 3: Alternative Architecture (Simpler Solution)
+
+Since the current WebSocket implementation is complex, consider this **simplified approach**:
+
+### Option A: HTTP Polling with Optimistic Updates
+
+```typescript
+// Replace complex WebSocket with simple polling
+const useSimpleMessaging = () => {
+  const [messages, setMessages] = useState({});
+  const pollInterval = useRef(null);
+  
+  const fetchMessages = async (propertyId) => {
+    const response = await fetch(`/api/messages/${propertyId}`);
+    const data = await response.json();
+    
+    // Simple deduplication using Set
+    setMessages(prev => {
+      const messageSet = new Set(prev[propertyId]?.map(m => m.id) || []);
+      const newMessages = data.filter(m => !messageSet.has(m.id));
+      return {
+        ...prev,
+        [propertyId]: [...(prev[propertyId] || []), ...newMessages]
+      };
+    });
+  };
+  
+  // Poll every 2 seconds when chat is open
+  useEffect(() => {
+    if (propertyId && isOpen) {
+      fetchMessages(propertyId);
+      pollInterval.current = setInterval(() => {
+        fetchMessages(propertyId);
+      }, 2000);
+    }
+    
+    return () => {
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
+  }, [propertyId, isOpen]);
+  
+  // Optimistic send
+  const sendMessage = async (content) => {
+    const tempMessage = { 
+      id: `temp-${Date.now()}`, 
+      content, 
+      createdAt: new Date() 
+    };
+    
+    // Add optimistically
+    setMessages(prev => ({
+      ...prev,
+      [propertyId]: [...(prev[propertyId] || []), tempMessage]
+    }));
+    
+    // Send to server
+    const response = await fetch('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ propertyId, content })
+    });
+    
+    const realMessage = await response.json();
+    
+    // Replace temp with real
+    setMessages(prev => ({
+      ...prev,
+      [propertyId]: prev[propertyId].map(m => 
+        m.id === tempMessage.id ? realMessage : m
+      )
+    }));
+  };
+  
+  return { messages, sendMessage };
+};
+```
+
+### Option B: Server-Sent Events (SSE) - Simpler than WebSocket
+
+```typescript
+const useSSEMessaging = () => {
+  useEffect(() => {
+    const eventSource = new EventSource(`/api/sse/messages/${propertyId}`);
+    
+    eventSource.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      // Simple deduplication
+      setMessages(prev => {
+        const exists = prev[propertyId]?.some(m => m.id === message.id);
+        if (exists) return prev;
+        
+        return {
+          ...prev,
+          [propertyId]: [...(prev[propertyId] || []), message]
+        };
+      });
+    };
+    
+    return () => eventSource.close();
+  }, [propertyId]);
+};
+```
+
+## Immediate Action Items:
+
+1. **Quick Fix**: Add the socket cleanup code above to prevent duplicate listeners
+2. **Test**: Clear browser cache/localStorage and test with fresh state
+3. **Consider**: Moving to HTTP polling for reliability - it's simpler and eliminates WebSocket complexity
+4. **Debug**: Add `socket.listeners('new-message').length` logging to verify listener count
+
+The root cause is **WebSocket event listeners persisting across reconnections**, not the deduplication logic itself. The simpler architecture options would eliminate this entire class of problems.
