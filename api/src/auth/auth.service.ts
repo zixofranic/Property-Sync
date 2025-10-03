@@ -178,6 +178,7 @@ export class AuthService {
       firstName: user.profile?.firstName,
       lastName: user.profile?.lastName,
       emailVerified: user.emailVerified,
+      userType: 'AGENT', // All users in users table are agents - FIX: Added userType to JWT
     };
 
     const accessToken = this.jwtService.sign(payload, {
