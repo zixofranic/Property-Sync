@@ -22,6 +22,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
-    return user;
+
+    // Return user with userType from JWT payload for authorization checks
+    return {
+      ...user,
+      userType: payload.userType || 'AGENT', // Extract userType from JWT payload
+    };
   }
 }
