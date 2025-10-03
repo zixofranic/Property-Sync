@@ -116,10 +116,15 @@ interface MessagingContextV2Type {
   getPropertyNotificationCount: (propertyId: string) => number;
   clearPropertyNotifications: (propertyId: string) => void;
 
-  // TASK 3: Hierarchical unread count methods
+  // TASK 3: Hierarchical unread count methods (Agent-only)
   getTotalUnreadCount: () => number;
   getClientUnreadCount: (clientId: string) => number;
   fetchHierarchicalUnreadCounts: () => Promise<void>;
+
+  // PHASE 2: Client badge methods (Client-only)
+  clientUnreadCounts: Record<string, number>; // propertyId -> unread count
+  fetchClientUnreadCounts: () => Promise<void>;
+  getClientPropertyUnreadCount: (propertyId: string) => number;
 
   // Real-time events
   typingUsers: Record<string, string[]>; // propertyId -> userIds
@@ -152,7 +157,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
   const [propertyNotificationCounts, setPropertyNotificationCounts] = useState<Record<string, number>>({});
 
-  // TASK 3: Hierarchical unread counts state
+  // TASK 3: Hierarchical unread counts state (Agent-only)
   const [hierarchicalUnreadCounts, setHierarchicalUnreadCounts] = useState<{
     totalUnread: number;
     clients: Array<{
@@ -166,6 +171,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }>;
     }>;
   } | null>(null);
+
+  // PHASE 2: Client unread counts state (Client-only)
+  const [clientUnreadCounts, setClientUnreadCounts] = useState<Record<string, number>>({});
 
   // Badge data loading state
   const [badgeDataLoading, setBadgeDataLoading] = useState<boolean>(false);
@@ -2497,18 +2505,98 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUserId, currentUserType, isConnected]);
 
+  // PHASE 2: Fetch client unread counts from API
+  const fetchClientUnreadCounts = useCallback(async () => {
+    console.log('📊 CLIENT BADGE: fetchClientUnreadCounts called with state:', {
+      currentUserId,
+      currentUserType,
+      isConnected
+    });
+
+    if (!currentUserId || currentUserType !== 'CLIENT' || !isConnected) {
+      console.warn('⚠️ CLIENT BADGE: Skipping client fetch - incomplete auth state:', {
+        hasUserId: !!currentUserId,
+        isClient: currentUserType === 'CLIENT',
+        isConnected
+      });
+      return;
+    }
+
+    setBadgeDataLoading(true);
+
+    // PHASE 2: Cache-then-network pattern - load from cache first
+    const { getCachedClientBadgeState, setCachedClientBadgeState } = useBadgePersistenceStore.getState();
+    const cachedState = getCachedClientBadgeState();
+
+    if (cachedState && cachedState.isFresh) {
+      console.log('✅ CLIENT BADGE: Loading badge state from cache (fresh, <5min old)');
+      setClientUnreadCounts(cachedState.counts);
+      // Continue with network request in background to refresh data
+    } else if (cachedState && !cachedState.isFresh) {
+      console.log('⚠️ CLIENT BADGE: Loading stale cache (>5min old), refreshing in background');
+      setClientUnreadCounts(cachedState.counts);
+    } else {
+      console.log('📡 CLIENT BADGE: No cache available, fetching from network');
+    }
+
+    try {
+      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('clientSessionToken') : null;
+      if (!sessionToken) {
+        console.warn('⚠️ CLIENT BADGE: No session token found');
+        return;
+      }
+
+      console.log('📡 CLIENT BADGE: Fetching from API endpoint');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v2/conversations/unread/client`,
+        {
+          headers: {
+            'X-Session-Token': sessionToken,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('❌ CLIENT BADGE: API request failed:', response.status, response.statusText);
+        throw new Error(`Failed to fetch client unread counts: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ CLIENT BADGE: Received data from API:', data);
+
+      setClientUnreadCounts(data.counts || {});
+
+      // PHASE 2: Cache the fresh data for next time
+      setCachedClientBadgeState(data.counts || {});
+      console.log('✅ CLIENT BADGE: Cached fresh badge state to localStorage');
+    } catch (error) {
+      console.error('❌ CLIENT BADGE: Failed to fetch client unread counts:', error);
+    } finally {
+      setBadgeDataLoading(false);
+    }
+  }, [currentUserId, currentUserType, isConnected]);
+
+  // PHASE 2: Get unread count for a specific property (client view)
+  const getClientPropertyUnreadCount = useCallback((propertyId: string): number => {
+    return clientUnreadCounts[propertyId] || 0;
+  }, [clientUnreadCounts]);
+
   // Auto-fetch badges when authentication state is established
   useEffect(() => {
     if (currentUserId && currentUserType === 'AGENT' && isConnected) {
       console.log('🎯 useEffect: Auth state established, fetching hierarchical badge counts');
       fetchHierarchicalUnreadCounts();
+    } else if (currentUserId && currentUserType === 'CLIENT' && isConnected) {
+      console.log('🎯 CLIENT BADGE: Auth state established, fetching client badge counts');
+      fetchClientUnreadCounts();
     }
 
     return () => {
       // Cleanup: cancel any pending fetches if component unmounts
       console.log('🧹 useEffect cleanup: Auth state changed');
     };
-  }, [currentUserId, currentUserType, isConnected, fetchHierarchicalUnreadCounts]);
+  }, [currentUserId, currentUserType, isConnected, fetchHierarchicalUnreadCounts, fetchClientUnreadCounts]);
 
   // Auto-join removed - components should handle joining explicitly to prevent duplicates
 
@@ -2546,11 +2634,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     getPropertyNotificationCount,
     clearPropertyNotifications,
 
-    // TASK 3: Hierarchical unread count methods
+    // TASK 3: Hierarchical unread count methods (Agent-only)
     getTotalUnreadCount,
     getClientUnreadCount,
     fetchHierarchicalUnreadCounts,
     badgeDataLoading,
+
+    // PHASE 2: Client badge methods (Client-only)
+    clientUnreadCounts,
+    fetchClientUnreadCounts,
+    getClientPropertyUnreadCount,
 
     // Real-time events
     typingUsers,
