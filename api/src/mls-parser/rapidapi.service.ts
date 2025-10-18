@@ -654,25 +654,26 @@ export class RapidAPIService {
           // Wrap API call with retry logic
           const response = await this.retryUtility.execute(
             async () => {
-              return await this.client.get('/properties/v3/detail', {
+              const apiResponse = await this.client.get('/properties/v3/detail', {
                 params: { property_id: propertyId },
               });
+
+              // DEBUG: Log immediately after API call
+              this.logger.log(`📥 RAW API Response Status: ${apiResponse.status}`);
+              this.logger.log(`📥 RAW API Response Data Keys: ${Object.keys(apiResponse.data || {}).join(', ')}`);
+              this.logger.log(`📥 RAW API Response (first 1000 chars): ${JSON.stringify(apiResponse.data).slice(0, 1000)}`);
+
+              return apiResponse;
             },
             RetryWithBackoff.isRetryableError
           );
-
-          // DEBUG: Log actual response structure
-          this.logger.log(`📥 Property detail response keys: ${Object.keys(response.data || {}).join(', ')}`);
-          if (response.data?.data) {
-            this.logger.log(`📥 response.data.data keys: ${Object.keys(response.data.data).join(', ')}`);
-          }
-          this.logger.log(`📥 First 500 chars: ${JSON.stringify(response.data).slice(0, 500)}`);
 
           // Validate response structure
           try {
             this.validatePropertyDetailResponse(response);
           } catch (validationError) {
             this.logger.error(`❌ Property detail validation failed: ${validationError.message} (NO CACHE MODE)`);
+            this.logger.error(`❌ Response data structure: ${JSON.stringify(response.data).slice(0, 2000)}`);
             throw new RapidAPIError(`Property ${propertyId} not found or has invalid data structure`);
           }
 
