@@ -418,14 +418,13 @@ export class RapidAPIService {
       invalidFields.push('data.home');
     }
 
-    // Check for essential property fields
+    // Check for essential property fields - detail endpoint has different structure
     const propertyData = response.data?.home;
     if (propertyData) {
-      if (!propertyData.location?.address) {
-        invalidFields.push('location.address');
-      }
-      if (!propertyData.description && !propertyData.list_price) {
-        invalidFields.push('description or list_price');
+      // Detail endpoint doesn't have location.address - it has description.beds, list_price, etc.
+      // Just validate we have basic property info
+      if (!propertyData.property_id && !propertyData.listing_id) {
+        invalidFields.push('property_id or listing_id');
       }
     }
 
@@ -799,8 +798,25 @@ export class RapidAPIService {
     data: any,
     propertyId: string,
   ): ParsedMLSProperty {
-    // Extract address from location object
+    // Extract address - detail endpoint has different structure than search
     const address = data.location?.address || {};
+
+    // Detail endpoint: parse address from href URL if location.address doesn't exist
+    let street = address.line || '';
+    let city = address.city || '';
+    let state = address.state || address.state_code || '';
+    let zipCode = address.postal_code || '';
+
+    if (!street && data.href) {
+      // Parse from URL: /1006-Corn-Island-Ct_Louisville_KY_40207_M42356-52846
+      const urlMatch = data.href.match(/\/([^\/]+)_([^_]+)_([A-Z]{2})_(\d{5})/);
+      if (urlMatch) {
+        street = urlMatch[1].replace(/-/g, ' ');
+        city = urlMatch[2].replace(/-/g, ' ');
+        state = urlMatch[3];
+        zipCode = urlMatch[4];
+      }
+    }
 
     // Extract description (property details like beds/baths)
     const desc = data.description || {};
@@ -808,11 +824,11 @@ export class RapidAPIService {
     return {
       shareId: propertyId || data.property_id || data.listing_id || '',
       address: {
-        street: address.line || '',
-        city: address.city || '',
-        state: address.state || '',
-        zipCode: address.postal_code || '',
-        full: `${address.line}, ${address.city}, ${address.state} ${address.postal_code}`,
+        street,
+        city,
+        state,
+        zipCode,
+        full: `${street}, ${city}, ${state} ${zipCode}`,
       },
       pricing: {
         listPrice: this.formatPrice(data.list_price || data.price),
