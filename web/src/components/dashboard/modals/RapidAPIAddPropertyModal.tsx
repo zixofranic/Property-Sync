@@ -151,12 +151,21 @@ export function RapidAPIAddPropertyModal({ isOpen, onClose }: RapidAPIAddPropert
 
       if (response.error || !response.data?.success) {
         if (response.data?.isDuplicate) {
+          // Duplicate found - navigate to timeline to show existing property
           addNotification({
-            type: 'warning',
-            title: 'Duplicate Property',
-            message: response.error || 'This property has already been added to this client\'s timeline',
+            type: 'info',
+            title: 'Property Already on Timeline',
+            message: 'This property is already being tracked. Showing timeline...',
             read: false
           });
+
+          // Refresh timeline to show the existing property
+          await loadTimeline(selectedClient.id);
+
+          // Close modal and show timeline
+          setTimeout(() => {
+            onClose();
+          }, 1000);
         } else {
           throw new Error(response.error || 'Import failed');
         }
