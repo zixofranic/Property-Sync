@@ -12,6 +12,64 @@ export class BatchManagementService {
     private conversationV2Service: ConversationV2Service,
   ) {}
 
+  /**
+   * Retry helper for MLS parsing with exponential backoff.
+   * Zillow typically blocks first attempt (403), succeeds on 2nd or 3rd.
+   */
+  private async retryParse<T>(
+    parseFunction: () => Promise<T>,
+    maxRetries: number = 3,
+    initialDelay: number = 2000,
+    mlsUrl: string = '',
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔄 Parse attempt ${attempt}/${maxRetries} for ${mlsUrl.substring(0, 60)}...`,
+        );
+        const result = await parseFunction();
+
+        // Check if result indicates failure (for parseQuickMLS/parseSingleMLS responses)
+        if ((result as any).success === false) {
+          lastError = (result as any).error;
+
+          // If this isn't the last attempt, retry
+          if (attempt < maxRetries) {
+            const delay = initialDelay * attempt; // 2s, 4s, 6s
+            console.log(
+              `⚠️ Parse failed (${lastError}). Retrying in ${delay}ms...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+
+        // Success or last attempt - return result
+        if (attempt > 1) {
+          console.log(`✅ Parse succeeded on attempt ${attempt}`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxRetries) {
+          const delay = initialDelay * attempt;
+          console.log(
+            `❌ Parse error: ${error.message}. Retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          console.error(`❌ Parse failed after ${maxRetries} attempts`);
+        }
+      }
+    }
+
+    // All retries failed - return or throw last error
+    throw lastError || new Error('Parse failed after all retries');
+  }
+
   // Create a new property batch
   async createPropertyBatch(
     agentId: string,
@@ -120,7 +178,11 @@ export class BatchManagementService {
     for (const batchProperty of batchProperties) {
       try {
         // Parse property data with full details immediately
-        const result = await this.mlsParser.parseSingleMLS(
+        // Use retry logic for client-submitted URLs (Zillow/Realtor often block first attempts)
+        const result = await this.retryParse(
+          () => this.mlsParser.parseSingleMLS(batchProperty.mlsUrl),
+          5, // max retries (2s, 4s, 6s, 8s, 10s delays)
+          2000, // initial delay
           batchProperty.mlsUrl,
         );
 
@@ -169,6 +231,7 @@ export class BatchManagementService {
         } else {
           // Fallback to URL-based data if parsing fails
           const urlData = this.parseUrlData(batchProperty.mlsUrl);
+          const errorMessage = result.error || 'Unknown error';
           propertyData = {
             timelineId: batch.timelineId,
             address: urlData.address || 'Loading address...',
@@ -192,6 +255,7 @@ export class BatchManagementService {
             isFullyParsed: false,
             loadingProgress: 50,
             importStatus: 'pending',
+            agentNotes: `⚠️ Import failed after 5 retry attempts: ${errorMessage}. Address extracted from URL. Agent action required.`,
           };
         }
 
@@ -423,8 +487,14 @@ export class BatchManagementService {
           },
         });
 
-        // Quick parse
-        const result = await this.mlsParser.parseQuickMLS(batchProperty.mlsUrl);
+        // Quick parse with retry logic
+        // 5 retries for client-submitted URLs (Zillow/Realtor often block first attempts)
+        const result = await this.retryParse(
+          () => this.mlsParser.parseQuickMLS(batchProperty.mlsUrl),
+          5, // max retries (2s, 4s, 6s, 8s, 10s delays)
+          2000, // initial delay
+          batchProperty.mlsUrl,
+        );
 
         if (result.success && result.data) {
           // Store quick data
@@ -440,29 +510,60 @@ export class BatchManagementService {
           // Create property with basic info
           await this.createQuickProperty(batchId, batchProperty, result.data);
         } else {
-          // Mark as failed
+          // Parsing failed - create property with URL-extracted address only
+          const urlData = this.parseUrlData(batchProperty.mlsUrl);
+
           await this.prisma.batchProperty.update({
             where: { id: batchProperty.id },
             data: {
               parseStatus: 'failed',
               parseError: result.error,
-              loadingProgress: 0,
+              loadingProgress: 40, // Set to "quick parsed" level for UI
             },
           });
+
+          // Still create property with address from URL
+          await this.createQuickProperty(batchId, batchProperty, {
+            address: urlData.address,
+            shareId: urlData.shareId || batchProperty.mlsUrl,
+            images: [], // No images available
+            pricing: null,
+            propertyDetails: {},
+            listingInfo: {},
+            // Mark as incomplete/failed
+            _importFailed: true,
+            _importError: result.error,
+          } as any);
         }
       } catch (error) {
         console.error(
           `Quick parsing failed for ${batchProperty.mlsUrl}:`,
           error,
         );
+
+        // Even on exception, create property with URL-extracted address
+        const urlData = this.parseUrlData(batchProperty.mlsUrl);
+
         await this.prisma.batchProperty.update({
           where: { id: batchProperty.id },
           data: {
             parseStatus: 'failed',
             parseError: error.message,
-            loadingProgress: 0,
+            loadingProgress: 40,
           },
         });
+
+        // Create property with address only
+        await this.createQuickProperty(batchId, batchProperty, {
+          address: urlData.address,
+          shareId: urlData.shareId || batchProperty.mlsUrl,
+          images: [],
+          pricing: null,
+          propertyDetails: {},
+          listingInfo: {},
+          _importFailed: true,
+          _importError: error.message,
+        } as any);
       }
     }
   }
@@ -489,8 +590,11 @@ export class BatchManagementService {
           },
         });
 
-        // Full parse
-        const result = await this.mlsParser.parseSingleMLS(
+        // Full parse with retry logic
+        const result = await this.retryParse(
+          () => this.mlsParser.parseSingleMLS(batchProperty.mlsUrl),
+          5, // max retries (2s, 4s, 6s, 8s, 10s delays)
+          2000, // initial delay
           batchProperty.mlsUrl,
         );
 
@@ -548,10 +652,14 @@ export class BatchManagementService {
       throw new Error('Batch not found');
     }
 
+    // Check if this is a failed import (address-only from URL)
+    const isFailed = quickData._importFailed || false;
+    const importError = quickData._importError || null;
+
     const property = await this.prisma.property.create({
       data: {
         timelineId: batch.timelineId,
-        address: quickData.address?.full || 'Address parsing...',
+        address: quickData.address?.full || quickData.address || 'Address unavailable',
         city: quickData.address?.city || '',
         state: quickData.address?.state || '',
         zipCode: quickData.address?.zipCode || '',
@@ -572,8 +680,11 @@ export class BatchManagementService {
         originalMlsUrl: batchProperty.mlsUrl,
         parsedData: quickData,
         parseTimestamp: new Date(),
-        isQuickParsed: true,
+        isQuickParsed: !isFailed, // False if import failed
         isFullyParsed: false,
+        agentNotes: isFailed
+          ? `⚠️ Import failed: ${importError}. Address extracted from URL. Agent action required.`
+          : null,
         loadingProgress: 40,
         importStatus: 'pending',
       },
@@ -654,8 +765,11 @@ export class BatchManagementService {
           data: { parseStatus: 'parsing' },
         });
 
-        // Parse MLS URL
-        const parseResult = await this.mlsParser.parseSingleMLS(
+        // Parse MLS URL with retry logic (Zillow/Realtor often block first attempts)
+        const parseResult = await this.retryParse(
+          () => this.mlsParser.parseSingleMLS(batchProperty.mlsUrl),
+          5, // max retries (2s, 4s, 6s, 8s, 10s delays)
+          2000, // initial delay
           batchProperty.mlsUrl,
         );
 
