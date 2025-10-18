@@ -313,6 +313,10 @@ export class MLSParserService {
     reason?: string;
     existingProperty?: any;
   }> {
+    console.log('\n🔍 DUPLICATE CHECK:');
+    console.log('  Source URL:', parsedProperty.sourceUrl);
+    console.log('  Full Address:', parsedProperty.address.full);
+
     // Check by MLS URL
     const existingByUrl = await this.prisma.property.findFirst({
       where: {
@@ -324,6 +328,8 @@ export class MLSParserService {
         },
       },
     });
+
+    console.log('  Existing by URL:', existingByUrl ? `FOUND (${existingByUrl.address})` : 'Not found');
 
     if (existingByUrl) {
       return {
@@ -337,6 +343,8 @@ export class MLSParserService {
     const normalizedAddress = this.normalizeAddress(
       parsedProperty.address.full,
     );
+    console.log('  Normalized Address:', normalizedAddress);
+
     const existingByAddress = await this.prisma.property.findFirst({
       where: {
         addressNormalized: normalizedAddress,
@@ -348,6 +356,8 @@ export class MLSParserService {
       },
     });
 
+    console.log('  Existing by Address:', existingByAddress ? `FOUND (${existingByAddress.address})` : 'Not found');
+
     if (existingByAddress) {
       return {
         isDuplicate: true,
@@ -356,6 +366,7 @@ export class MLSParserService {
       };
     }
 
+    console.log('  ✅ No duplicate found\n');
     return { isDuplicate: false };
   }
 

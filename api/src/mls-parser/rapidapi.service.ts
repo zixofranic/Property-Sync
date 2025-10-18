@@ -860,6 +860,7 @@ export class RapidAPIService {
         listDate: data.list_date || '',
       },
       description: desc.text || data.description?.text || '',
+      sourceUrl: data.href || data.permalink || '', // Add sourceUrl for duplicate detection
       rawData: {
         property_id: propertyId,
         tax_history: data.tax_history || [],
