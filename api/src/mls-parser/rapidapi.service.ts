@@ -654,7 +654,7 @@ export class RapidAPIService {
           // Wrap API call with retry logic
           const response = await this.retryUtility.execute(
             async () => {
-              return await this.client.get('/v3/property-detail', {
+              return await this.client.get('/properties/v3/detail', {
                 params: { property_id: propertyId },
               });
             },
