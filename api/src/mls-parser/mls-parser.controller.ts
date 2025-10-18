@@ -456,18 +456,22 @@ export class MLSParserController {
       }
 
       // Find or create timeline for this client
+      console.log('📋 Getting timeline for client:', body.clientId);
       let timeline = await this.timelinesService.getAgentTimeline(agentId, body.clientId);
+      console.log('📋 Timeline result:', timeline ? `Found (${timeline.id})` : 'Not found');
 
       let timelineId = timeline.id;
 
       // If no timeline exists, create one
       if (!timelineId) {
+        console.log('📋 Creating new timeline...');
         const prisma = this.timelinesService['prisma']; // Access via bracket notation
         const client = await prisma.client.findFirst({
           where: { id: body.clientId, agentId },
         });
 
         if (!client) {
+          console.log('❌ Client not found');
           return {
             success: false,
             error: 'Client not found',
@@ -486,14 +490,17 @@ export class MLSParserController {
         });
 
         timelineId = newTimeline.id;
+        console.log('✅ Timeline created:', timelineId);
       }
 
       // Save property to timeline with all RapidAPI data
+      console.log('💾 Adding property to timeline:', timelineId);
       const savedProperty = await this.timelinesService.addRapidAPIPropertyToTimeline(
         agentId,
         timelineId,
         propertyData,
       );
+      console.log('✅ Property saved:', savedProperty.id);
 
       return {
         success: true,
@@ -502,6 +509,8 @@ export class MLSParserController {
         timelineId,
       };
     } catch (error) {
+      console.error('❌ Import error:', error.message);
+      console.error('❌ Stack:', error.stack);
       return {
         success: false,
         error: error.message,
