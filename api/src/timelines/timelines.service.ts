@@ -1333,11 +1333,11 @@ export class TimelinesService {
         // RapidAPI-specific fields
         rapidapi_property_id: rapidAPIData.shareId,
         rapidapi_permalink: rapidAPIData.rawData.permalink || undefined,
-        tax_history: rapidAPIData.rawData.tax_history ? JSON.stringify(rapidAPIData.rawData.tax_history) : undefined,
-        nearby_schools: rapidAPIData.rawData.nearby_schools ? JSON.stringify(rapidAPIData.rawData.nearby_schools) : undefined,
-        flood_risk: rapidAPIData.rawData.flood_risk ? JSON.stringify(rapidAPIData.rawData.flood_risk) : undefined,
-        fire_risk: rapidAPIData.rawData.fire_risk ? JSON.stringify(rapidAPIData.rawData.fire_risk) : undefined,
-        noise_score: rapidAPIData.rawData.noise_score ? JSON.stringify({ score: rapidAPIData.rawData.noise_score }) : undefined,
+        tax_history: rapidAPIData.rawData.tax_history || undefined,
+        nearby_schools: rapidAPIData.rawData.nearby_schools || undefined,
+        flood_risk: rapidAPIData.rawData.flood_risk || undefined,
+        fire_risk: rapidAPIData.rawData.fire_risk || undefined,
+        noise_score: rapidAPIData.rawData.noise_score ? { score: rapidAPIData.rawData.noise_score } : undefined,
         last_sold_price: rapidAPIData.rawData.last_sold_price || undefined,
         last_sold_date: rapidAPIData.rawData.last_sold_date ? new Date(rapidAPIData.rawData.last_sold_date) : undefined,
 
