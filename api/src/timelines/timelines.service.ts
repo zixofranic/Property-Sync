@@ -1061,13 +1061,10 @@ export class TimelinesService {
     property: any,
     clientId: string,
   ): PropertyResponseDto {
-    const addressParts = [
-      property.address,
-      property.city,
-      property.state,
-      property.zipCode,
-    ].filter(Boolean);
-    const combinedAddress = addressParts.join(', ');
+    // property.address already contains the full address string
+    // (e.g., "2508 Boulevard Napoleon, Louisville, KY 40205")
+    // so we don't need to concatenate it with city, state, and zip
+    const combinedAddress = property.address || '';
 
     const primaryImage =
       Array.isArray(property.imageUrls) && property.imageUrls.length > 0
@@ -1275,5 +1272,96 @@ export class TimelinesService {
       orderBy: { position: 'desc' },
     });
     return lastProperty?.position || 0;
+  }
+
+  // NEW: Add RapidAPI property to timeline with all enriched data
+  async addRapidAPIPropertyToTimeline(
+    agentId: string,
+    timelineId: string,
+    rapidAPIData: any, // ParsedMLSProperty from RapidAPIService
+  ) {
+    // Check plan limits before adding property
+    const canAdd = await this.usersService.checkCanAddProperties(agentId, 1);
+    if (!canAdd.canAdd) {
+      throw new BadRequestException(canAdd.reason);
+    }
+
+    const timeline = await this.prisma.timeline.findFirst({
+      where: { id: timelineId, agentId },
+    });
+
+    if (!timeline) {
+      throw new NotFoundException('Timeline not found');
+    }
+
+    // Transform RapidAPI data to database format
+    const newProperty = await this.prisma.property.create({
+      data: {
+        // Basic property info
+        address: rapidAPIData.address.full,
+        city: rapidAPIData.address.city,
+        state: rapidAPIData.address.state,
+        zipCode: rapidAPIData.address.zipCode,
+        price: rapidAPIData.pricing.listPrice,
+        description: rapidAPIData.description || 'Property details loading...',
+
+        // Property details
+        bedrooms: parseInt(rapidAPIData.propertyDetails.beds) || null,
+        bathrooms: parseFloat(rapidAPIData.propertyDetails.baths) || null,
+        squareFootage: parseInt(rapidAPIData.propertyDetails.sqft?.replace(/,/g, '')) || null,
+        propertyType: rapidAPIData.propertyDetails.propertyType || null,
+
+        // Images and listing
+        imageUrls: JSON.stringify(rapidAPIData.images || []),
+        listingUrl: rapidAPIData.rawData.href || rapidAPIData.rawData.permalink || null,
+
+        // RapidAPI-specific fields
+        rapidapi_property_id: rapidAPIData.shareId,
+        rapidapi_permalink: rapidAPIData.rawData.permalink || null,
+        tax_history: rapidAPIData.rawData.tax_history || null,
+        nearby_schools: rapidAPIData.rawData.nearby_schools || null,
+        flood_risk: rapidAPIData.rawData.flood_risk || null,
+        fire_risk: rapidAPIData.rawData.fire_risk || null,
+        noise_score: rapidAPIData.rawData.noise_score || null,
+        last_sold_price: rapidAPIData.rawData.last_sold_price || null,
+        last_sold_date: rapidAPIData.rawData.last_sold_date ? new Date(rapidAPIData.rawData.last_sold_date) : null,
+
+        // Timeline and position
+        timelineId,
+        position: (await this.getLastPropertyPosition(timelineId)) + 1,
+        isFullyParsed: true, // RapidAPI data is always fully parsed
+      },
+    });
+
+    // Create conversation for this property automatically
+    let conversationId: string | null = null;
+    try {
+      const conversation = await this.messagingService.createOrGetConversation({
+        agentId,
+        clientId: timeline.clientId,
+        timelineId,
+        propertyId: newProperty.id,
+      });
+      conversationId = conversation.id;
+      console.log(`Created conversation ${conversationId} for RapidAPI property ${newProperty.id}`);
+    } catch (error) {
+      console.warn('Conversation creation failed:', error.message);
+    }
+
+    // Send property notification
+    try {
+      await this.sendPropertyNotification(agentId, timelineId, newProperty.id);
+    } catch (error) {
+      console.warn('Property notification failed:', error.message);
+    }
+
+    const formattedProperty = this.formatPropertyResponse(newProperty, timeline.clientId);
+
+    // Add conversationId to the response
+    if (conversationId) {
+      (formattedProperty as any).conversationId = conversationId;
+    }
+
+    return formattedProperty;
   }
 }

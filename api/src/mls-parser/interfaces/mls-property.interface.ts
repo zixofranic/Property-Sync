@@ -25,7 +25,7 @@ export interface ParsedMLSProperty {
     full: string;
   };
   pricing: PriceData | null;
-  images: ImageData[];
+  images: ImageData[] | string[]; // Support both formats
   propertyDetails: {
     beds?: string;
     baths?: string;
@@ -39,9 +39,12 @@ export interface ParsedMLSProperty {
     listingAgent?: string;
     listingOffice?: string;
     status?: string;
+    listDate?: string; // RapidAPI field
   };
-  scrapedAt: Date;
-  sourceUrl: string;
+  description?: string; // RapidAPI field
+  rawData?: any; // For RapidAPI extra data (tax_history, schools, etc.)
+  scrapedAt?: Date; // Optional for RapidAPI
+  sourceUrl?: string; // Optional for RapidAPI
 }
 
 export interface ParseResult {
