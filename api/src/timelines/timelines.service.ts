@@ -1266,6 +1266,17 @@ export class TimelinesService {
     return notifications;
   }
 
+  /**
+   * Normalize an address for comparison and duplicate detection
+   */
+  private normalizeAddress(address: string): string {
+    return address
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   private async getLastPropertyPosition(timelineId: string): Promise<number> {
     const lastProperty = await this.prisma.property.findFirst({
       where: { timelineId },
@@ -1313,18 +1324,22 @@ export class TimelinesService {
 
         // Images and listing
         imageUrls: JSON.stringify(rapidAPIData.images || []),
-        listingUrl: rapidAPIData.rawData.href || rapidAPIData.rawData.permalink || null,
+        listingUrl: rapidAPIData.rawData.href || rapidAPIData.rawData.permalink || undefined,
+
+        // MLS Parser Integration (for duplicate detection)
+        originalMlsUrl: rapidAPIData.sourceUrl || undefined,
+        addressNormalized: this.normalizeAddress(rapidAPIData.address.full),
 
         // RapidAPI-specific fields
         rapidapi_property_id: rapidAPIData.shareId,
-        rapidapi_permalink: rapidAPIData.rawData.permalink || null,
+        rapidapi_permalink: rapidAPIData.rawData.permalink || undefined,
         tax_history: rapidAPIData.rawData.tax_history ? JSON.stringify(rapidAPIData.rawData.tax_history) : undefined,
         nearby_schools: rapidAPIData.rawData.nearby_schools ? JSON.stringify(rapidAPIData.rawData.nearby_schools) : undefined,
-        flood_risk: rapidAPIData.rawData.flood_risk || null,
-        fire_risk: rapidAPIData.rawData.fire_risk || null,
-        noise_score: rapidAPIData.rawData.noise_score || null,
-        last_sold_price: rapidAPIData.rawData.last_sold_price || null,
-        last_sold_date: rapidAPIData.rawData.last_sold_date ? new Date(rapidAPIData.rawData.last_sold_date) : null,
+        flood_risk: rapidAPIData.rawData.flood_risk ? JSON.stringify(rapidAPIData.rawData.flood_risk) : undefined,
+        fire_risk: rapidAPIData.rawData.fire_risk ? JSON.stringify(rapidAPIData.rawData.fire_risk) : undefined,
+        noise_score: rapidAPIData.rawData.noise_score ? JSON.stringify({ score: rapidAPIData.rawData.noise_score }) : undefined,
+        last_sold_price: rapidAPIData.rawData.last_sold_price || undefined,
+        last_sold_date: rapidAPIData.rawData.last_sold_date ? new Date(rapidAPIData.rawData.last_sold_date) : undefined,
 
         // Timeline and position
         timelineId,
