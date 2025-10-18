@@ -1302,7 +1302,7 @@ export class TimelinesService {
         city: rapidAPIData.address.city,
         state: rapidAPIData.address.state,
         zipCode: rapidAPIData.address.zipCode,
-        price: rapidAPIData.pricing.listPrice,
+        price: rapidAPIData.pricing.priceNumeric,
         description: rapidAPIData.description || 'Property details loading...',
 
         // Property details
