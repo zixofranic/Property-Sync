@@ -33,7 +33,7 @@ import {
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { useHUD } from '@/providers/HUDProvider';
 import { useMessaging } from '@/contexts/MessagingContext';
-import { BatchPropertyModal } from '../modals/BatchPropertyModal';
+import { RapidAPIAddPropertyModal } from './modals/RapidAPIAddPropertyModal';
 import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
 import { Notifications } from '../ui/Notifications';
@@ -1435,16 +1435,10 @@ const testProfileAPI = async () => {
 </div>
 
       {/* Modals */}
-      <BatchPropertyModal 
-        isOpen={activeModal === 'add-property'} 
+      <RapidAPIAddPropertyModal
+        isOpen={activeModal === 'add-property'}
         onClose={() => {
           setActiveModal(null);
-        }}
-        onImportSuccess={async () => {
-          // Refresh email state after successful batch import
-          if (currentTimeline) {
-            await fetchEmailState(currentTimeline.id);
-          }
         }}
       />
 

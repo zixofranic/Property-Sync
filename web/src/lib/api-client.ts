@@ -928,6 +928,19 @@ async updateEmailPreferences(preferences: {
   async authenticateClientAccess(shareToken: string, clientName: string, phoneLastFour: string): Promise<ApiResponse<{
     sessionToken: string;
     clientName: string;
+    timelineId: string;
+    shareToken: string;
+    expiresAt: Date;
+    user: {
+      id: string;
+      userType: 'CLIENT';
+      email?: string;
+      name: string;
+      clientName: string;
+      clientId: string;
+      timelineId: string;
+      sessionToken: string;
+    };
   }>> {
     return this.request(`/api/v1/share/${shareToken}/authenticate`, {
       method: 'POST',
@@ -1073,6 +1086,77 @@ async updateEmailPreferences(preferences: {
       method: 'POST',
       body: JSON.stringify({ mlsUrl }),
     });
+  }
+
+  // ============================================
+  // NEW: RapidAPI Property Search & Import Methods
+  // ============================================
+
+  /**
+   * Search for properties by address using RapidAPI
+   * @param address - Full or partial address (e.g., "Louisville, KY" or "3617 Nellie Bly Dr, Louisville, KY 40299")
+   * @returns Array of property search results with property_id for import
+   */
+  async searchPropertiesByAddress(address: string): Promise<ApiResponse<{
+    success: boolean;
+    count: number;
+    results: Array<{
+      property_id: string;
+      address: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      price: number;
+      beds: number;
+      baths: number;
+      sqft: number;
+      photo: string;
+      status: string;
+    }>;
+  }>> {
+    return this.request('/api/v1/mls/search', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+  }
+
+  /**
+   * Import a property from RapidAPI by property_id
+   * @param propertyId - RapidAPI property_id from search results
+   * @param clientId - Client ID to import property for
+   * @returns Imported property data with timeline information
+   */
+  async importPropertyFromRapidAPI(
+    propertyId: string,
+    clientId: string
+  ): Promise<ApiResponse<{
+    success: boolean;
+    data?: any;
+    message?: string;
+    timelineId?: string;
+    isDuplicate?: boolean;
+    existingProperty?: any;
+    error?: string;
+  }>> {
+    return this.request('/api/v1/mls/import', {
+      method: 'POST',
+      body: JSON.stringify({ propertyId, clientId }),
+    });
+  }
+
+  /**
+   * Get address autocomplete suggestions
+   * @param query - Partial address string
+   * @returns Array of autocomplete suggestions
+   */
+  async autocompleteAddress(query: string): Promise<ApiResponse<{
+    success: boolean;
+    suggestions: Array<{
+      text: string;
+      type: string;
+    }>;
+  }>> {
+    return this.request(`/api/v1/mls/autocomplete?query=${encodeURIComponent(query)}`);
   }
 }
 
