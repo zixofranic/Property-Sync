@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { MLSParserService } from './mls-parser.service';
 import { MLSParserController } from './mls-parser.controller';
 import { BatchController } from './batch.controller';
@@ -16,7 +17,11 @@ import { RapidAPIService } from './rapidapi.service';
 import { TimelinesModule } from '../timelines/timelines.module';
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => TimelinesModule)],
+  imports: [
+    PrismaModule,
+    forwardRef(() => TimelinesModule),
+    CacheModule.register(),
+  ],
   providers: [
     MLSParserService,
     BatchManagementService,
