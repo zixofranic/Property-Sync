@@ -238,8 +238,8 @@ model Property {
   rapidapi_permalink   String? // RapidAPI permalink
   tax_history          Json?   // Tax history data
   nearby_schools       Json?   // Nearby schools data
-  flood_risk           Json?   // Flood risk data
-  fire_risk            Json?   // Fire risk data
+  flood_risk           String? // Flood risk severity (minimal/low/moderate/high)
+  fire_risk            String? // Fire risk severity (minimal/low/moderate/high)
   noise_score          Json?   // Noise score data
   last_sold_price      Int?    // Last sold price in cents
   last_sold_date       DateTime? // Last sold date

@@ -1335,11 +1335,15 @@ export class TimelinesService {
         rapidapi_permalink: rapidAPIData.rawData.permalink || undefined,
         tax_history: rapidAPIData.rawData.tax_history || undefined,
         nearby_schools: rapidAPIData.rawData.nearby_schools || undefined,
-        flood_risk: rapidAPIData.rawData.flood_risk || undefined,
-        fire_risk: rapidAPIData.rawData.fire_risk || undefined,
+        flood_risk: rapidAPIData.rawData.flood_risk || undefined, // String: "minimal", "low", "moderate", "high"
+        fire_risk: rapidAPIData.rawData.fire_risk || undefined,   // String: "minimal", "low", "moderate", "high"
         noise_score: rapidAPIData.rawData.noise_score ? { score: rapidAPIData.rawData.noise_score } : undefined,
-        last_sold_price: rapidAPIData.rawData.last_sold_price || undefined,
-        last_sold_date: rapidAPIData.rawData.last_sold_date ? new Date(rapidAPIData.rawData.last_sold_date) : undefined,
+        last_sold_price: rapidAPIData.rawData.last_sold_price && rapidAPIData.rawData.last_sold_price > 0
+          ? rapidAPIData.rawData.last_sold_price
+          : undefined,
+        last_sold_date: rapidAPIData.rawData.last_sold_date && rapidAPIData.rawData.last_sold_date.trim() !== ''
+          ? new Date(rapidAPIData.rawData.last_sold_date)
+          : undefined,
 
         // Timeline and position
         timelineId,
