@@ -661,6 +661,13 @@ export class RapidAPIService {
             RetryWithBackoff.isRetryableError
           );
 
+          // DEBUG: Log actual response structure
+          this.logger.log(`📥 Property detail response keys: ${Object.keys(response.data || {}).join(', ')}`);
+          if (response.data?.data) {
+            this.logger.log(`📥 response.data.data keys: ${Object.keys(response.data.data).join(', ')}`);
+          }
+          this.logger.log(`📥 First 500 chars: ${JSON.stringify(response.data).slice(0, 500)}`);
+
           // Validate response structure
           try {
             this.validatePropertyDetailResponse(response);
