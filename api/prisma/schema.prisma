@@ -211,7 +211,7 @@ model Property {
   description     String?  // Property description
   imageUrls       String   @default("") // JSON string of image URLs
   listingUrl      String?  // MLS link
-  
+
   // NEW: MLS Parser Integration Fields
   mlsSource       String?   // 'flexmls', 'mls_pin', etc.
   originalMlsUrl  String?   // Original URL used for parsing
@@ -219,19 +219,30 @@ model Property {
   parseTimestamp  DateTime? // When this property was parsed
   imageCount      Int       @default(0) // Number of images parsed
   parseErrors     String   @default("") // JSON string of parse errors
-  
+
   // NEW: Enhanced Duplicate Detection
   addressNormalized String? // Normalized address for similarity matching
   priceRange       String?  // Price category for grouping
-  
+
   // NEW: Batch Processing Fields
   batchId         String?   // Links to PropertyBatch
   importStatus    String    @default("completed") // 'pending', 'completed', 'failed'
-  
+
   // NEW: Progressive Loading Fields
   isQuickParsed   Boolean   @default(false) // Basic info loaded quickly
   isFullyParsed   Boolean   @default(true) // All details loaded
   loadingProgress Int       @default(100) // Percentage of data loaded (0-100)
+
+  // NEW: RapidAPI-specific fields
+  rapidapi_property_id String? // RapidAPI property ID (shareId)
+  rapidapi_permalink   String? // RapidAPI permalink
+  tax_history          Json?   // Tax history data
+  nearby_schools       Json?   // Nearby schools data
+  flood_risk           Json?   // Flood risk data
+  fire_risk            Json?   // Fire risk data
+  noise_score          Json?   // Noise score data
+  last_sold_price      Int?    // Last sold price in cents
+  last_sold_date       DateTime? // Last sold date
   
   // Agent management
   agentNotes      String?

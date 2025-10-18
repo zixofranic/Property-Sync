@@ -10,6 +10,21 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+// Helper to convert time strings to seconds
+function parseExpiryToSeconds(expiry: string): number {
+  const match = expiry.match(/^(\d+)([smhd])$/);
+  if (!match) return 900; // 15m default
+  const value = parseInt(match[1]);
+  const unit = match[2];
+  switch (unit) {
+    case 's': return value;
+    case 'm': return value * 60;
+    case 'h': return value * 3600;
+    case 'd': return value * 86400;
+    default: return 900;
+  }
+}
+
 @Module({
   imports: [
     UsersModule,
@@ -17,12 +32,15 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'railway-fallback-secret-key-2024-property-sync',
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m',
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const expiryString = configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m';
+        return {
+          secret: configService.get<string>('JWT_SECRET') || 'railway-fallback-secret-key-2024-property-sync',
+          signOptions: {
+            expiresIn: parseExpiryToSeconds(expiryString),
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],

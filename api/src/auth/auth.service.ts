@@ -171,6 +171,21 @@ export class AuthService {
     });
   }
 
+  private parseExpiryToSeconds(expiry: string | undefined): number {
+    if (!expiry) return 900; // 15m default
+    const match = expiry.match(/^(\d+)([smhd])$/);
+    if (!match) return 900;
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    switch (unit) {
+      case 's': return value;
+      case 'm': return value * 60;
+      case 'h': return value * 3600;
+      case 'd': return value * 86400;
+      default: return 900;
+    }
+  }
+
   private async generateTokens(user: any): Promise<AuthResponseDto> {
     const payload = {
       email: user.email,
@@ -181,20 +196,22 @@ export class AuthService {
       userType: 'AGENT', // All users in users table are agents - FIX: Added userType to JWT
     };
 
+    const accessExpiryString = this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m';
+    const refreshExpiryString = this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRY') || '7d';
+
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY'),
+      expiresIn: this.parseExpiryToSeconds(accessExpiryString),
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRY'),
+      expiresIn: this.parseExpiryToSeconds(refreshExpiryString),
     });
 
     return {
       accessToken,
       refreshToken,
       tokenType: 'Bearer',
-      expiresIn:
-        this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRY') || '15m', // Fix: handle undefined
+      expiresIn: accessExpiryString,
       user: {
         id: user.id,
         email: user.email,
