@@ -1318,8 +1318,8 @@ export class TimelinesService {
         // RapidAPI-specific fields
         rapidapi_property_id: rapidAPIData.shareId,
         rapidapi_permalink: rapidAPIData.rawData.permalink || null,
-        tax_history: rapidAPIData.rawData.tax_history || null,
-        nearby_schools: rapidAPIData.rawData.nearby_schools || null,
+        tax_history: rapidAPIData.rawData.tax_history ? JSON.stringify(rapidAPIData.rawData.tax_history) : null,
+        nearby_schools: rapidAPIData.rawData.nearby_schools ? JSON.stringify(rapidAPIData.rawData.nearby_schools) : null,
         flood_risk: rapidAPIData.rawData.flood_risk || null,
         fire_risk: rapidAPIData.rawData.fire_risk || null,
         noise_score: rapidAPIData.rawData.noise_score || null,
