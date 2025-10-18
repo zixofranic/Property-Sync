@@ -413,12 +413,13 @@ export class RapidAPIService {
       invalidFields.push('data');
     }
 
-    if (!response.data?.data) {
-      invalidFields.push('data.data');
+    // FIXED: Detail endpoint returns data.home, not data.data
+    if (!response.data?.home) {
+      invalidFields.push('data.home');
     }
 
     // Check for essential property fields
-    const propertyData = response.data?.data;
+    const propertyData = response.data?.home;
     if (propertyData) {
       if (!propertyData.location?.address) {
         invalidFields.push('location.address');
@@ -677,8 +678,8 @@ export class RapidAPIService {
             throw new RapidAPIError(`Property ${propertyId} not found or has invalid data structure`);
           }
 
-          // Transform API response to our schema
-          const propertyData = this.transformToPropertySchema(response.data.data, propertyId);
+          // Transform API response to our schema (FIXED: use data.home, not data.data)
+          const propertyData = this.transformToPropertySchema(response.data.home, propertyId);
 
           // CACHING DISABLED - Skip cache save
           this.logger.log(`✅ Returning property ${propertyId} (NO CACHE)`);
