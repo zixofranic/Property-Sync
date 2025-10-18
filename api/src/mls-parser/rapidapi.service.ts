@@ -413,13 +413,17 @@ export class RapidAPIService {
       invalidFields.push('data');
     }
 
-    // FIXED: Detail endpoint returns data.home, not data.data
-    if (!response.data?.home) {
-      invalidFields.push('data.home');
+    // FIXED: API returns double-nested structure: data.data.home
+    if (!response.data?.data) {
+      invalidFields.push('data.data');
+    }
+
+    if (!response.data?.data?.home) {
+      invalidFields.push('data.data.home');
     }
 
     // Check for essential property fields - detail endpoint has different structure
-    const propertyData = response.data?.home;
+    const propertyData = response.data?.data?.home;
     if (propertyData) {
       // Detail endpoint doesn't have location.address - it has description.beds, list_price, etc.
       // Just validate we have basic property info
@@ -660,7 +664,9 @@ export class RapidAPIService {
 
               // DEBUG: Log immediately after API call
               this.logger.log(`📥 RAW API Response Status: ${apiResponse.status}`);
-              this.logger.log(`📥 RAW API Response Data Keys: ${Object.keys(apiResponse.data || {}).join(', ')}`);
+              this.logger.log(`📥 RAW API Response Top-Level Keys: ${Object.keys(apiResponse.data || {}).join(', ')}`);
+              this.logger.log(`📥 RAW API Response Second-Level Keys: ${Object.keys(apiResponse.data?.data || {}).join(', ')}`);
+              this.logger.log(`📥 Has home object: ${!!apiResponse.data?.data?.home}`);
               this.logger.log(`📥 RAW API Response (first 1000 chars): ${JSON.stringify(apiResponse.data).slice(0, 1000)}`);
 
               return apiResponse;
@@ -673,12 +679,14 @@ export class RapidAPIService {
             this.validatePropertyDetailResponse(response);
           } catch (validationError) {
             this.logger.error(`❌ Property detail validation failed: ${validationError.message} (NO CACHE MODE)`);
+            this.logger.error(`❌ Expected path: response.data.data.home`);
+            this.logger.error(`❌ Actual structure - data: ${!!response.data}, data.data: ${!!response.data?.data}, data.data.home: ${!!response.data?.data?.home}`);
             this.logger.error(`❌ Response data structure: ${JSON.stringify(response.data).slice(0, 2000)}`);
             throw new RapidAPIError(`Property ${propertyId} not found or has invalid data structure`);
           }
 
-          // Transform API response to our schema (FIXED: use data.home, not data.data)
-          const propertyData = this.transformToPropertySchema(response.data.home, propertyId);
+          // Transform API response to our schema (FIXED: use data.data.home - double nested!)
+          const propertyData = this.transformToPropertySchema(response.data.data.home, propertyId);
 
           // CACHING DISABLED - Skip cache save
           this.logger.log(`✅ Returning property ${propertyId} (NO CACHE)`);
