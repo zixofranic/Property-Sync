@@ -266,29 +266,13 @@ export class MLSParserController {
         return await this.lookupProperty({ propertyId: body.address.trim() });
       }
 
-      // Parse address into components
-      const addressParts = body.address.split(',').map(s => s.trim());
-      const hasStreetAddress = addressParts.length >= 3; // "Street, City, State Zip"
-      const streetAddress = hasStreetAddress ? addressParts[0].toLowerCase() : null;
-
-      console.log('🔍 Controller: Parsed street address:', streetAddress);
-
-      // Extract zip code from address
-      const zipMatch = body.address.match(/\b(\d{5})\b/);
-      const zipCode = zipMatch ? zipMatch[1] : null;
-
-      // Parse city and state
-      const { city, stateCode } = this.rapidApiService.parseAddress(body.address);
-      console.log('🔍 Controller: Parsed - city:', city, 'state:', stateCode, 'zip:', zipCode);
-
-      // Search using RapidAPI - use zip code if available (much more accurate!)
-      const searchParam = zipCode || city;
-      console.log('🔍 Controller: Searching with:', zipCode ? `zip code ${zipCode}` : `city ${city}`);
-      const results = await this.rapidApiService.searchProperties(searchParam, stateCode, 50);
+      // NEW: Use location.search parameter for accurate address-based search
+      console.log('🏠 Controller: Using address-based search with location.search');
+      const results = await this.rapidApiService.searchByAddress(body.address, 20);
       console.log('🔍 Controller: Got', results.length, 'results from RapidAPI');
 
       // Map results to response format
-      let mappedResults = results.map((property) => ({
+      const mappedResults = results.map((property) => ({
         property_id: property.property_id,
         address: property.location?.address?.line || '',
         city: property.location?.address?.city || '',
@@ -302,54 +286,11 @@ export class MLSParserController {
         status: property.status || '',
       }));
 
-      // If a specific street address was provided, try to filter results to match
-      if (streetAddress && streetAddress.length > 3) {
-        console.log('🔍 Controller: Filtering for street address:', streetAddress);
-        console.log('🔍 Controller: Total results before filtering:', mappedResults.length);
-        console.log('🔍 Controller: Sample addresses from API (first 5):');
-        mappedResults.slice(0, 5).forEach(prop => {
-          console.log('  -', prop.address);
-        });
-
-        // Extract street number from search address (e.g., "1864" from "1864 princeton dr")
-        const streetNumberMatch = streetAddress.match(/^\d+/);
-        const streetNumber = streetNumberMatch ? streetNumberMatch[0] : null;
-
-        const filtered = mappedResults.filter((prop) => {
-          const propAddress = prop.address.toLowerCase();
-
-          // If we have a street number, prioritize exact number matches
-          if (streetNumber) {
-            const propHasNumber = propAddress.startsWith(streetNumber);
-            if (propHasNumber) {
-              // Check if rest of address also matches
-              return propAddress.includes(streetAddress.replace(streetNumber, '').trim().split(' ')[0]);
-            }
-          }
-
-          // Fallback: check if the property address contains the street address
-          return propAddress.includes(streetAddress);
-        });
-
-        console.log('🔍 Controller: After filtering, found', filtered.length, 'matching properties');
-
-        // If we found matches, use them; otherwise return all results
-        if (filtered.length > 0) {
-          mappedResults = filtered; // Return all matches (don't limit to 10 yet)
-        } else {
-          // No exact matches found, return all results from the search
-          console.log('⚠️ Controller: No exact matches found, returning all search results');
-        }
-      }
-
-      // Limit final results to 20 (whether filtered or not)
-      mappedResults = mappedResults.slice(0, 20);
-
       const response = {
         success: true,
         count: mappedResults.length,
         results: mappedResults,
-        searchType: streetAddress ? 'address-filtered' : 'city-search',
+        searchType: 'address-search', // Now using location.search for accurate results
       };
 
       console.log('\n✅ SEARCH RESPONSE');

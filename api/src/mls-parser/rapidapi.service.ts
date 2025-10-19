@@ -621,6 +621,50 @@ export class RapidAPIService {
   }
 
   /**
+   * Search properties by full address string (more accurate than city/state search)
+   * @param address Full address string (e.g., "2869 Regan Ave, Redwood City, CA")
+   * @returns Array of matching properties
+   */
+  async searchByAddress(address: string, limit: number = 10): Promise<any[]> {
+    try {
+      this.logger.log(`🏠 Address search: ${address}`);
+
+      // Check API quota
+      await this.quotaManager.checkAndIncrement('/properties/v3/list');
+
+      // Use location.search parameter for full address matching
+      const response = await this.retryUtility.execute(async () => {
+        const requestBody = {
+          location: { search: address },
+          limit,
+          status: ['for_sale', 'ready_to_build'],
+          sort: {
+            direction: 'desc',
+            field: 'list_date'
+          }
+        };
+
+        this.logger.log('📤 Address Search Request:', JSON.stringify(requestBody, null, 2));
+        return await this.client.post('/properties/v3/list', requestBody);
+      });
+
+      // Validate response
+      if (!response.data?.data?.home_search?.results) {
+        this.logger.warn(`⚠️ No properties found for address: ${address}`);
+        return [];
+      }
+
+      const results = response.data.data.home_search.results;
+      this.logger.log(`✅ Found ${results.length} properties for address: ${address}`);
+
+      return results;
+    } catch (error) {
+      this.logger.error(`❌ Address search failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Autocomplete address suggestions
    * @param query Partial address string (e.g., "1864 princeton" or "Louisville, KY")
    * @returns Array of address suggestions
