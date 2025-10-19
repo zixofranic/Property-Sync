@@ -880,6 +880,7 @@ export class RapidAPIService {
   /**
    * Extract and normalize image URLs from photos array
    * RapidAPI returns photos as array of objects with href property
+   * Prefer high-resolution images over thumbnails
    */
   private extractImages(photos: any): string[] {
     if (!photos || !Array.isArray(photos)) {
@@ -889,7 +890,18 @@ export class RapidAPIService {
     return photos
       .map((photo: any) => {
         if (typeof photo === 'string') return photo;
-        return photo.href || photo.url || '';
+
+        // Prefer high-res images over thumbnails
+        // RapidAPI often has: href (thumb), high_res_href (HD), or tags with different sizes
+        const highRes = photo.high_res_href ||
+                       photo.highres ||
+                       photo.large_href ||
+                       photo.tags?.find((t: any) => t.label?.includes('virtual_tour'))?.href ||
+                       photo.href ||
+                       photo.url ||
+                       '';
+
+        return highRes;
       })
       .filter(Boolean);
   }
