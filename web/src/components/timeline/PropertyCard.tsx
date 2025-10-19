@@ -46,6 +46,9 @@ export function PropertyCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState(property.description || '');
 
   // V2 messaging hooks for notifications
   const messaging = useMessaging();
@@ -204,7 +207,7 @@ export function PropertyCard({
         whileHover={{ scale: 1.02, x: isAlternating ? 0 : 10 }}
       >
         {/* Property Image - BIGGER WITH OVERLAYS */}
-        <div className="relative h-80 bg-slate-700 group">
+        <div className="relative h-96 bg-slate-700 group">
           {/* Clickable overlay for photo viewer - Only when not loading */}
           {!isLoading && (
             <div 
@@ -326,9 +329,9 @@ export function PropertyCard({
 
           {/* View Details Button - Bottom Left */}
           <div className="absolute bottom-4 left-4 z-20 flex items-center space-x-2 flex-wrap">
-            {property.mlsLink && (
+            {(property.mlsLink || (property as any).listingUrl) && (
               <button
-                onClick={() => onViewMLS && onViewMLS(property.mlsLink!)}
+                onClick={() => onViewMLS && onViewMLS(property.mlsLink || (property as any).listingUrl)}
                 className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -403,12 +406,69 @@ export function PropertyCard({
             </div>
           )}
 
-          {/* Description */}
-          {property.description && (
+          {/* Description - Collapsible with Edit for Agents */}
+          {(property.description || !isClientView) && (
             <div className="mb-4">
-              <p className="text-slate-300 text-lg leading-relaxed font-medium">
-                {property.description}
-              </p>
+              {isEditingDescription && !isClientView ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    placeholder="Add property description..."
+                    rows={6}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-300 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        // TODO: Save description to backend
+                        setIsEditingDescription(false);
+                      }}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditedDescription(property.description || '');
+                        setIsEditingDescription(false);
+                      }}
+                      className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {property.description && (
+                    <>
+                      <p className={`text-slate-300 text-sm leading-relaxed ${!isDescriptionExpanded && property.description.length > 200 ? 'line-clamp-3' : ''}`}>
+                        {property.description}
+                      </p>
+                      {property.description.length > 200 && (
+                        <button
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          className="text-blue-400 hover:text-blue-300 text-sm font-medium mt-1"
+                        >
+                          {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {!isClientView && (
+                    <button
+                      onClick={() => setIsEditingDescription(true)}
+                      className="text-slate-400 hover:text-slate-300 text-xs mt-2 flex items-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span>Edit description</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
