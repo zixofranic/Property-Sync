@@ -633,9 +633,12 @@ export class RapidAPIService {
       await this.quotaManager.checkAndIncrement('/locations/v3/auto-complete');
 
       // Call RapidAPI autocomplete endpoint
+      // Note: Using the same endpoint as property search but with autocomplete flag
       const response = await this.retryUtility.execute(async () => {
-        return await this.client.get('/locations/v3/auto-complete', {
-          params: { input: query },
+        return await this.client.post('/properties/v3/list', {
+          location: { search: query },
+          limit: 10,
+          autocomplete: true
         });
       });
 
