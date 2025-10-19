@@ -43,6 +43,11 @@ export function RapidAPIAddPropertyModal({ isOpen, onClose }: RapidAPIAddPropert
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Autocomplete state
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [isLoadingAutocomplete, setIsLoadingAutocomplete] = useState(false);
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
@@ -50,8 +55,39 @@ export function RapidAPIAddPropertyModal({ isOpen, onClose }: RapidAPIAddPropert
       setSearchResults([]);
       setSelectedPropertyId(null);
       setHasSearched(false);
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
     }
   }, [isOpen]);
+
+  // Debounced autocomplete
+  useEffect(() => {
+    // Only autocomplete if query is at least 3 characters and user hasn't searched yet
+    if (searchQuery.trim().length < 3 || hasSearched) {
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    setIsLoadingAutocomplete(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await apiClient.autocompleteAddress(searchQuery);
+        if (response.data?.suggestions) {
+          setAutocompleteSuggestions(response.data.suggestions);
+          setShowAutocomplete(response.data.suggestions.length > 0);
+        }
+      } catch (error) {
+        console.error('Autocomplete failed:', error);
+        setAutocompleteSuggestions([]);
+        setShowAutocomplete(false);
+      } finally {
+        setIsLoadingAutocomplete(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, hasSearched]);
 
   // Handle address search
   const handleSearch = async () => {
@@ -260,36 +296,90 @@ export function RapidAPIAddPropertyModal({ isOpen, onClose }: RapidAPIAddPropert
                 Enter Address, City, or Property ID
               </label>
 
-              <div className="flex space-x-3">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="e.g., 1700441 or Louisville, KY or 3617 Nellie Bly Dr, Louisville, KY"
-                  disabled={isSearching}
-                />
-                <motion.button
-                  type="button"
-                  onClick={handleSearch}
-                  disabled={isSearching || !selectedClient}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                  whileHover={{ scale: isSearching ? 1 : 1.02 }}
-                  whileTap={{ scale: isSearching ? 1 : 0.98 }}
-                >
-                  {isSearching ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Searching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-5 h-5" />
-                      <span>Search</span>
-                    </>
+              <div className="relative">
+                <div className="flex space-x-3">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onFocus={() => {
+                      if (autocompleteSuggestions.length > 0 && !hasSearched) {
+                        setShowAutocomplete(true);
+                      }
+                    }}
+                    className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="e.g., 1700441 or Louisville, KY or 3617 Nellie Bly Dr, Louisville, KY"
+                    disabled={isSearching}
+                  />
+                  <motion.button
+                    type="button"
+                    onClick={handleSearch}
+                    disabled={isSearching || !selectedClient}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                    whileHover={{ scale: isSearching ? 1 : 1.02 }}
+                    whileTap={{ scale: isSearching ? 1 : 0.98 }}
+                  >
+                    {isSearching ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Searching...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-5 h-5" />
+                        <span>Search</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+
+                {/* Autocomplete Dropdown */}
+                <AnimatePresence>
+                  {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-10 w-[calc(100%-120px)] mt-2 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto"
+                    >
+                      {autocompleteSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const fullAddress = suggestion.address
+                              ? `${suggestion.address}${suggestion.city ? ', ' + suggestion.city : ''}${suggestion.state ? ', ' + suggestion.state : ''}`
+                              : suggestion.display;
+                            setSearchQuery(fullAddress);
+                            setShowAutocomplete(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-slate-600 transition-colors border-b border-slate-600 last:border-b-0 flex items-start space-x-3"
+                        >
+                          <MapPin className="w-4 h-4 text-blue-400 mt-1 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white text-sm font-medium truncate">
+                              {suggestion.address || suggestion.display}
+                            </div>
+                            <div className="text-slate-400 text-xs truncate">
+                              {suggestion.city && suggestion.state
+                                ? `${suggestion.city}, ${suggestion.state}${suggestion.zipCode ? ' ' + suggestion.zipCode : ''}`
+                                : suggestion.areaType}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
                   )}
-                </motion.button>
+                </AnimatePresence>
+
+                {isLoadingAutocomplete && !showAutocomplete && (
+                  <div className="absolute z-10 w-[calc(100%-120px)] mt-2 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl px-4 py-3">
+                    <div className="flex items-center space-x-2 text-slate-400 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading suggestions...</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <p className="text-xs text-slate-400 mt-2">

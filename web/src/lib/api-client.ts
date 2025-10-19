@@ -1146,14 +1146,20 @@ async updateEmailPreferences(preferences: {
 
   /**
    * Get address autocomplete suggestions
-   * @param query - Partial address string
-   * @returns Array of autocomplete suggestions
+   * @param query - Partial address string (min 3 characters)
+   * @returns Array of autocomplete suggestions from RapidAPI
    */
   async autocompleteAddress(query: string): Promise<ApiResponse<{
     success: boolean;
+    count: number;
     suggestions: Array<{
-      text: string;
-      type: string;
+      display: string;
+      address: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      propertyId: string;
+      areaType: string;
     }>;
   }>> {
     return this.request(`/api/v1/mls/autocomplete?query=${encodeURIComponent(query)}`);
