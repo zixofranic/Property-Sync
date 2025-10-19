@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, 
-  Plus, 
-  Settings, 
-  BarChart3, 
+import {
+  Users,
+  Plus,
+  Settings,
+  BarChart3,
   CreditCard,
   Search,
   Bell,
@@ -28,12 +28,14 @@ import {
   AlertCircle,
   X,
   ExternalLink,
-  Palette
+  Palette,
+  Link as LinkIcon
 } from 'lucide-react';
 import { useMissionControlStore, Property } from '@/stores/missionControlStore';
 import { useHUD } from '@/providers/HUDProvider';
 import { useMessaging } from '@/contexts/MessagingContext';
 import { RapidAPIAddPropertyModal } from './modals/RapidAPIAddPropertyModal';
+import { BatchPropertyModal } from '../modals/BatchPropertyModal';
 import { MLSViewModal } from '../modals/MLSViewModal';
 import { PropertyCard } from '../timeline/PropertyCard';
 import { Notifications } from '../ui/Notifications';
@@ -114,6 +116,7 @@ export function MissionControl() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [currentHue, setCurrentHue] = useState(220);
+  const [showAddPropertyMenu, setShowAddPropertyMenu] = useState(false);
   const themeInitialized = useRef(false);
   const [emailState, setEmailState] = useState<any>(null);
   const [emailStateLoading, setEmailStateLoading] = useState(false);
@@ -178,7 +181,7 @@ export function MissionControl() {
     }
   };
 
-  // Close notifications dropdown and color picker when clicking outside
+  // Close notifications dropdown, color picker, and add property menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -188,11 +191,14 @@ export function MissionControl() {
       if (showColorPicker && !target.closest('[data-color-picker]')) {
         setShowColorPicker(false);
       }
+      if (showAddPropertyMenu && !target.closest('[data-add-property-menu]')) {
+        setShowAddPropertyMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotificationsDropdown, showColorPicker]);
+  }, [showNotificationsDropdown, showColorPicker, showAddPropertyMenu]);
 
   // Get current timeline and properties
   const currentTimeline = selectedClient ? getClientTimeline(selectedClient.id) : null;
@@ -1271,7 +1277,7 @@ const testProfileAPI = async () => {
                   >
                     <div className="relative mb-8">
                       <motion.button
-                        onClick={() => setActiveModal('add-property')}
+                        onClick={() => setShowAddPropertyMenu(true)}
                         className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 rounded-full flex items-center justify-center mx-auto shadow-2xl transition-all duration-300 cursor-pointer"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
@@ -1282,11 +1288,11 @@ const testProfileAPI = async () => {
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-4">Start Building the Timeline</h3>
                     <p className="text-slate-400 mb-8 text-lg leading-relaxed">
-                      Add the first property to {selectedClient.name || 'this client'}'s journey and watch their engagement grow. 
+                      Add the first property to {selectedClient.name || 'this client'}'s journey and watch their engagement grow.
                       Create a personalized experience that converts browsers into buyers.
                     </p>
                     <motion.button
-                      onClick={() => setActiveModal('add-property')}
+                      onClick={() => setShowAddPropertyMenu(true)}
                       className="px-10 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -1331,24 +1337,69 @@ const testProfileAPI = async () => {
 
       {/* Prominent Add Property Button - Only show when there are properties */}
       {selectedClient && properties.length > 0 && (
-        <div className="fixed bottom-32 right-4 sm:right-20">
-          <motion.button
-            onClick={() => setActiveModal('add-property')}
-            disabled={!isOnline}
-            className={`w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
-              isOnline
-                ? 'hover:scale-110 cursor-pointer' 
-                : 'opacity-50 cursor-not-allowed'
-            }`}
-            whileHover={{ scale: isOnline ? 1.1 : 1 }}
-            whileTap={{ scale: isOnline ? 0.95 : 1 }}
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Plus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
-          </motion.button>
+        <div className="fixed bottom-32 right-4 sm:right-20" data-add-property-menu>
+          <div className="relative">
+            <motion.button
+              onClick={() => setShowAddPropertyMenu(!showAddPropertyMenu)}
+              disabled={!isOnline}
+              className={`w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 ${
+                isOnline
+                  ? 'hover:scale-110 cursor-pointer'
+                  : 'opacity-50 cursor-not-allowed'
+              }`}
+              whileHover={{ scale: isOnline ? 1.1 : 1 }}
+              whileTap={{ scale: isOnline ? 0.95 : 1 }}
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Plus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+            </motion.button>
+
+            {/* Add Property Menu */}
+            <AnimatePresence>
+              {showAddPropertyMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                  className="absolute bottom-full right-0 mb-4 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden min-w-[280px]"
+                  data-add-property-menu
+                >
+                  <div className="p-2">
+                    <button
+                      onClick={() => {
+                        setActiveModal('rapidapi-search');
+                        setShowAddPropertyMenu(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg transition-all duration-200 mb-2"
+                    >
+                      <Search className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-semibold">Search by Address</div>
+                        <div className="text-xs opacity-80">Find properties via RapidAPI</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveModal('mls-scraper');
+                        setShowAddPropertyMenu(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200"
+                    >
+                      <LinkIcon className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-semibold">Import from MLS URL</div>
+                        <div className="text-xs opacity-80">Paste FlexMLS property links</div>
+                      </div>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       )}
       
@@ -1436,15 +1487,20 @@ const testProfileAPI = async () => {
 
       {/* Modals */}
       <RapidAPIAddPropertyModal
-        isOpen={activeModal === 'add-property'}
+        isOpen={activeModal === 'add-property' || activeModal === 'rapidapi-search'}
         onClose={() => {
           setActiveModal(null);
         }}
       />
 
-      <ClientsModal 
-        isOpen={activeModal === 'clients'} 
-        onClose={() => setActiveModal(null)} 
+      <BatchPropertyModal
+        isOpen={activeModal === 'mls-scraper'}
+        onClose={() => setActiveModal(null)}
+      />
+
+      <ClientsModal
+        isOpen={activeModal === 'clients'}
+        onClose={() => setActiveModal(null)}
         />
 
 
