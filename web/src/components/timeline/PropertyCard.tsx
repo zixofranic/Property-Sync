@@ -16,6 +16,7 @@ interface PropertyCardProps {
   onViewMLS?: (mlsLink: string) => void;
   onDelete?: (propertyId: string) => void;
   onDeletePhoto?: (propertyId: string, photoUrl: string) => void;
+  onUpdateDescription?: (propertyId: string, description: string) => void;
   isClientView?: boolean;
   index: number;
   isAlternating?: boolean;
@@ -29,6 +30,7 @@ export function PropertyCard({
   onViewMLS,
   onDelete,
   onDeletePhoto,
+  onUpdateDescription,
   isClientView = false,
   index,
   isAlternating = false,
@@ -421,7 +423,11 @@ export function PropertyCard({
                   <div className="flex space-x-2">
                     <button
                       onClick={() => {
-                        // TODO: Save description to backend
+                        if (onUpdateDescription) {
+                          onUpdateDescription(property.id, editedDescription);
+                        }
+                        // Update local property object
+                        property.description = editedDescription;
                         setIsEditingDescription(false);
                       }}
                       className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
