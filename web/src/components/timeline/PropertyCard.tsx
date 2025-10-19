@@ -207,7 +207,7 @@ export function PropertyCard({
         whileHover={{ scale: 1.02, x: isAlternating ? 0 : 10 }}
       >
         {/* Property Image - BIGGER WITH OVERLAYS */}
-        <div className="relative h-96 bg-slate-700 group">
+        <div className="relative h-80 bg-slate-700 group">
           {/* Clickable overlay for photo viewer - Only when not loading */}
           {!isLoading && (
             <div 
