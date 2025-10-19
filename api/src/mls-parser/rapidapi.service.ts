@@ -632,8 +632,8 @@ export class RapidAPIService {
       // Check API quota
       await this.quotaManager.checkAndIncrement('/properties/v3/list');
 
-      // Use location.search parameter for full address matching
-      const response = await this.retryUtility.execute(async () => {
+      // Try 1: Search with status filter (for_sale, ready_to_build)
+      const responseWithStatus = await this.retryUtility.execute(async () => {
         const requestBody = {
           location: { search: address },
           limit,
@@ -644,18 +644,44 @@ export class RapidAPIService {
           }
         };
 
-        this.logger.log('📤 Address Search Request:', JSON.stringify(requestBody, null, 2));
+        this.logger.log('📤 Address Search Request (with status filter):', JSON.stringify(requestBody, null, 2));
+        return await this.client.post('/properties/v3/list', requestBody);
+      });
+
+      // Check if we got results with status filter
+      if (responseWithStatus.data?.data?.home_search?.results?.length > 0) {
+        const results = responseWithStatus.data.data.home_search.results;
+        this.logger.log(`✅ Found ${results.length} properties for address: ${address} (for_sale/ready_to_build)`);
+        return results;
+      }
+
+      // Try 2: No results with status filter, try without status filter
+      this.logger.warn(`⚠️ No active listings found, searching ALL statuses for: ${address}`);
+      await this.quotaManager.checkAndIncrement('/properties/v3/list');
+
+      const responseAllStatuses = await this.retryUtility.execute(async () => {
+        const requestBody = {
+          location: { search: address },
+          limit,
+          // No status filter - get properties regardless of status
+          sort: {
+            direction: 'desc',
+            field: 'list_date'
+          }
+        };
+
+        this.logger.log('📤 Address Search Request (all statuses):', JSON.stringify(requestBody, null, 2));
         return await this.client.post('/properties/v3/list', requestBody);
       });
 
       // Validate response
-      if (!response.data?.data?.home_search?.results) {
-        this.logger.warn(`⚠️ No properties found for address: ${address}`);
+      if (!responseAllStatuses.data?.data?.home_search?.results) {
+        this.logger.warn(`⚠️ No properties found for address (even without status filter): ${address}`);
         return [];
       }
 
-      const results = response.data.data.home_search.results;
-      this.logger.log(`✅ Found ${results.length} properties for address: ${address}`);
+      const results = responseAllStatuses.data.data.home_search.results;
+      this.logger.log(`✅ Found ${results.length} properties for address: ${address} (all statuses)`);
 
       return results;
     } catch (error) {
