@@ -630,15 +630,15 @@ export class RapidAPIService {
       this.logger.log(`🔍 Autocomplete request: ${query}`);
 
       // Check API quota
-      await this.quotaManager.checkAndIncrement('/locations/v3/auto-complete');
+      await this.quotaManager.checkAndIncrement('/locations/v2/auto-complete');
 
-      // Call RapidAPI autocomplete endpoint
-      // Note: Using the same endpoint as property search but with autocomplete flag
+      // Call RapidAPI autocomplete endpoint (v2, not v3!)
       const response = await this.retryUtility.execute(async () => {
-        return await this.client.post('/properties/v3/list', {
-          location: { search: query },
-          limit: 10,
-          autocomplete: true
+        return await this.client.get('/locations/v2/auto-complete', {
+          params: {
+            input: query,
+            limit: 10
+          }
         });
       });
 
@@ -648,15 +648,24 @@ export class RapidAPIService {
       this.logger.log(`✅ Autocomplete: Found ${autocompleteResults.length} suggestions`);
 
       // Map to simplified format
-      return autocompleteResults.map((result: any) => ({
-        display: result._id || result.area_type || '',
-        address: result.full_address?.line || '',
-        city: result.full_address?.city || '',
-        state: result.full_address?.state_code || '',
-        zipCode: result.full_address?.postal_code || '',
-        propertyId: result.mpr_id || result.prop_id || '',
-        areaType: result.area_type || 'address',
-      })).filter(suggestion => suggestion.address || suggestion.display);
+      // Response structure: { autocomplete: [ { area_type, _id, line, city, state_code, postal_code, mpr_id } ] }
+      return autocompleteResults.map((result: any) => {
+        // For addresses: use line (street address)
+        // For cities/postal codes: use full_address array or construct from city/state
+        const displayAddress = result.line ||
+                               (Array.isArray(result.full_address) ? result.full_address[0] : '') ||
+                               `${result.city || ''} ${result.state_code || ''}`.trim();
+
+        return {
+          display: displayAddress,
+          address: result.line || '',
+          city: result.city || '',
+          state: result.state_code || '',
+          zipCode: result.postal_code || '',
+          propertyId: result.mpr_id || '',
+          areaType: result.area_type || 'address',
+        };
+      }).filter(suggestion => suggestion.display && suggestion.display.length > 0);
 
     } catch (error) {
       this.logger.error(`❌ Autocomplete failed: ${error.message}`);
