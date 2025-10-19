@@ -880,7 +880,7 @@ export class RapidAPIService {
   /**
    * Extract and normalize image URLs from photos array
    * RapidAPI returns photos as array of objects with href property
-   * Prefer high-resolution images over thumbnails
+   * Convert thumbnail URLs to high-resolution by manipulating URL parameters
    */
   private extractImages(photos: any): string[] {
     if (!photos || !Array.isArray(photos)) {
@@ -889,21 +889,33 @@ export class RapidAPIService {
 
     return photos
       .map((photo: any) => {
-        if (typeof photo === 'string') return photo;
+        if (typeof photo === 'string') return this.convertToHighRes(photo);
 
-        // Prefer high-res images over thumbnails
-        // RapidAPI often has: href (thumb), high_res_href (HD), or tags with different sizes
-        const highRes = photo.high_res_href ||
-                       photo.highres ||
-                       photo.large_href ||
-                       photo.tags?.find((t: any) => t.label?.includes('virtual_tour'))?.href ||
-                       photo.href ||
-                       photo.url ||
-                       '';
+        // Get the photo URL (prefer href)
+        const photoUrl = photo.href || photo.url || '';
 
-        return highRes;
+        return this.convertToHighRes(photoUrl);
       })
       .filter(Boolean);
+  }
+
+  /**
+   * Convert rdcpix.com thumbnail URLs to high-resolution
+   * Example: https://ap.rdcpix.com/abc123-m1234567890s.jpg
+   * Formats: -m (medium), -w (wide), -o (original)
+   * Change to -w1024_h768_x2 for high-res or -o for original
+   */
+  private convertToHighRes(url: string): string {
+    if (!url) return '';
+
+    // For rdcpix.com images, replace size suffix with high-res version
+    if (url.includes('rdcpix.com')) {
+      // Replace -m<digits>s with -w1920_h1080_x2 (HD resolution)
+      return url.replace(/-m\d+s\.jpg/, '-w1920_h1080_x2.jpg')
+                .replace(/-m\d+s\.webp/, '-w1920_h1080_x2.webp');
+    }
+
+    return url;
   }
 
   /**
