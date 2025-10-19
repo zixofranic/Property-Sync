@@ -633,17 +633,11 @@ export class RapidAPIService {
       await this.quotaManager.checkAndIncrement('/locations/v3/auto-complete');
 
       // Call RapidAPI autocomplete endpoint
-      const response = await this.retryUtility.execute(
-        async () => {
-          return await this.client.get('/locations/v3/auto-complete', {
-            params: { input: query },
-          });
-        },
-        {
-          maxRetries: 2,
-          shouldRetry: (error) => error.response?.status === 429 || error.code === 'ECONNABORTED',
-        },
-      );
+      const response = await this.retryUtility.execute(async () => {
+        return await this.client.get('/locations/v3/auto-complete', {
+          params: { input: query },
+        });
+      });
 
       // Parse autocomplete results
       const autocompleteResults = response.data?.autocomplete || [];
