@@ -47,10 +47,13 @@ export interface RapidAPIProperty {
     status?: string;
     listDate?: string;
     mlsNumber?: string;
+    listingAgent?: string;
+    listingOffice?: string;
   };
 
   // RapidAPI-specific enriched data
   rawData: {
+    property_id?: string;
     href?: string;
     permalink?: string;
 

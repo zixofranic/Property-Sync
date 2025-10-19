@@ -1317,9 +1317,9 @@ export class TimelinesService {
         description: rapidAPIData.description || 'Property details loading...',
 
         // Property details
-        bedrooms: parseInt(rapidAPIData.propertyDetails.beds) || null,
-        bathrooms: parseFloat(rapidAPIData.propertyDetails.baths) || null,
-        squareFootage: parseInt(rapidAPIData.propertyDetails.sqft?.replace(/,/g, '')) || null,
+        bedrooms: parseInt(rapidAPIData.propertyDetails.beds || '0') || null,
+        bathrooms: parseFloat(rapidAPIData.propertyDetails.baths || '0') || null,
+        squareFootage: parseInt((rapidAPIData.propertyDetails.sqft || '0').replace(/,/g, '')) || null,
         propertyType: rapidAPIData.propertyDetails.propertyType || null,
 
         // Images and listing

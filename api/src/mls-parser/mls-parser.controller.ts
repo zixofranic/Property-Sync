@@ -439,22 +439,6 @@ export class MLSParserController {
       // Fetch full property details from RapidAPI
       const propertyData = await this.rapidApiService.getPropertyById(body.propertyId);
 
-      // Check for duplicates
-      const duplicateCheck = await this.mlsParserService.checkEnhancedDuplicate(
-        agentId,
-        body.clientId,
-        propertyData,
-      );
-
-      if (duplicateCheck.isDuplicate) {
-        return {
-          success: false,
-          error: `Property already tracked: ${duplicateCheck.reason}`,
-          isDuplicate: true,
-          existingProperty: duplicateCheck.existingProperty,
-        };
-      }
-
       // Find or create timeline for this client
       console.log('📋 Getting timeline for client:', body.clientId);
       let timeline = await this.timelinesService.getAgentTimeline(agentId, body.clientId);
