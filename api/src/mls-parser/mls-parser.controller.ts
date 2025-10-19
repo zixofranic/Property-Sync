@@ -416,6 +416,43 @@ export class MLSParserController {
   }
 
   /**
+   * Autocomplete address suggestions using RapidAPI
+   * Example: GET /api/v1/mls/autocomplete?query=1864+princeton
+   * Returns: Array of address suggestions with property IDs
+   */
+  @Get('autocomplete')
+  @UseGuards(JwtAuthGuard)
+  async autocompleteAddress(@Query('query') query: string) {
+    try {
+      if (!query || query.trim().length < 3) {
+        return {
+          success: true,
+          suggestions: [],
+          message: 'Query must be at least 3 characters',
+        };
+      }
+
+      console.log('🔍 Autocomplete request:', query);
+
+      // Call RapidAPI autocomplete service
+      const suggestions = await this.rapidApiService.autocompleteAddress(query);
+
+      return {
+        success: true,
+        suggestions,
+        count: suggestions.length,
+      };
+    } catch (error) {
+      console.error('❌ Autocomplete error:', error.message);
+      return {
+        success: false,
+        error: error.message,
+        suggestions: [],
+      };
+    }
+  }
+
+  /**
    * Import property by property_id using RapidAPI
    * Example: POST /api/v1/mls/import
    * Body: { "propertyId": "4951372754", "clientId": "required-client-id" }

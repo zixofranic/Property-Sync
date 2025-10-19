@@ -621,6 +621,53 @@ export class RapidAPIService {
   }
 
   /**
+   * Autocomplete address suggestions
+   * @param query Partial address string (e.g., "1864 princeton" or "Louisville, KY")
+   * @returns Array of address suggestions
+   */
+  async autocompleteAddress(query: string): Promise<any[]> {
+    try {
+      this.logger.log(`🔍 Autocomplete request: ${query}`);
+
+      // Check API quota
+      await this.quotaManager.checkAndIncrement('/locations/v3/auto-complete');
+
+      // Call RapidAPI autocomplete endpoint
+      const response = await this.retryUtility.execute(
+        async () => {
+          return await this.client.get('/locations/v3/auto-complete', {
+            params: { input: query },
+          });
+        },
+        {
+          maxRetries: 2,
+          shouldRetry: (error) => error.response?.status === 429 || error.code === 'ECONNABORTED',
+        },
+      );
+
+      // Parse autocomplete results
+      const autocompleteResults = response.data?.autocomplete || [];
+
+      this.logger.log(`✅ Autocomplete: Found ${autocompleteResults.length} suggestions`);
+
+      // Map to simplified format
+      return autocompleteResults.map((result: any) => ({
+        display: result._id || result.area_type || '',
+        address: result.full_address?.line || '',
+        city: result.full_address?.city || '',
+        state: result.full_address?.state_code || '',
+        zipCode: result.full_address?.postal_code || '',
+        propertyId: result.mpr_id || result.prop_id || '',
+        areaType: result.area_type || 'address',
+      })).filter(suggestion => suggestion.address || suggestion.display);
+
+    } catch (error) {
+      this.logger.error(`❌ Autocomplete failed: ${error.message}`);
+      throw new Error(`Autocomplete failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Get full property details by property_id
    * @param propertyId RapidAPI property_id
    * @returns Full parsed property data
