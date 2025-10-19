@@ -717,6 +717,9 @@ export class RapidAPIService {
 
       this.logger.log(`✅ Autocomplete: Found ${autocompleteResults.length} suggestions`);
 
+      // DEBUG: Log raw autocomplete results to understand structure
+      this.logger.log('🔍 RAW Autocomplete Results:', JSON.stringify(autocompleteResults.slice(0, 3), null, 2));
+
       // Map to simplified format
       // Response structure: { autocomplete: [ { area_type, _id, line, city, state_code, postal_code, mpr_id } ] }
       return autocompleteResults.map((result: any) => {
