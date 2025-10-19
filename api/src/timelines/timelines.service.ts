@@ -1289,7 +1289,7 @@ export class TimelinesService {
   async addRapidAPIPropertyToTimeline(
     agentId: string,
     timelineId: string,
-    rapidAPIData: any, // ParsedMLSProperty from RapidAPIService
+    rapidAPIData: import('../mls-parser/interfaces/rapidapi-property.interface').RapidAPIProperty,
   ) {
     // Check plan limits before adding property
     const canAdd = await this.usersService.checkCanAddProperties(agentId, 1);
@@ -1331,7 +1331,7 @@ export class TimelinesService {
         addressNormalized: this.normalizeAddress(rapidAPIData.address.full),
 
         // RapidAPI-specific fields
-        rapidapi_property_id: rapidAPIData.shareId,
+        rapidapi_property_id: rapidAPIData.property_id,
         rapidapi_permalink: rapidAPIData.rawData.permalink || undefined,
         tax_history: rapidAPIData.rawData.tax_history || undefined,
         nearby_schools: rapidAPIData.rawData.nearby_schools || undefined,

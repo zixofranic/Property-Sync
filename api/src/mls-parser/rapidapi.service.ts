@@ -2,7 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import axios, { AxiosInstance } from 'axios';
-import { ParsedMLSProperty } from './interfaces/mls-property.interface';
+import { RapidAPIProperty } from './interfaces/rapidapi-property.interface';
 
 /**
  * RapidAPI Real Estate Service
@@ -625,7 +625,7 @@ export class RapidAPIService {
    * @param propertyId RapidAPI property_id
    * @returns Full parsed property data
    */
-  async getPropertyById(propertyId: string): Promise<ParsedMLSProperty> {
+  async getPropertyById(propertyId: string): Promise<RapidAPIProperty> {
     // CACHING DISABLED FOR TESTING - Skip all cache operations
     this.logger.log(`🔴 Cache DISABLED: Fetching property ${propertyId} fresh from RapidAPI`);
 
@@ -639,7 +639,7 @@ export class RapidAPIService {
    */
   private async executePropertyDetailRequestNoCache(
     propertyId: string
-  ): Promise<ParsedMLSProperty> {
+  ): Promise<RapidAPIProperty> {
     this.logger.log(`🔴 Fetching property details for ID: ${propertyId} (NO CACHE)`);
 
     // No fallback when testing
@@ -805,7 +805,7 @@ export class RapidAPIService {
   private transformToPropertySchema(
     data: any,
     propertyId: string,
-  ): ParsedMLSProperty {
+  ): RapidAPIProperty {
     // Extract address - detail endpoint has different structure than search
     const address = data.location?.address || {};
 
@@ -830,7 +830,8 @@ export class RapidAPIService {
     const desc = data.description || {};
 
     return {
-      shareId: propertyId || data.property_id || data.listing_id || '',
+      property_id: propertyId || data.property_id || '',
+      listing_id: data.listing_id || undefined,
       address: {
         street,
         city,
