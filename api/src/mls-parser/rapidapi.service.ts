@@ -350,6 +350,12 @@ export class RapidAPIService {
       timeout: 10000, // 10 second timeout
     });
 
+    // DEBUG: Log API configuration
+    this.logger.log(`🔑 RapidAPI initialized:`);
+    this.logger.log(`   Host: ${this.apiHost}`);
+    this.logger.log(`   Key: ${this.apiKey ? this.apiKey.substring(0, 10) + '...' : 'NOT SET'}`);
+    this.logger.log(`   BaseURL: https://${this.apiHost}`);
+
     // Initialize circuit breaker
     this.circuitBreaker = new CircuitBreaker(this.logger);
 
