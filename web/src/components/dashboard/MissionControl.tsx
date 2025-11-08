@@ -1335,8 +1335,8 @@ const testProfileAPI = async () => {
         </div>
       </div>
 
-      {/* Prominent Add Property Button - Only show when there are properties */}
-      {selectedClient && properties.length > 0 && (
+      {/* Prominent Add Property Button - Show when client is selected */}
+      {selectedClient && (
         <div className="fixed bottom-32 right-4 sm:right-20" data-add-property-menu>
           <div className="relative">
             <motion.button
