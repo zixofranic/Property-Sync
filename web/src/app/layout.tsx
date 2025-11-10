@@ -5,6 +5,7 @@ import './globals.css';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { HUDProvider } from '@/providers/HUDProvider';
 import { MessagingProvider } from '@/contexts/MessagingContext';
+import { UnifiedBadgeProvider } from '@/contexts/UnifiedBadgeContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,9 +26,11 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning={true}>
         <AuthProvider>
           <HUDProvider>
-            <MessagingProvider>
-              {children}
-            </MessagingProvider>
+            <UnifiedBadgeProvider>
+              <MessagingProvider>
+                {children}
+              </MessagingProvider>
+            </UnifiedBadgeProvider>
           </HUDProvider>
         </AuthProvider>
       </body>
