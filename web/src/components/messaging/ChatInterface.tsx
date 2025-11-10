@@ -27,6 +27,7 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const joinedPropertyRef = useRef<string | null>(null);
+  const propertyIdRef = useRef(propertyId); // Track propertyId for cleanup
   const { user } = useMissionControlStore();
 
   // V2 messaging
@@ -89,6 +90,21 @@ export default function ChatInterface({
     }
   };
 
+
+  // Update propertyId ref when it changes
+  useEffect(() => {
+    propertyIdRef.current = propertyId;
+  }, [propertyId]);
+
+  // Cleanup: leave conversation ONLY on unmount
+  useEffect(() => {
+    return () => {
+      if (propertyIdRef.current && messaging.leavePropertyConversation) {
+        console.log(`🧹 ChatInterface cleanup: Leaving property ${propertyIdRef.current}`);
+        messaging.leavePropertyConversation(propertyIdRef.current);
+      }
+    };
+  }, []); // Empty array = only runs on mount/unmount
 
   // Initialize conversation if we have timelineId but no conversationId
   useEffect(() => {

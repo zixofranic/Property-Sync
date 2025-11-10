@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { io, Socket } from 'socket.io-client';
 import { useMissionControlStore } from '@/stores/missionControlStore';
 import { useBadgePersistenceStore } from '@/stores/badgePersistenceStore';
+import { useUnifiedBadges } from './UnifiedBadgeContext'; // P2-7: Unified badge system integration
 
 // Extend Socket interface to include our cleanup function
 declare module 'socket.io-client' {
@@ -138,6 +139,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useMissionControlStore();
   const { addNotification } = useMissionControlStore();
 
+  // P2-7: Integrate with unified badge system
+  const unifiedBadges = useUnifiedBadges();
+
   // Connection state with state machine
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.IDLE);
@@ -171,6 +175,19 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }>;
     }>;
   } | null>(null);
+
+  // P2-6 FIX: Flattened badge state for O(1) lookups
+  const [flatBadgeState, setFlatBadgeState] = useState<{
+    totalUnread: number;
+    byClient: Record<string, number>; // clientId -> unreadCount
+    byProperty: Record<string, { count: number; clientId: string; address: string }>; // propertyId -> { count, clientId, address }
+    clientNames: Record<string, string>; // clientId -> clientName
+  }>({
+    totalUnread: 0,
+    byClient: {},
+    byProperty: {},
+    clientNames: {},
+  });
 
   // PHASE 2: Client unread counts state (Client-only)
   const [clientUnreadCounts, setClientUnreadCounts] = useState<Record<string, number>>({});
@@ -216,6 +233,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const MAX_CONNECTION_ATTEMPTS = 10;
   const BACKOFF_DELAYS = [1000, 2000, 5000, 10000, 30000]; // Exponential backoff delays
+
+  // P1-5 FIX: AbortController for request deduplication
+  const fetchAbortControllerRef = useRef<AbortController | null>(null);
 
   // TASK 1 & 2: Auth state initialization tracking
   const [authStateChecked, setAuthStateChecked] = useState(false);
@@ -908,6 +928,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
         // TASK 8: Clear recently processed messages Map
         setRecentlyProcessedMessages(new Map());
+
+        // P2-8 FIX: Invalidate badge cache on disconnect
+        const { clearCache } = useBadgePersistenceStore.getState();
+        clearCache();
+        console.log('🗑️ P2-8: Badge cache cleared on disconnect');
       } else {
         console.log('🔄 Page refresh detected, preserving connection state');
       }
@@ -1684,11 +1709,23 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       messages: MessageV2[];
       status: string;
     }) => {
-      console.log('🔵 Property conversation joined:', data);
+      console.log('🔵 Property conversation joined:', {
+        propertyId: data.propertyId,
+        conversationId: data.conversationId,
+        status: data.status,
+        messageCount: data.messages?.length || 0,
+        messages: data.messages?.map(m => ({
+          id: m.id,
+          content: m.content?.substring(0, 30),
+          senderType: m.senderType,
+          senderId: m.senderId,
+          createdAt: m.createdAt
+        }))
+      });
 
       // Handle different status responses
       if (data.status === 'success' && data.conversationId) {
-        console.log(`✅ Property ${data.propertyId} joined successfully`);
+        console.log(`✅ Property ${data.propertyId} joined successfully with ${data.messages?.length || 0} messages`);
 
         // Store conversation data
         setPropertyConversations(prev => ({
@@ -1768,7 +1805,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
             finalCount: finalMessages.length,
             tempMessagesPreserved: finalMessages.filter(m => m.id.startsWith('temp-')).length,
             duplicatesPrevented: (existingMessages.length + serverMessages.length) - finalMessages.length,
-            markedAsProcessed: serverMessages.length
+            markedAsProcessed: serverMessages.length,
+            finalMessages: finalMessages.map(m => ({
+              id: m.id,
+              content: m.content?.substring(0, 30),
+              senderType: m.senderType,
+              senderId: m.senderId
+            }))
           });
 
           return {
@@ -1815,10 +1858,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         return prev;
       });
 
-      // TASK 6 + PHASE 3: Request badge refresh based on user type
-      if (currentUserType === 'AGENT') {
-        fetchHierarchicalUnreadCounts();
-      } else if (currentUserType === 'CLIENT') {
+      // P1-3 FIX: Removed redundant fetchHierarchicalUnreadCounts() call
+      // Badge updates now come via hierarchicalUnreadCountsUpdated event (P0-1 fix)
+      if (currentUserType === 'CLIENT') {
         // PHASE 3: Update client badge counts directly from socket event
         setClientUnreadCounts(prev => ({
           ...prev,
@@ -1828,7 +1870,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // ISSUE 1 FIX: Listen for hierarchical unread counts updated event
+    // ISSUE 1 FIX + P2-7: Listen for hierarchical unread counts updated event
     newSocket.on('hierarchicalUnreadCountsUpdated', (data: {
       totalUnread: number;
       clients: Array<{
@@ -1842,13 +1884,33 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         }>;
       }>;
     }) => {
-      console.log('📊 ISSUE 1: Hierarchical unread counts updated via WebSocket:', data);
+      console.log('📊 P2-7: Hierarchical unread counts updated via WebSocket:', data);
 
-      // Directly update the hierarchical unread counts state
+      // Directly update the hierarchical unread counts state (legacy)
       setHierarchicalUnreadCounts(data);
 
-      // Trigger badge re-render by updating the state
-      console.log('✅ ISSUE 1: Badge state updated with real-time hierarchical counts');
+      // P2-7: Sync with unified badge system
+      // Clear existing message badges and add new ones
+      unifiedBadges.clearBadgesByType('message');
+
+      data.clients.forEach(client => {
+        client.properties.forEach(property => {
+          if (property.unreadCount > 0) {
+            unifiedBadges.addBadge({
+              type: 'message',
+              count: property.unreadCount,
+              read: false,
+              clientId: client.clientId,
+              clientName: client.clientName,
+              propertyId: property.propertyId,
+              propertyAddress: property.address,
+              color: 'orange',
+            });
+          }
+        });
+      });
+
+      console.log('✅ P2-7: Synced hierarchical badge counts to unified system');
     });
 
     newSocket.on('error', (error: any) => {
@@ -1856,13 +1918,20 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       const lastErrorTime = newSocket.lastErrorTime || 0;
 
-      if (now - lastErrorTime > 1000) { // Only log errors once per second
-        console.error('❌ V2 messaging error:', error);
+      // P0 FIX: Handle empty error objects gracefully
+      const errorMessage = error?.message || error?.error || 'Unknown error';
+      const hasUsefulError = error && (error.message || error.error || Object.keys(error).length > 0);
+
+      if (now - lastErrorTime > 1000 && hasUsefulError) { // Only log errors once per second
+        console.error('❌ V2 messaging error:', {
+          message: errorMessage,
+          details: error
+        });
         newSocket.lastErrorTime = now;
       }
 
       // Only show critical connection errors to user
-      if (error.message &&
+      if (error?.message &&
           !error.message.includes('Failed to mark messages as read') &&
           !error.message.includes('Property conversation not found') &&
           !error.message.includes('Authentication required')) {
@@ -1908,6 +1977,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         }
         setSocket(null);
         setIsConnected(false);
+
+        // P2-8 FIX: Invalidate badge cache on cleanup
+        const { clearCache } = useBadgePersistenceStore.getState();
+        clearCache();
+        console.log('🗑️ P2-8: Badge cache cleared on cleanup');
       }
     };
   }, [socket]);
@@ -1927,6 +2001,36 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [currentUserId, currentUserType]);
+
+  // P2-9 FIX: Multi-tab synchronization via storage events
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      // Only handle badge persistence storage changes
+      if (event.key === 'badge-persistence-storage' && event.newValue) {
+        try {
+          const newState = JSON.parse(event.newValue);
+          const cachedBadgeState = newState.state?.cachedBadgeState;
+
+          if (cachedBadgeState?.hierarchicalCounts) {
+            console.log('🔄 P2-9: Badge state synced from another tab');
+            setHierarchicalUnreadCounts(cachedBadgeState.hierarchicalCounts);
+          }
+        } catch (error) {
+          console.error('❌ P2-9: Failed to parse storage event:', error);
+        }
+      }
+    };
+
+    // Listen for storage changes from other tabs
+    window.addEventListener('storage', handleStorageChange);
+
+    console.log('👀 P2-9: Multi-tab synchronization enabled');
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      console.log('🧹 P2-9: Multi-tab synchronization listener removed');
+    };
+  }, []);
 
   // TASK 10: Get or create property conversation with state lifecycle
   const getOrCreatePropertyConversation = useCallback(async (propertyId: string, timelineId: string): Promise<PropertyConversation> => {
@@ -2285,10 +2389,99 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         [propertyId]: 0,
       }));
+
+      // P0-2 + P2-6 FIX: Optimistically update badge counts - now uses flat state for O(1) updates
+      if (userType === 'AGENT' && unreadMessages.length > 0) {
+        console.log(`🔄 P0-2/P2-6: Optimistically decrementing badge by ${unreadMessages.length} for property ${propertyId}`);
+
+        // P2-6: Direct O(1) update to flat state
+        setFlatBadgeState(prev => {
+          const propertyData = prev.byProperty[propertyId];
+
+          if (!propertyData) {
+            console.log('⚠️ P2-6: Property not found in flat state, skipping optimistic update');
+            return prev;
+          }
+
+          const clientId = propertyData.clientId;
+          const oldPropertyCount = propertyData.count;
+          const oldClientCount = prev.byClient[clientId] || 0;
+
+          // Calculate new counts
+          const newPropertyCount = Math.max(0, oldPropertyCount - unreadMessages.length);
+          const newClientCount = Math.max(0, oldClientCount - unreadMessages.length);
+          const newTotal = Math.max(0, prev.totalUnread - unreadMessages.length);
+
+          console.log(`✅ P2-6: Badge optimistically updated (total: ${prev.totalUnread} → ${newTotal})`);
+
+          return {
+            ...prev,
+            totalUnread: newTotal,
+            byClient: {
+              ...prev.byClient,
+              [clientId]: newClientCount,
+            },
+            byProperty: {
+              ...prev.byProperty,
+              [propertyId]: {
+                ...propertyData,
+                count: newPropertyCount,
+              },
+            },
+          };
+        });
+
+        // Also update hierarchical state for backward compatibility
+        setHierarchicalUnreadCounts(prev => {
+          if (!prev) return prev;
+
+          const clientWithProperty = prev.clients.find(client =>
+            client.properties.some(prop => prop.propertyId === propertyId)
+          );
+
+          if (!clientWithProperty) return prev;
+
+          const updatedClients = prev.clients.map(client => {
+            if (client.clientId !== clientWithProperty.clientId) {
+              return client;
+            }
+
+            const updatedProperties = client.properties.map(prop => {
+              if (prop.propertyId !== propertyId) {
+                return prop;
+              }
+              return {
+                ...prop,
+                unreadCount: Math.max(0, prop.unreadCount - unreadMessages.length),
+              };
+            });
+
+            return {
+              ...client,
+              properties: updatedProperties,
+              unreadCount: Math.max(0, client.unreadCount - unreadMessages.length),
+            };
+          });
+
+          return {
+            totalUnread: Math.max(0, prev.totalUnread - unreadMessages.length),
+            clients: updatedClients,
+          };
+        });
+
+        // P2-8 FIX: Invalidate badge cache after marking as read to prevent stale counts
+        const { clearCache } = useBadgePersistenceStore.getState();
+        clearCache();
+        console.log('🗑️ P2-8: Badge cache cleared after mark-as-read to prevent stale counts');
+
+        // P2-7: Sync to unified badge system
+        unifiedBadges.markMessagesAsRead(propertyId, unreadMessages.map(m => m.id));
+        console.log('✅ P2-7: Synced mark-as-read to unified badge system');
+      }
     } catch (error) {
       console.error('❌ Failed to mark messages as read:', error);
     }
-  }, [socket, isConnected, propertyConversations, messages, currentUserId, currentUserType]);
+  }, [socket, isConnected, propertyConversations, messages, currentUserId, currentUserType, user, unifiedBadges]);
 
   // Join property conversation (load messages)
   const joinPropertyConversation = useCallback((propertyId: string) => {
@@ -2418,11 +2611,52 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  // TASK 3: Get total unread count across all properties (memoized)
+  // P2-6 FIX: Helper function to convert hierarchical data to flat structure
+  const hierarchicalToFlat = useCallback((hierarchical: typeof hierarchicalUnreadCounts) => {
+    if (!hierarchical) {
+      return {
+        totalUnread: 0,
+        byClient: {},
+        byProperty: {},
+        clientNames: {},
+      };
+    }
+
+    const byClient: Record<string, number> = {};
+    const byProperty: Record<string, { count: number; clientId: string; address: string }> = {};
+    const clientNames: Record<string, string> = {};
+
+    hierarchical.clients.forEach(client => {
+      byClient[client.clientId] = client.unreadCount;
+      clientNames[client.clientId] = client.clientName;
+
+      client.properties.forEach(property => {
+        byProperty[property.propertyId] = {
+          count: property.unreadCount,
+          clientId: client.clientId,
+          address: property.address,
+        };
+      });
+    });
+
+    return {
+      totalUnread: hierarchical.totalUnread,
+      byClient,
+      byProperty,
+      clientNames,
+    };
+  }, []);
+
+  // P2-6 FIX: Sync flat state whenever hierarchical state changes
+  useEffect(() => {
+    const flat = hierarchicalToFlat(hierarchicalUnreadCounts);
+    setFlatBadgeState(flat);
+  }, [hierarchicalUnreadCounts, hierarchicalToFlat]);
+
+  // TASK 3: Get total unread count across all properties (memoized) - P2-6: Now uses flat state
   const getTotalUnreadCount = useCallback(() => {
-    // Use hierarchical unread counts as the authoritative source
-    return hierarchicalUnreadCounts?.totalUnread || 0;
-  }, [hierarchicalUnreadCounts]);
+    return flatBadgeState.totalUnread;
+  }, [flatBadgeState]);
 
   // ISSUE 9 FIX: Create memoized conversationsByClient map for O(1) lookup
   const conversationsByClient = useMemo(() => {
@@ -2437,14 +2671,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return clientMap;
   }, [propertyConversations]);
 
-  // TASK 3: Get unread count for a specific client (use hierarchical data)
+  // TASK 3: Get unread count for a specific client - P2-6: O(1) lookup with flat state
   const getClientUnreadCount = useCallback((clientId: string) => {
-    // Use hierarchical unread counts as the authoritative source
-    if (!hierarchicalUnreadCounts?.clients) return 0;
-
-    const client = hierarchicalUnreadCounts.clients.find(c => c.clientId === clientId);
-    return client?.unreadCount || 0;
-  }, [hierarchicalUnreadCounts]);
+    return flatBadgeState.byClient[clientId] || 0;
+  }, [flatBadgeState]);
 
   // TASK 3: Fetch hierarchical unread counts from API
   const fetchHierarchicalUnreadCounts = useCallback(async () => {
@@ -2462,6 +2692,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+
+    // P1-5 FIX: Abort any in-flight request before starting new one
+    if (fetchAbortControllerRef.current) {
+      console.log('🛑 P1-5: Aborting previous fetch request');
+      fetchAbortControllerRef.current.abort();
+    }
+
+    // P1-5 FIX: Create new AbortController for this request
+    fetchAbortControllerRef.current = new AbortController();
+    const signal = fetchAbortControllerRef.current.signal;
 
     setBadgeDataLoading(true);
 
@@ -2491,6 +2731,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          signal, // P1-5 FIX: Pass abort signal to fetch
         }
       );
 
@@ -2505,7 +2746,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       setCachedBadgeState(data);
       console.log('✅ ISSUE 2: Cached fresh badge state to localStorage');
       console.log('✅ Hierarchical unread counts fetched:', data);
-    } catch (error) {
+    } catch (error: any) {
+      // P1-5 FIX: Handle aborted requests gracefully without logging errors
+      if (error.name === 'AbortError') {
+        console.log('🛑 P1-5: Fetch request was cancelled (deduplication)');
+        return;
+      }
       console.error('Failed to fetch hierarchical unread counts:', error);
     } finally {
       setBadgeDataLoading(false);

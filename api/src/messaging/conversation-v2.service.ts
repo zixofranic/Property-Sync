@@ -187,8 +187,15 @@ export class ConversationV2Service {
 
   // Get all conversations for an agent
   async getAgentConversations(agentId: string) {
+    // BADGE FIX: Filter out conversations for soft-deleted clients
     return this.prisma.propertyConversation.findMany({
-      where: { agentId, status: 'ACTIVE' },
+      where: {
+        agentId,
+        status: 'ACTIVE',
+        client: {
+          isActive: true, // BADGE FIX: Exclude soft-deleted clients
+        },
+      },
       include: {
         property: {
           select: {
@@ -315,10 +322,14 @@ export class ConversationV2Service {
       console.log(`📊 ISSUE 8: Fetching hierarchical counts for agent: ${agentId}`);
 
       // Single optimized query with proper joins
+      // BADGE FIX: Filter out conversations for soft-deleted clients
       const conversations = await this.prisma.propertyConversation.findMany({
         where: {
           agentId,
           status: 'ACTIVE',
+          client: {
+            isActive: true, // BADGE FIX: Exclude soft-deleted clients
+          },
         },
         select: {
           id: true,
@@ -401,11 +412,15 @@ export class ConversationV2Service {
     try {
       console.log(`📊 ISSUE 8: Fetching unread counts by client for agent: ${agentId}`);
 
+      // BADGE FIX: Filter out soft-deleted clients
       const conversations = await this.prisma.propertyConversation.groupBy({
         by: ['clientId'],
         where: {
           agentId,
           status: 'ACTIVE',
+          client: {
+            isActive: true, // BADGE FIX: Exclude soft-deleted clients
+          },
         },
         _sum: {
           unreadAgentCount: true,

@@ -71,7 +71,26 @@ export default function ChatInterfaceV2({
 
   // Get current property messages with stronger deduplication
   const currentMessages = useMemo(() => {
-    if (!propertyId || !messages[propertyId]) return [];
+    if (!propertyId) {
+      console.log('🔍 ChatInterface: No propertyId provided');
+      return [];
+    }
+
+    if (!messages[propertyId]) {
+      console.log('🔍 ChatInterface: No messages found for property:', propertyId);
+      console.log('   Available properties in messages:', Object.keys(messages));
+      return [];
+    }
+
+    console.log('🔍 ChatInterface: Processing messages for property:', propertyId, {
+      rawMessageCount: messages[propertyId].length,
+      rawMessages: messages[propertyId].map(m => ({
+        id: m.id,
+        content: m.content?.substring(0, 30),
+        senderType: m.senderType,
+        senderId: m.senderId
+      }))
+    });
 
     const messageMap = new Map();
     messages[propertyId].forEach(message => {
@@ -81,8 +100,12 @@ export default function ChatInterfaceV2({
       }
     });
 
-    return Array.from(messageMap.values())
+    const dedupedMessages = Array.from(messageMap.values())
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Newest first
+
+    console.log('🔍 ChatInterface: Final message count after dedup:', dedupedMessages.length);
+
+    return dedupedMessages;
   }, [propertyId, messages]);
 
 
@@ -111,15 +134,22 @@ export default function ChatInterfaceV2({
     }
   }, [propertyId, timelineId, isConnected]);
 
-  // Cleanup on unmount
+  // Track current propertyId in ref for cleanup
+  const propertyIdRef = useRef(propertyId);
+
+  useEffect(() => {
+    propertyIdRef.current = propertyId;
+  }, [propertyId]);
+
+  // Cleanup on unmount ONLY (not on propertyId changes)
   useEffect(() => {
     return () => {
-      if (propertyId) {
-        console.log(`🧹 Cleaning up property: ${propertyId}`);
-        leavePropertyConversation(propertyId);
+      if (propertyIdRef.current) {
+        console.log(`🧹 Cleaning up property: ${propertyIdRef.current}`);
+        leavePropertyConversation(propertyIdRef.current);
       }
     };
-  }, [propertyId]);
+  }, []); // Empty dependency array = only runs on unmount
 
   // TASK 5: Visibility API check
   useEffect(() => {
