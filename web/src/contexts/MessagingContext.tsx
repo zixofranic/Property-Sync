@@ -1867,6 +1867,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           [data.propertyId]: data.clientUnreadCount
         }));
         console.log('✅ CLIENT BADGE: Updated badge count for property:', data.propertyId, data.clientUnreadCount);
+
+        // BADGE FIX: Clear client badge cache to force fresh fetch on next reload
+        setCachedClientBadgeState(prev => ({
+          ...prev,
+          [data.propertyId]: data.clientUnreadCount
+        }));
       }
     });
 
@@ -1911,6 +1917,18 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
 
       console.log('✅ P2-7: Synced hierarchical badge counts to unified system');
+    });
+
+    // BADGE FIX: Listen for client badge updates
+    newSocket.on('clientUnreadCountsUpdated', (data: { counts: { [propertyId: string]: number } }) => {
+      console.log('📊 BADGE FIX: Client unread counts updated via WebSocket:', data);
+
+      // Update client badge counts directly from socket event
+      setClientUnreadCounts(data.counts || {});
+
+      // BADGE FIX: Clear cache to force fresh fetch on next reload
+      setCachedClientBadgeState({});
+      console.log('✅ BADGE FIX: Updated client badge counts and cleared cache');
     });
 
     newSocket.on('error', (error: any) => {
@@ -2801,7 +2819,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
       console.log('📡 CLIENT BADGE: Fetching from API endpoint');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v2/conversations/unread/client`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010'}/api/v2/conversations/unread/client`,
         {
           headers: {
             'X-Session-Token': sessionToken,

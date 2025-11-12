@@ -653,6 +653,9 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
 
       this.logger.log(`✅ Property message sent by ${client.userType} ${client.userId} for property ${data.propertyId}`);
 
+      // BADGE FIX: Emit badge updates after message is sent
+      await this.emitBadgeUpdatesForConversation(conversation.id, conversation.agentId, conversation.clientId);
+
     } catch (error) {
       this.logger.error('❌ Send property message error:', error);
       client.emit('message-error', {
@@ -719,6 +722,10 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
       });
 
       this.logger.log(`✅ Message sent in conversation ${data.conversationId}`);
+
+      // BADGE FIX: Emit badge updates after message is sent
+      await this.emitBadgeUpdatesForConversation(conversation.id, conversation.agentId, conversation.clientId);
+
     } catch (error) {
       this.logger.error('Send message error:', error);
       client.emit('message-error', {
@@ -796,6 +803,9 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
         success: true,
       });
 
+      // BADGE FIX: Emit badge updates after messages are marked as read
+      await this.emitBadgeUpdatesForConversation(conversation.id, conversation.agentId, conversation.clientId);
+
     } catch (error) {
       this.logger.error('❌ Mark messages read error:', error);
       client.emit('error', { message: 'Failed to mark messages as read', details: error.message });
@@ -832,6 +842,10 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
             success: true,
             propertyId: data.propertyId,
           });
+
+          // BADGE FIX: Emit badge updates after messages are marked as read
+          await this.emitBadgeUpdatesForConversation(conversation.id, conversation.agentId, conversation.clientId);
+
         } catch (error) {
           this.logger.error('Failed to mark property messages as read:', error);
           // Don't fail silently for property-based reads
@@ -860,6 +874,10 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
           success: true,
           conversationId: data.conversationId,
         });
+
+        // BADGE FIX: Emit badge updates after messages are marked as read
+        const conversation = await this.conversationService.getConversationById(data.conversationId);
+        await this.emitBadgeUpdatesForConversation(conversation.id, conversation.agentId, conversation.clientId);
       } else {
         throw new Error('Either propertyId or conversationId must be provided');
       }
@@ -936,6 +954,46 @@ export class WebSocketV2Gateway implements OnGatewayConnection, OnGatewayDisconn
   // Helper method to broadcast property-specific notifications
   broadcastPropertyNotification(timelineId: string, notification: any) {
     this.server.to(`timeline:${timelineId}`).emit('property-notification', notification);
+  }
+
+  // BADGE FIX: Helper method to emit badge updates for a conversation
+  private async emitBadgeUpdatesForConversation(conversationId: string, agentId: string, clientId: string) {
+    try {
+      this.logger.log(`📊 BADGE FIX: Emitting badge updates for conversation ${conversationId}`);
+
+      // Get updated conversation with fresh unread counts
+      const updatedConversation = await this.conversationService.getConversationById(conversationId);
+
+      // Emit per-property badge update to both agent and client rooms
+      this.server.to(`property:${updatedConversation.propertyId}`).emit('unreadCountsUpdated', {
+        propertyId: updatedConversation.propertyId,
+        agentUnreadCount: updatedConversation.unreadAgentCount,
+        clientUnreadCount: updatedConversation.unreadClientCount,
+      });
+
+      // Emit hierarchical badge update to the agent
+      try {
+        const hierarchicalCounts = await this.conversationService.getHierarchicalUnreadCounts(agentId);
+        this.server.to(`agent:${agentId}`).emit('hierarchicalUnreadCountsUpdated', hierarchicalCounts);
+        this.logger.log(`✅ BADGE FIX: Emitted hierarchical badge update to agent ${agentId}`);
+      } catch (error) {
+        this.logger.error(`❌ BADGE FIX: Failed to emit hierarchical badge update to agent ${agentId}:`, error);
+      }
+
+      // Emit client-specific badge update
+      try {
+        const clientUnreadCounts = await this.conversationService.getClientUnreadCounts(clientId);
+        this.server.to(`client:${clientId}`).emit('clientUnreadCountsUpdated', {
+          counts: clientUnreadCounts,
+        });
+        this.logger.log(`✅ BADGE FIX: Emitted client badge update to client ${clientId}`);
+      } catch (error) {
+        this.logger.error(`❌ BADGE FIX: Failed to emit client badge update to client ${clientId}:`, error);
+      }
+
+    } catch (error) {
+      this.logger.error('❌ BADGE FIX: Failed to emit badge updates:', error);
+    }
   }
 
   // SERVER-SIDE MESSAGE DEDUPLICATION: Remove duplicate messages based on ID
