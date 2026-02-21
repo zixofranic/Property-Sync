@@ -7,6 +7,9 @@ import {
   UseGuards,
   Request,
   Query,
+  Headers,
+  UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
@@ -18,11 +21,64 @@ import { TimelinesService } from '../timelines/timelines.service';
 
 @Controller('api/v1/mls')
 export class MLSParserController {
+  private readonly logger = new Logger(MLSParserController.name);
+
   constructor(
     private readonly mlsParserService: MLSParserService,
     private readonly rapidApiService: RapidAPIService,
     private readonly timelinesService: TimelinesService,
   ) {}
+
+  /**
+   * PropIQ Parse Endpoint
+   *
+   * Public endpoint for PropIQ to parse FlexMLS share links.
+   * Uses full Chromium (not serverless chromium-min) for reliable extraction.
+   * Auth: x-api-key header.
+   *
+   * POST /api/v1/mls/propiq-parse
+   * Body: { shareUrl, width?, height?, maxPhotos? }
+   * Returns: { success, rawFields, photos, photoCount }
+   */
+  @Public()
+  @Post('propiq-parse')
+  async propiqParse(
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: { shareUrl: string; width?: number; height?: number; maxPhotos?: number },
+  ) {
+    // API key auth
+    const expectedKey = process.env.PROPIQ_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid API key');
+    }
+
+    const { shareUrl, width = 1200, height = 900, maxPhotos = 50 } = body;
+
+    if (!shareUrl || typeof shareUrl !== 'string') {
+      return { success: false, error: 'shareUrl is required' };
+    }
+
+    if (!shareUrl.includes('flexmls.com') && !shareUrl.includes('flex') && !shareUrl.includes('spark')) {
+      return { success: false, error: 'URL must be a FlexMLS share link' };
+    }
+
+    try {
+      const result = await this.mlsParserService.propiqParse(shareUrl, { width, height, maxPhotos });
+      this.logger.log(`[PropIQ] Extracted ${Object.keys(result.rawFields).length} fields, ${result.photos.length} photos from ${shareUrl}`);
+      return {
+        success: true,
+        rawFields: result.rawFields,
+        photos: result.photos,
+        photoCount: result.photos.length,
+      };
+    } catch (error) {
+      this.logger.error(`[PropIQ] Parse failed: ${error.message}`, error.stack);
+      return {
+        success: false,
+        error: `Failed to parse share link: ${error.message}`,
+      };
+    }
+  }
 
   // Test browser connection (no auth required)
   @Public()

@@ -300,6 +300,202 @@ export class MLSParserService {
   }
 
   /**
+   * PropIQ-specific parse method.
+   *
+   * Uses the same browser instance but runs PropIQ's extraction logic:
+   * 1. data-listing JSON attribute (richest structured data from Spark API)
+   * 2. #tagged_listing_media JSON (all photos)
+   * 3. Text fallback for fields missed by JSON
+   *
+   * Returns raw fields + photos — PropIQ maps these to its own types.
+   */
+  async propiqParse(
+    shareUrl: string,
+    options: { width?: number; height?: number; maxPhotos?: number } = {},
+  ): Promise<{ rawFields: Record<string, string>; photos: Array<{ url: string; caption: string }> }> {
+    const { width = 1200, height = 900, maxPhotos = 50 } = options;
+
+    if (!this.browser) {
+      throw new Error('Browser not initialized');
+    }
+
+    // Verify browser is still connected
+    try {
+      await this.browser.version();
+    } catch {
+      this.logger.warn('Browser disconnected, reinitializing...');
+      await this.initBrowser();
+      if (!this.browser) throw new Error('Failed to reinitialize browser');
+    }
+
+    const page = await this.browser.newPage();
+
+    try {
+      await page.setViewport({ width: 1280, height: 800 });
+      await page.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      );
+
+      this.logger.log(`[PropIQ] Navigating to ${shareUrl}`);
+      await page.goto(shareUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+
+      // Wait for critical data elements rendered by FlexMLS JS
+      await Promise.all([
+        page.waitForSelector('[data-listing]', { timeout: 15000 }).catch(() => {}),
+        page.waitForSelector('#tagged_listing_media', { timeout: 15000 }).catch(() => {}),
+      ]);
+
+      // Wait for collapsible sections to appear
+      await page.waitForSelector('.c-collapsible__title', { timeout: 10000 }).catch(() => {});
+
+      // Expand all collapsible sections (county, basement, garage, etc.)
+      await page.evaluate(() => {
+        const titles = document.querySelectorAll('.c-collapsible__title');
+        for (const t of titles) (t as HTMLElement).click();
+      });
+
+      // Wait for expanded content to render
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Poll until data-listing has 5+ keys (full render)
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('[data-listing]');
+          if (!el) return false;
+          try {
+            const data = JSON.parse(el.getAttribute('data-listing') || '{}');
+            return Object.keys(data).length >= 5;
+          } catch { return false; }
+        },
+        { timeout: 10000 },
+      ).catch(() => {});
+
+      // Extract everything in one page.evaluate call
+      const extracted = await page.evaluate((maxP: number) => {
+        const rawFields: Record<string, string> = {};
+        const photoResults: Array<{ url: string; caption: string }> = [];
+
+        // === PRIMARY: data-listing JSON attribute ===
+        const els = document.querySelectorAll('[data-listing]');
+        for (const el of els) {
+          const jsonStr = el.getAttribute('data-listing');
+          if (!jsonStr) continue;
+          try {
+            const obj = JSON.parse(jsonStr);
+            for (const [key, val] of Object.entries(obj)) {
+              if (val != null && typeof val !== 'object') {
+                rawFields[key] = String(val);
+              }
+            }
+            break;
+          } catch { /* skip */ }
+        }
+
+        // === PRIMARY: #tagged_listing_media photos ===
+        const mediaEl = document.getElementById('tagged_listing_media');
+        if (mediaEl) {
+          try {
+            const data = JSON.parse(mediaEl.textContent || '');
+            const allMedia = data?.combined?.All;
+            if (Array.isArray(allMedia)) {
+              for (const entry of allMedia) {
+                const html = entry.html || '';
+                const srcMatch = html.match(/src="([^"]+)"/);
+                const altMatch = html.match(/alt="([^"]+)"/);
+                if (srcMatch && srcMatch[1].includes('sparkplatform.com')) {
+                  photoResults.push({
+                    url: srcMatch[1],
+                    caption: altMatch ? altMatch[1] : '',
+                  });
+                }
+              }
+            }
+          } catch { /* skip */ }
+        }
+
+        // === FALLBACK: Text extraction for fields missed by JSON ===
+        const bodyText = document.body.innerText || '';
+
+        const mlsMatch = bodyText.match(/#(\d{6,12})/);
+        if (mlsMatch && !rawFields['MlsNumber']) rawFields['MlsNumber'] = mlsMatch[1];
+
+        const priceMatch = bodyText.match(/\$[\d,]+(?:\.\d{2})?/);
+        if (priceMatch && !rawFields['ListPrice']) rawFields['ListPrice'] = priceMatch[0];
+
+        const statusMatch = bodyText.match(/\b(Active|Pending|Sold|Expired|Cancelled|Withdrawn|Under Contract)\b/i);
+        if (statusMatch && !rawFields['StandardStatus']) rawFields['StandardStatus'] = statusMatch[1];
+
+        const labelPatterns: Array<[RegExp, string]> = [
+          [/Total\s*#?\s*Bedrooms?\s*\n\s*(\d+)/i, 'BedsTotal'],
+          [/Total\s*Bathrooms?\s*\n\s*([\d.]+)/i, 'BathsTotal'],
+          [/Baths\s*-\s*Full\s*\n\s*(\d+)/i, 'BathroomsFull'],
+          [/Baths\s*-\s*1\/2\s*\n\s*(\d+)/i, 'BathroomsHalf'],
+          [/Above\s*Grade\s*Finished\s*\n\s*([\d,.]+)/i, 'AboveGradeFinished'],
+          [/Below\s*Grade\s*Finished\s*\n\s*([\d,.]+)/i, 'BelowGradeFinishedArea'],
+          [/Below\s*Grade\s*Unfin\s*\n\s*([\d,.]+)/i, 'BelowGradeUnfinished'],
+          [/SqFt\s*-\s*Total\s*Finished\s*\n\s*([\d,.]+)/i, 'BuildingAreaTotal'],
+          [/Property\s*Sub\s*Type\s*\n\s*(.+)/i, 'PropertySubType'],
+          [/HOA\s*Annual\s*\$\s*\n\s*([\d,]+)/i, 'HOAAnnual'],
+          [/Listing\s*Office\s*\n\s*(.+)/i, 'ListOfficeName'],
+          [/Listing\s*Date\s*\n\s*(.+)/i, 'ListingContractDate'],
+          [/Original\s*List\s*Price\s*\n\s*\$?([\d,]+)/i, 'OriginalListPrice'],
+          [/County\s*\n+\s*([A-Za-z]+)/i, 'CountyOrParish'],
+          [/Area\s*\n+\s*(.+)/i, 'Area'],
+          [/Zip\s*Code\s*\n\s*(\d{5})/i, 'PostalCode'],
+          [/Year\s*Built\s*\n?\s*:?\s*(\d{4})/i, 'YearBuilt'],
+          [/Garage\s*Spaces\s*\n\s*(\d+)/i, 'GarageSpaces'],
+          [/Acres\s*\n\s*([\d.]+)/i, 'LotSizeAcres'],
+          [/Total\s*Fireplaces\s*\n\s*(\d+)/i, 'Fireplaces'],
+          [/Subdivision(?:\/Condo)?\s*\n+\s*(.+)/i, 'SubdivisionName'],
+        ];
+
+        for (const [pattern, key] of labelPatterns) {
+          if (!rawFields[key]) {
+            const match = bodyText.match(pattern);
+            if (match) rawFields[key] = match[1].trim();
+          }
+        }
+
+        // Description
+        const descSection = bodyText.match(/Description\n\n([\s\S]+?)(?:\n\nLocation|\n\nListing Details|\n\nTaxes)/);
+        if (descSection) rawFields['_description'] = descSection[1].trim();
+
+        // === FALLBACK: img tags if tagged_listing_media had no photos ===
+        if (photoResults.length === 0) {
+          const imgs = document.querySelectorAll('img');
+          for (const img of imgs) {
+            const src = img.src || img.getAttribute('data-src') || '';
+            if (src.includes('sparkplatform.com') || src.includes('resize.spark')) {
+              photoResults.push({ url: src, caption: img.alt || img.title || '' });
+            }
+          }
+        }
+
+        // Deduplicate photos
+        const seen = new Set<string>();
+        const deduped = photoResults.filter((r) => {
+          const base = r.url.replace(/\/\d+x\d+\//, '/KEY/').split('?')[0];
+          if (seen.has(base)) return false;
+          seen.add(base);
+          return true;
+        }).slice(0, maxP);
+
+        return { rawFields, photos: deduped };
+      }, maxPhotos);
+
+      // Resize photo URLs to requested dimensions
+      const photos = extracted.photos.map((p) => ({
+        url: p.url.replace(/\/\d+x\d+\//, `/${width}x${height}/`),
+        caption: p.caption,
+      }));
+
+      return { rawFields: extracted.rawFields, photos };
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
    * Enhanced duplicate detection
    *
    * Checks if a property already exists for a given agent/client combination
