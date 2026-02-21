@@ -454,7 +454,7 @@ export class ConversationV2Service {
           status: 'ACTIVE',
           // BADGE FIX: Filter out soft-deleted clients
           client: {
-            deletedAt: null,
+            deletedAt: null as any,
           },
         },
         _sum: {
@@ -462,7 +462,7 @@ export class ConversationV2Service {
         },
       });
 
-      const totalUnread = result._sum.unreadAgentCount || 0;
+      const totalUnread = result._sum?.unreadAgentCount || 0;
       console.log(`✅ ISSUE 8: Total unread for agent: ${totalUnread}`);
 
       return totalUnread;
