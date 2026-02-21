@@ -452,10 +452,6 @@ export class ConversationV2Service {
         where: {
           agentId,
           status: 'ACTIVE',
-          // BADGE FIX: Filter out soft-deleted clients
-          client: {
-            deletedAt: null as any,
-          },
         },
         _sum: {
           unreadAgentCount: true,
